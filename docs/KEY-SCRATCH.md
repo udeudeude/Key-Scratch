@@ -10,7 +10,7 @@ This fork retains Ortholinear's offline glide engine and adds a local scratchpad
 - **Paste** appends clipboard text outside edit mode or inserts at the caret in edit mode.
 - **Copy** copies selected note text or the entire note.
 - **Insert** inserts the entire note into the host text field.
-- **Clear** erases the local note (currently no undo).
+- **Hold Clear** requires a long press to erase the local note (currently no undo).
 - Notes are stored in the keyboard extension's UserDefaults. Deleting the app can delete the note. They do **not** sync with other devices or the companion app.
 
 ## Known gaps
