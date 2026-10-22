@@ -53,7 +53,11 @@ final class KeyboardViewController: UIInputViewController {
         keyboard.globeButton.addTarget(self, action: #selector(handleInputModeList(from:with:)), for: .allTouchEvents)
         suggestions.snapshot = { [weak self] in self?.suggestionSnapshot() }
         suggestions.apply = { [weak self] edit, snapshot in self?.applySuggestion(edit, snapshot: snapshot) }
-        suggestions.insertWord = { [weak self] in self?.insertGlided($0) }
+        suggestions.insertWord = { [weak self] in
+            guard let self else { return nil }
+            if self.scratchpad.isEditingNote { self.scratchpad.type($0 + " "); return $0 }
+            return self.insertGlided($0)
+        }
         suggestions.glideContext = { [weak self] in self?.glideContext() }
         suggestions.switchLanguage = { [weak self] in self?.switchLanguage(to: $0) }
         keyboard.onAction = { [weak self] in self?.handle($0) }
@@ -118,6 +122,7 @@ final class KeyboardViewController: UIInputViewController {
     }
 
     private func suggestionSnapshot() -> SuggestionSnapshot? {
+        if scratchpad.isEditingNote { return nil }
         guard isViewLoaded, view.window != nil, lastKeyboardType != nil else { return nil }
         let allowed = Self.suggestionTypes
         guard allowed.contains(textDocumentProxy.keyboardType ?? .default),
@@ -140,6 +145,7 @@ final class KeyboardViewController: UIInputViewController {
     }
 
     private func glideContext() -> GlideContext? {
+        if scratchpad.isEditingNote { return nil }
         guard isViewLoaded, view.window != nil, lastKeyboardType != nil else { return nil }
         let allowed = Self.suggestionTypes
         guard allowed.contains(textDocumentProxy.keyboardType ?? .default),
@@ -315,6 +321,17 @@ final class KeyboardViewController: UIInputViewController {
     }
 
     private func handle(_ action: KeyAction) {
+        if scratchpad.isEditingNote {
+            switch action {
+            case .text(let value): scratchpad.type(inputState.consume(value))
+            case .space: scratchpad.type(" ")
+            case .enter: scratchpad.type("\n")
+            case .backspace: scratchpad.deleteBackward()
+            default: break
+            }
+            keyboard.inputState = inputState
+            return
+        }
         suggestions.cancelGlide()
         switch action {
         case .text, .space, .enter, .backspace: break
