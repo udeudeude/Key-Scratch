@@ -6,6 +6,30 @@ final class ScratchpadView: UIView {
     private let textView = UITextView()
     private let storeKey = "key-scratch.local-note.v1"
     var onInsert: ((String) -> Void)?
+    var onEditingChange: ((Bool) -> Void)?
+    private(set) var isEditingNote = false
+    private let editButton = UIButton(type: .system)
+
+    func type(_ text: String) {
+        guard isEditingNote else { return }
+        let range = textView.selectedRange
+        guard let stringRange = Range(range, in: textView.text) else { return }
+        textView.text.replaceSubrange(stringRange, with: text)
+        textView.selectedRange = NSRange(location: range.location + (text as NSString).length, length: 0)
+        save()
+    }
+
+    func deleteBackward() {
+        guard isEditingNote else { return }
+        let selection = textView.selectedRange
+        if selection.length > 0 {
+            type("")
+        } else if selection.location > 0 {
+            let prior = (textView.text as NSString).rangeOfComposedCharacterSequence(at: selection.location - 1)
+            textView.selectedRange = prior
+            type("")
+        }
+    }
 
     override init(frame: CGRect) {
         super.init(frame: frame)
@@ -17,6 +41,10 @@ final class ScratchpadView: UIView {
         toolbar.axis = .horizontal
         toolbar.spacing = 2
         toolbar.distribution = .fillEqually
+        editButton.setTitle("Edit", for: .normal)
+        editButton.titleLabel?.font = .systemFont(ofSize: 10, weight: .semibold)
+        editButton.addTarget(self, action: #selector(toggleEditing), for: .touchUpInside)
+        toolbar.addArrangedSubview(editButton)
         for (title, action) in [("Paste", #selector(pasteClipboard)),
                                 ("Copy", #selector(copyNote)),
                                 ("Insert", #selector(insertNote)),
@@ -52,10 +80,16 @@ final class ScratchpadView: UIView {
 
     required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
 
+    @objc private func toggleEditing() {
+        isEditingNote.toggle()
+        editButton.setTitle(isEditingNote ? "Done" : "Edit", for: .normal)
+        onEditingChange?(isEditingNote)
+    }
+
     @objc private func pasteClipboard() {
         guard let incoming = UIPasteboard.general.string, !incoming.isEmpty else { return }
-        textView.text = textView.text.isEmpty ? incoming : textView.text + "\n" + incoming
-        save()
+        if isEditingNote { type(incoming) }
+        else { textView.text = textView.text.isEmpty ? incoming : textView.text + "\n" + incoming; save() }
     }
 
     @objc private func copyNote() {
