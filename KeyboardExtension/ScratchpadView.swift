@@ -14,7 +14,9 @@ final class ScratchpadView: UIView {
         guard isEditingNote else { return }
         let range = textView.selectedRange
         guard let stringRange = Range(range, in: textView.text) else { return }
-        textView.text.replaceSubrange(stringRange, with: text)
+        var updated = textView.text ?? ""
+        updated.replaceSubrange(stringRange, with: text)
+        textView.text = updated
         textView.selectedRange = NSRange(location: range.location + (text as NSString).length, length: 0)
         save()
     }
