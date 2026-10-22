@@ -323,14 +323,12 @@ final class KeyboardViewController: UIInputViewController {
     private func handle(_ action: KeyAction) {
         if scratchpad.isEditingNote {
             switch action {
-            case .text(let value): scratchpad.type(inputState.consume(value))
-            case .space: scratchpad.type(" ")
-            case .enter: scratchpad.type("\n")
-            case .backspace: scratchpad.deleteBackward()
+            case .text(let value): scratchpad.type(inputState.consume(value)); keyboard.inputState = inputState; return
+            case .space: scratchpad.type(" "); return
+            case .enter: scratchpad.type("\n"); return
+            case .backspace: scratchpad.deleteBackward(); return
             default: break
             }
-            keyboard.inputState = inputState
-            return
         }
         suggestions.cancelGlide()
         switch action {
