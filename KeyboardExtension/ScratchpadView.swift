@@ -62,6 +62,9 @@ final class ScratchpadView: UIView {
         textView.backgroundColor = .clear
         textView.isEditable = false
         textView.isSelectable = true
+        let caretTap = UITapGestureRecognizer(target: self, action: #selector(positionCaret(_:)))
+        caretTap.cancelsTouchesInView = false
+        textView.addGestureRecognizer(caretTap)
         textView.textContainerInset = UIEdgeInsets(top: 4, left: 2, bottom: 4, right: 2)
         textView.text = UserDefaults.standard.string(forKey: storeKey) ?? ""
         textView.accessibilityLabel = "Saved scratchpad note"
@@ -82,9 +85,18 @@ final class ScratchpadView: UIView {
 
     required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
 
+    @objc private func positionCaret(_ recognizer: UITapGestureRecognizer) {
+        guard isEditingNote else { return }
+        let point = recognizer.location(in: textView)
+        if let position = textView.closestPosition(to: point) {
+            textView.selectedTextRange = textView.textRange(from: position, to: position)
+        }
+    }
+
     @objc private func toggleEditing() {
         isEditingNote.toggle()
         editButton.setTitle(isEditingNote ? "Done" : "Edit", for: .normal)
+        textView.tintColor = isEditingNote ? .systemBlue : .secondaryLabel
         onEditingChange?(isEditingNote)
     }
 
