@@ -2,6 +2,8 @@ import UIKit
 
 final class KeyboardViewController: UIInputViewController {
     private let keyboard = KeyboardView()
+    private let scratchpad = ScratchpadView()
+    private var scratchpadWidth: NSLayoutConstraint?
     private var heightConstraint: NSLayoutConstraint?
     private var inputState = InputState()
     private var punctuationSpacing = PunctuationSpacing()
@@ -30,8 +32,16 @@ final class KeyboardViewController: UIInputViewController {
         keyboard.accessibilityIdentifier = "system-keyboard-surface"
         keyboard.translatesAutoresizingMaskIntoConstraints = false
         view.addSubview(keyboard)
+        scratchpad.translatesAutoresizingMaskIntoConstraints = false
+        view.addSubview(scratchpad)
+        scratchpadWidth = scratchpad.widthAnchor.constraint(equalTo: view.widthAnchor, multiplier: 0.30)
+        scratchpadWidth?.isActive = true
+        scratchpad.onInsert = { [weak self] text in self?.textDocumentProxy.insertText(text) }
         NSLayoutConstraint.activate([
-            keyboard.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            scratchpad.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            scratchpad.topAnchor.constraint(equalTo: view.topAnchor),
+            scratchpad.bottomAnchor.constraint(equalTo: view.bottomAnchor),
+            keyboard.leadingAnchor.constraint(equalTo: scratchpad.trailingAnchor),
             keyboard.trailingAnchor.constraint(equalTo: view.trailingAnchor),
             keyboard.topAnchor.constraint(equalTo: view.topAnchor),
             keyboard.bottomAnchor.constraint(equalTo: view.bottomAnchor)
