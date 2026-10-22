@@ -40,13 +40,20 @@ final class ScratchpadView: UIView {
         layer.borderWidth = 0.5
 
         let toolbar = UIStackView()
-        toolbar.axis = .horizontal
-        toolbar.spacing = 2
-        toolbar.distribution = .fillEqually
+        toolbar.axis = .vertical
+        toolbar.spacing = 1
+        let topRow = UIStackView()
+        topRow.axis = .horizontal
+        topRow.distribution = .fillEqually
+        let bottomRow = UIStackView()
+        bottomRow.axis = .horizontal
+        bottomRow.distribution = .fillEqually
+        toolbar.addArrangedSubview(topRow)
+        toolbar.addArrangedSubview(bottomRow)
         editButton.setTitle("Edit", for: .normal)
         editButton.titleLabel?.font = .systemFont(ofSize: 10, weight: .semibold)
         editButton.addTarget(self, action: #selector(toggleEditing), for: .touchUpInside)
-        toolbar.addArrangedSubview(editButton)
+        topRow.addArrangedSubview(editButton)
         for (title, action) in [("Paste", #selector(pasteClipboard)),
                                 ("Copy", #selector(copyNote)),
                                 ("Insert", #selector(insertNote)),
@@ -55,7 +62,8 @@ final class ScratchpadView: UIView {
             button.setTitle(title, for: .normal)
             button.titleLabel?.font = .systemFont(ofSize: 9, weight: .semibold)
             button.addTarget(self, action: action, for: .touchUpInside)
-            toolbar.addArrangedSubview(button)
+            if title == "Insert" { topRow.addArrangedSubview(button) }
+            else { bottomRow.addArrangedSubview(button) }
         }
 
         textView.font = .monospacedSystemFont(ofSize: 10, weight: .regular)
@@ -79,7 +87,7 @@ final class ScratchpadView: UIView {
             stack.trailingAnchor.constraint(equalTo: trailingAnchor),
             stack.topAnchor.constraint(equalTo: topAnchor),
             stack.bottomAnchor.constraint(equalTo: bottomAnchor),
-            toolbar.heightAnchor.constraint(equalToConstant: 28)
+            toolbar.heightAnchor.constraint(equalToConstant: 48)
         ])
     }
 
