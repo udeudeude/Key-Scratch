@@ -56,8 +56,7 @@ final class ScratchpadView: UIView {
         topRow.addArrangedSubview(editButton)
         for (title, action) in [("Paste", #selector(pasteClipboard)),
                                 ("Copy", #selector(copyNote)),
-                                ("Insert", #selector(insertNote)),
-                                ("Clear", #selector(clearNote))] {
+                                ("Insert", #selector(insertNote))] {
             let button = UIButton(type: .system)
             button.setTitle(title, for: .normal)
             button.titleLabel?.font = .systemFont(ofSize: 9, weight: .semibold)
@@ -65,6 +64,12 @@ final class ScratchpadView: UIView {
             if title == "Insert" { topRow.addArrangedSubview(button) }
             else { bottomRow.addArrangedSubview(button) }
         }
+
+        let clearButton = UIButton(type: .system)
+        clearButton.setTitle("Hold Clear", for: .normal)
+        clearButton.titleLabel?.font = .systemFont(ofSize: 9, weight: .semibold)
+        clearButton.addGestureRecognizer(UILongPressGestureRecognizer(target: self, action: #selector(clearNoteOnHold(_:))))
+        bottomRow.addArrangedSubview(clearButton)
 
         textView.font = .monospacedSystemFont(ofSize: 10, weight: .regular)
         textView.backgroundColor = .clear
@@ -126,7 +131,8 @@ final class ScratchpadView: UIView {
         onInsert?(textView.text)
     }
 
-    @objc private func clearNote() {
+    @objc private func clearNoteOnHold(_ recognizer: UILongPressGestureRecognizer) {
+        guard recognizer.state == .began else { return }
         textView.text = ""
         save()
     }
