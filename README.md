@@ -1,3 +1,5 @@
+> **Key Scratch fork:** Experimental local notes panel alongside Ortholinear. See [Key Scratch build and testing instructions](docs/KEY-SCRATCH.md). Work in progress on `feature/scratchpad-first-pass`.
+
 # Ortholinear
 
 A native, private Ukrainian + English keyboard for iPhone and iPad, with 13 optional layouts: Polish, German, French, Spanish, Czech, Slovak, Croatian/Bosnian/Montenegrin/Serbian (Latin and Cyrillic), Swedish, Norwegian, Danish, Dutch, and Russian. Straight rows, equal character cells, and configurable geometry. Swift 6, iOS 17+, UIKit keyboard extension, SwiftUI containing app. No third-party runtime code dependencies; bundled language data has separate licenses.

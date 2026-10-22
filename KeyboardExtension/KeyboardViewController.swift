@@ -2,6 +2,8 @@ import UIKit
 
 final class KeyboardViewController: UIInputViewController {
     private let keyboard = KeyboardView()
+    private let scratchpad = ScratchpadView()
+    private var scratchpadWidth: NSLayoutConstraint?
     private var heightConstraint: NSLayoutConstraint?
     private var inputState = InputState()
     private var punctuationSpacing = PunctuationSpacing()
@@ -30,8 +32,16 @@ final class KeyboardViewController: UIInputViewController {
         keyboard.accessibilityIdentifier = "system-keyboard-surface"
         keyboard.translatesAutoresizingMaskIntoConstraints = false
         view.addSubview(keyboard)
+        scratchpad.translatesAutoresizingMaskIntoConstraints = false
+        view.addSubview(scratchpad)
+        scratchpadWidth = scratchpad.widthAnchor.constraint(equalTo: view.widthAnchor, multiplier: 0.30)
+        scratchpadWidth?.isActive = true
+        scratchpad.onInsert = { [weak self] text in self?.textDocumentProxy.insertText(text) }
         NSLayoutConstraint.activate([
-            keyboard.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            scratchpad.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            scratchpad.topAnchor.constraint(equalTo: view.topAnchor),
+            scratchpad.bottomAnchor.constraint(equalTo: view.bottomAnchor),
+            keyboard.leadingAnchor.constraint(equalTo: scratchpad.trailingAnchor),
             keyboard.trailingAnchor.constraint(equalTo: view.trailingAnchor),
             keyboard.topAnchor.constraint(equalTo: view.topAnchor),
             keyboard.bottomAnchor.constraint(equalTo: view.bottomAnchor)
@@ -43,7 +53,11 @@ final class KeyboardViewController: UIInputViewController {
         keyboard.globeButton.addTarget(self, action: #selector(handleInputModeList(from:with:)), for: .allTouchEvents)
         suggestions.snapshot = { [weak self] in self?.suggestionSnapshot() }
         suggestions.apply = { [weak self] edit, snapshot in self?.applySuggestion(edit, snapshot: snapshot) }
-        suggestions.insertWord = { [weak self] in self?.insertGlided($0) }
+        suggestions.insertWord = { [weak self] in
+            guard let self else { return nil }
+            if self.scratchpad.isEditingNote { self.scratchpad.type($0 + " "); return $0 }
+            return self.insertGlided($0)
+        }
         suggestions.glideContext = { [weak self] in self?.glideContext() }
         suggestions.switchLanguage = { [weak self] in self?.switchLanguage(to: $0) }
         keyboard.onAction = { [weak self] in self?.handle($0) }
@@ -108,6 +122,7 @@ final class KeyboardViewController: UIInputViewController {
     }
 
     private func suggestionSnapshot() -> SuggestionSnapshot? {
+        if scratchpad.isEditingNote { return nil }
         guard isViewLoaded, view.window != nil, lastKeyboardType != nil else { return nil }
         let allowed = Self.suggestionTypes
         guard allowed.contains(textDocumentProxy.keyboardType ?? .default),
@@ -130,6 +145,7 @@ final class KeyboardViewController: UIInputViewController {
     }
 
     private func glideContext() -> GlideContext? {
+        if scratchpad.isEditingNote { return nil }
         guard isViewLoaded, view.window != nil, lastKeyboardType != nil else { return nil }
         let allowed = Self.suggestionTypes
         guard allowed.contains(textDocumentProxy.keyboardType ?? .default),
@@ -305,6 +321,15 @@ final class KeyboardViewController: UIInputViewController {
     }
 
     private func handle(_ action: KeyAction) {
+        if scratchpad.isEditingNote {
+            switch action {
+            case .text(let value): scratchpad.type(inputState.consume(value)); keyboard.inputState = inputState; return
+            case .space: scratchpad.type(" "); return
+            case .enter: scratchpad.type("\n"); return
+            case .backspace: scratchpad.deleteBackward(); return
+            default: break
+            }
+        }
         suggestions.cancelGlide()
         switch action {
         case .text, .space, .enter, .backspace: break
