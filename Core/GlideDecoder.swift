@@ -59,11 +59,14 @@ struct GlideDecoder: Sendable {
             uniqueRows.insert(halfRow)
         }
         let ys = uniqueRows.sorted()
-        var pitch = geometry.unit
+        var smallestPitch: CGFloat?
         for index in 1..<ys.count {
             let separation = ys[index] - ys[index - 1]
-            if separation > 1 && (pitch <= 1 || separation < pitch) { pitch = separation }
+            if separation > 1 {
+                smallestPitch = min(smallestPitch ?? separation, separation)
+            }
         }
+        let pitch = smallestPitch ?? geometry.unit
         scale = SIMD2(1 / max(geometry.unit, 1), 1 / max(pitch, 1))
         var keyIndex: [Unicode.Scalar: Int] = [:], keys: [SIMD2<Double>] = []
         for (letter, center) in geometry.centers.sorted(by: { $0.key < $1.key }) {
