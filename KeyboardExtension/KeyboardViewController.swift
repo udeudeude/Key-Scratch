@@ -253,32 +253,110 @@ final class KeyboardViewController: UIInputViewController {
         keyboard.inputState = inputState
     }
 
+    /// Inserts exactly one separator *after* the word, the behavior iOS users
+    /// expect when a swipe is immediately followed by individual key taps.
+    /// A punctuation mark can replace that separator; Delete can remove the
+    /// entire most recent glide rather than a single letter.
     private func insertGlided(_ word: String) -> String? {
         guard isViewLoaded, inputState.page == .letters else { return nil }
         applyingSuggestion = true
         defer { applyingSuggestion = false }
-        var text = word
+        var text = inputState.language == .english && word == "i" ? "I" : word
         switch inputState.shift {
-        case .once: text = word.prefix(1).uppercased() + word.dropFirst(); inputState.shift = .off; autoShifted = false
-        case .locked: text = word.uppercased()
+        case .once:
+            text = text.prefix(1).uppercased() + text.dropFirst()
+            inputState.shift = .off
+            autoShifted = false
+        case .locked: text = text.uppercased()
         case .off: break
         }
         expander.forget()
-        // A glide is directed to whichever destination is currently active.
-        if scratchpad.isEditingNote {
-            let needsSpace = scratchpad.beforeCaret.last.map { !$0.isWhitespace && !"([{«„“'\"".contains($0) } ?? false
-            scratchpad.type((needsSpace ? " " : "") + text)
-            updateAutoShift()
-            keyboard.inputState = inputState
-            return text
+        let inNotes = scratchpad.isEditingNote
+        let before = inNotes ? scratchpad.beforeCaret : (textDocumentProxy.documentContextBeforeInput ?? "")
+        let after = inNotes ? scratchpad.afterCaret : (textDocumentProxy.documentContextAfterInput ?? "")
+        let selected = inNotes ? scratchpad.selectedNoteText : (textDocumentProxy.selectedText ?? "")
+        let needsLeadingSpace = selected.isEmpty && before.last.map {
+            !$0.isWhitespace && !"([{«„“'\"".contains($0)
+        } ?? false
+        let needsTrailingSpace = after.first.map {
+            !$0.isWhitespace && !".,!?;:)]}\"'".contains($0)
+        } ?? true
+        let inserted = (needsLeadingSpace ? " " : "") + text + (needsTrailingSpace ? " " : "")
+        pendingGlide = (inserted, inNotes)
+        if inNotes {
+            noteSpacing.reset()
+            scratchpad.type(inserted)
+            if needsTrailingSpace {
+                noteSpacing.adoptSpace(before: scratchpad.beforeCaret)
+            }
+        } else {
+            punctuationSpacing.reset()
+            textDocumentProxy.insertText(inserted)
+            if needsTrailingSpace {
+                // Time 0 ensures a first explicit space accepts the automatic one
+                // without accidentally triggering the two-space period shortcut.
+                punctuationSpacing.adoptSpace(
+                    before: textDocumentProxy.documentContextBeforeInput ?? "")
+            }
         }
-        // Glides are whole words: separate them from the word or mark before.
-        let needsSpace = textDocumentProxy.documentContextBeforeInput?.last.map { !$0.isWhitespace && !"([{«„“'\"".contains($0) } ?? false
-        punctuationSpacing.reset()
-        textDocumentProxy.insertText((needsSpace ? " " : "") + text)
         updateAutoShift()
         keyboard.inputState = inputState
         return text
+    }
+
+    /// The first Delete after a glide removes exactly that just-inserted word.
+    /// If the host edited its text meanwhile, the suffix check fails safely.
+    private func deleteRecentGlide(inNotes: Bool) -> Bool {
+        guard let pendingGlide, pendingGlide.inNotes == inNotes else { return false }
+        let before = inNotes ? scratchpad.beforeCaret : (textDocumentProxy.documentContextBeforeInput ?? "")
+        let selected = inNotes ? scratchpad.selectedNoteText : (textDocumentProxy.selectedText ?? "")
+        guard selected.isEmpty, before.hasSuffix(pendingGlide.inserted) else {
+            self.pendingGlide = nil
+            return false
+        }
+        if inNotes {
+            scratchpad.replaceBeforeCaret(characters: pendingGlide.inserted.count, with: "")
+            noteSpacing.reset()
+        } else {
+            for _ in pendingGlide.inserted { textDocumentProxy.deleteBackward() }
+            punctuationSpacing.reset()
+        }
+        self.pendingGlide = nil
+        return true
+    }
+
+    /// Automatically capitalize English's standalone pronoun, including "i'm".
+    /// Delay replacement until the following delimiter so "inside" remains
+    /// lowercase while the user types it one character at a time.
+    private func capitalizeStandaloneI(before: String, incoming: String, inNotes: Bool) {
+        guard inputState.language == .english, before.last == "i",
+              incoming == " " || incoming == "\n" || incoming == "'" || incoming == "’"
+                  || incoming == "." || incoming == "," || incoming == "!" || incoming == "?" else { return }
+        let previous = before.dropLast().last
+        guard previous == nil || !(previous!.isLetter || previous!.isNumber) else { return }
+        if inNotes {
+            scratchpad.replaceBeforeCaret(characters: 1, with: "I")
+        } else {
+            textDocumentProxy.deleteBackward()
+            textDocumentProxy.insertText("I")
+        }
+    }
+
+    /// Punctuation spacing, the double-space period, and text replacements
+    /// follow the same rules in the scratchpad as in the host app.
+    @discardableResult
+    private func insertNote(_ value: String) -> String {
+        let before = scratchpad.beforeCaret
+        capitalizeStandaloneI(before: before, incoming: value, inNotes: true)
+        let prefs = keyboard.preferences
+        let edit = noteSpacing.edit(for: value, before: scratchpad.beforeCaret,
+                                    enabled: prefs.autoSpacePunctuation,
+                                    doubleSpacePeriod: prefs.doubleSpacePeriod,
+                                    at: ProcessInfo.processInfo.systemUptime,
+                                    shortcutStarts: availableExpansions.shortcutStarts)
+        if edit.deleteBackward { scratchpad.deleteBackward() }
+        if !edit.text.isEmpty { scratchpad.type(edit.text) }
+        return edit.text
     }
 
     private func switchLanguage(to language: KeyboardLanguage) {
