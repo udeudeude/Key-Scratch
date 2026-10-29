@@ -385,13 +385,22 @@ final class SuggestionCoordinator {
         keyboard.onGlide = { [weak self] points in self?.glide(points) }
     }
 
+    /// Warm the swipe dictionary as soon as the active language is known,
+    /// rather than at the first finger lift. Never put this on the main actor.
+    func prepareGlide(for language: KeyboardLanguage) {
+        guard language.dictionaryCode != nil else { return }
+        Task(priority: .userInitiated) { [fastGlideWorker] in
+            await fastGlideWorker.prepare(language)
+        }
+    }
+
     /// A new keyboard appearance may show a tip again, up to its limit.
     func beginSession() {
         cancelGlide()
         tipChosen = false
         sessionTip = nil
-        if let language = keyboard?.inputState.language, language.dictionaryCode != nil {
-            Task(priority: .utility) { [fastGlideWorker] in await fastGlideWorker.prepare(language) }
+        if let language = keyboard?.inputState.language {
+            prepareGlide(for: language)
         }
     }
 
