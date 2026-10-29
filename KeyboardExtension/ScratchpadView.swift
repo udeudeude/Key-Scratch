@@ -174,7 +174,11 @@ final class ScratchpadView: UIView, UITextViewDelegate {
         erase.addGestureRecognizer(UILongPressGestureRecognizer(target: self, action: #selector(clearNoteOnHold(_:))))
         bottom.addArrangedSubview(erase)
 
-        editor.font = .monospacedSystemFont(ofSize: 10, weight: .regular)
+        // San Francisco's text cut is optically tuned for tiny point sizes,
+        // with less wasted width than the previous monospaced face.
+        editor.font = .systemFont(ofSize: 11, weight: .medium)
+        editor.textColor = .label
+        editor.textContainer.lineFragmentPadding = 1
         editor.backgroundColor = .clear
         editor.isEditable = false
         editor.isSelectable = true
@@ -184,7 +188,7 @@ final class ScratchpadView: UIView, UITextViewDelegate {
         caret.isHidden = true
         caret.isUserInteractionEnabled = false
         editor.addSubview(caret)
-        editor.textContainerInset = UIEdgeInsets(top: 4, left: 2, bottom: 4, right: 2)
+        editor.textContainerInset = UIEdgeInsets(top: 2, left: 2, bottom: 2, right: 2)
         editor.text = UserDefaults.standard.string(forKey: storeKey) ?? ""
         editor.accessibilityLabel = "Scratchpad note. Tap to type with Key Scratch."
         let tap = UITapGestureRecognizer(target: self, action: #selector(noteTapped(_:)))
@@ -206,7 +210,7 @@ final class ScratchpadView: UIView, UITextViewDelegate {
             stack.trailingAnchor.constraint(equalTo: trailingAnchor),
             stack.topAnchor.constraint(equalTo: topAnchor),
             stack.bottomAnchor.constraint(equalTo: bottomAnchor),
-            toolbar.heightAnchor.constraint(equalToConstant: 48)
+            toolbar.heightAnchor.constraint(equalToConstant: 42)
         ])
     }
 
