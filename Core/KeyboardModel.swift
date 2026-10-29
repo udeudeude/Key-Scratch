@@ -469,11 +469,12 @@ enum KeyboardLayout {
 /// Configurations for controlled Key Scratch experiments. Colors are identifiers,
 /// not a new keyboard theme. The mode is persisted with ordinary keyboard settings.
 enum KeyScratchMode: String, Codable, CaseIterable, Identifiable, Sendable {
-    case reference, split, quiet, narrow
+    case reference, legacy, split, quiet, narrow
     var id: String { rawValue }
     var colorName: String {
         switch self {
         case .reference: "Blue"
+        case .legacy: "Red"
         case .split: "Green"
         case .quiet: "Amber"
         case .narrow: "Purple"
@@ -482,6 +483,7 @@ enum KeyScratchMode: String, Codable, CaseIterable, Identifiable, Sendable {
     var shortName: String {
         switch self {
         case .reference: "Full width"
+        case .legacy: "Shared split"
         case .split: "Split"
         case .quiet: "Quiet"
         case .narrow: "Narrow notes"
@@ -490,7 +492,8 @@ enum KeyScratchMode: String, Codable, CaseIterable, Identifiable, Sendable {
     var title: String { colorName + " · " + shortName }
     var purpose: String {
         switch self {
-        case .reference: "No notes panel; the original shared glide worker. Measures baseline latency."
+        case .reference: "No notes panel; original shared swipe worker. Full-width reference."
+        case .legacy: "Same notes width as Green, but original swipe worker; isolates worker latency."
         case .split: "Notes on the left; swipe processing has its own priority worker."
         case .quiet: "Same split as Green but pauses live word suggestions to test contention."
         case .narrow: "Smaller notes panel than Green, leaving more room for swipe gestures."
@@ -499,6 +502,7 @@ enum KeyScratchMode: String, Codable, CaseIterable, Identifiable, Sendable {
     var colorHex: UInt32 {
         switch self {
         case .reference: 0x2869BA
+        case .legacy: 0xB13E49
         case .split: 0x23765A
         case .quiet: 0xB57917
         case .narrow: 0x8056AD
@@ -507,11 +511,11 @@ enum KeyScratchMode: String, Codable, CaseIterable, Identifiable, Sendable {
     func noteFraction(userWidth: Double) -> Double {
         switch self {
         case .reference: 0
-        case .split, .quiet: userWidth
+        case .legacy, .split, .quiet: userWidth
         case .narrow: max(0.16, userWidth - 0.10)
         }
     }
-    var usesDedicatedGlide: Bool { self != .reference }
+    var usesDedicatedGlide: Bool { self != .reference && self != .legacy }
     var hasLiveSuggestions: Bool { self != .quiet }
 }
 
