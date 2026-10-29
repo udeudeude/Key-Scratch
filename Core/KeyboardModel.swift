@@ -534,7 +534,7 @@ struct KeyboardPreferences: Codable, Equatable, Sendable {
     var columnSpacing: Double = 2
     var rowSpacing: Double = 2
     var fillGaps: Bool = true
-    var defaultLanguage: KeyboardLanguage = .english
+    var defaultLanguage: KeyboardLanguage = .ukrainian
     var controlHeight: Double = 48
     var letterSize: Double = 24
     var actionKeyWidth: Double = 2.4
@@ -561,7 +561,7 @@ struct KeyboardPreferences: Codable, Equatable, Sendable {
     var contextualSuggestions: Bool = true
 
     /// The languages the language key cycles through, in `allCases` order.
-    var languages: [KeyboardLanguage] = [.english]
+    var languages: [KeyboardLanguage] = [.ukrainian, .english]
     var englishLayout: EnglishLayout = .qwerty
     var rememberLanguage: Bool = true
     /// Bumped to make the keyboard forget remembered languages; see LanguageMemory.
@@ -708,7 +708,7 @@ extension KeyboardPreferences {
         // Legacy Ortholinear configurations using untouched factory geometry migrate
         // to Key Scratch's more compact defaults. Deliberately customized sizes survive.
         if !c.contains(.schemaVersion), keyHeight == 48 { keyHeight = 72 }
-        // Older installs keep language preferences; new installs start with English.
+        // Retain upstream language defaults. The Lab offers one-tap English-only mode.
         if keyHeight == 72 && controlHeight == 56 && rowSpacing == 3 && letterSize == 28 {
             keyHeight = 62
             controlHeight = 48
