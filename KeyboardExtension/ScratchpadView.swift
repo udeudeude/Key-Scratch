@@ -10,6 +10,10 @@ import UIKit
 final class ScratchpadView: UIView, UITextViewDelegate, UIEditMenuInteractionDelegate {
     private let editor = UITextView()
     private let caret = UIView()
+    /// UITextView's native selection highlight can disappear when the view is
+    /// deliberately non-first-responder inside a keyboard extension.
+    /// Show selectionRects in iOS blue without changing the selected text.
+    private var selectionHighlights: [UIView] = []
     private lazy var editMenu = UIEditMenuInteraction(delegate: self)
     private let returnToApp = UIButton(type: .system)
     private let message = UILabel()
@@ -208,6 +212,7 @@ final class ScratchpadView: UIView, UITextViewDelegate, UIEditMenuInteractionDel
         // with less wasted width than the previous monospaced face.
         editor.font = .systemFont(ofSize: 11, weight: .medium)
         editor.textColor = .label
+        editor.tintColor = .systemBlue
         editor.textContainer.lineFragmentPadding = 1
         editor.backgroundColor = .clear
         editor.isEditable = false
@@ -334,6 +339,7 @@ final class ScratchpadView: UIView, UITextViewDelegate, UIEditMenuInteractionDel
     }
 
     private func updateCaret() {
+        updateSelectionHighlights()
         guard isEditingNote, let selection = editor.selectedTextRange,
               selection.isEmpty else {
             caret.isHidden = true
@@ -346,6 +352,42 @@ final class ScratchpadView: UIView, UITextViewDelegate, UIEditMenuInteractionDel
         }
         caret.frame = CGRect(x: rect.minX, y: rect.minY, width: 1.5, height: max(rect.height, 12))
         caret.isHidden = false
+    }
+
+    /// Reuse lightweight overlays instead of rewriting attributedText, which
+    /// would destroy the selected range or cause nested UITextView delegate calls.
+    private func updateSelectionHighlights() {
+        let selected = safeSelection()
+        guard isEditingNote, selected.length > 0,
+              let start = editor.position(from: editor.beginningOfDocument, offset: selected.location),
+              let end = editor.position(from: start, offset: selected.length),
+              let range = editor.textRange(from: start, to: end) else {
+            selectionHighlights.forEach { $0.isHidden = true }
+            return
+        }
+        let highlights = editor.selectionRects(for: range)
+            .map(\.rect)
+            .filter { $0.width > 0.5 && $0.height > 1 && $0.minX.isFinite && $0.minY.isFinite }
+            .prefix(80)
+        for (index, rect) in highlights.enumerated() {
+            let overlay: UIView
+            if index < selectionHighlights.count {
+                overlay = selectionHighlights[index]
+            } else {
+                overlay = UIView()
+                overlay.backgroundColor = UIColor.systemBlue.withAlphaComponent(0.26)
+                overlay.isUserInteractionEnabled = false
+                editor.addSubview(overlay)
+                selectionHighlights.append(overlay)
+            }
+            // UITextInput selection rectangles are already in UITextView coordinates.
+            overlay.frame = rect.intersection(editor.bounds)
+            overlay.isHidden = overlay.frame.isNull || overlay.frame.isEmpty
+        }
+        for index in highlights.count..<selectionHighlights.count {
+            selectionHighlights[index].isHidden = true
+        }
+        editor.bringSubviewToFront(caret)
     }
 
     /// Hold a finger on a word to select it and display iOS's floating edit menu.
