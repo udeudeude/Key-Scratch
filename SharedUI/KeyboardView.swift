@@ -40,6 +40,7 @@ final class KeyboardView: UIControl {
     var glideEnabled = false { didSet { if !glideEnabled { for id in sessions.keys { sessions[id]?.trace = nil } } } }
     var onAction: ((KeyAction) -> Void)?
     var onCursor: ((Int) -> Void)?
+    var onCursorVertical: ((Int) -> Void)?
     var onDismiss: (() -> Void)?
     var onGlide: (([CGPoint]) -> Void)?
     var onGesture: ((KeyboardGesture) -> Void)?
@@ -71,6 +72,7 @@ final class KeyboardView: UIControl {
         let start: CGPoint
         var began = ProcessInfo.processInfo.systemUptime
         var cursorSteps = 0
+        var cursorRows = 0
         var cursorMode = false
         var timer: Timer?
         var startCell: Int
@@ -483,8 +485,9 @@ final class KeyboardView: UIControl {
             }
             sessions[id] = session
             if key.action == .backspace { emit(.backspace) }
-            if key.action == .backspace || !key.alternatives.isEmpty {
-                let delay = key.action == .backspace ? DeleteRepeat.initialDelay : 0.42
+            if key.action == .backspace || key.action == .space || !key.alternatives.isEmpty {
+                let delay = key.action == .backspace ? DeleteRepeat.initialDelay
+                    : (key.action == .space ? 0.32 : 0.42)
                 let timer = Timer(timeInterval: delay, repeats: false) { [weak self] _ in
                     MainActor.assumeIsolated { self?.beginHold(id: id, key: key) }
                 }
@@ -499,6 +502,9 @@ final class KeyboardView: UIControl {
         guard sessions[id] != nil else { return }
         if key.action == .backspace {
             repeatDelete(id: id)
+        } else if key.action == .space {
+            sessions[id]?.cursorMode = true
+            setNeedsDisplay()
         } else if popup == nil {
             sessions[id]?.trace = nil
             popup = (id, key.alternatives, 0)
@@ -557,13 +563,20 @@ final class KeyboardView: UIControl {
                 continue
             }
             if session.original == .space {
-                let delta = point.x - session.start.x
-                if abs(delta) >= 12 { session.cursorMode = true }
+                let dx = point.x - session.start.x
+                let dy = point.y - session.start.y
+                if hypot(dx, dy) >= 12 { session.cursorMode = true }
                 if session.cursorMode {
-                    let steps = Int(delta / 12)
-                    let offset = steps - session.cursorSteps
-                    if offset != 0 { onCursor?(offset) }
-                    session.cursorSteps = steps
+                    session.timer?.invalidate()
+                    session.timer = nil
+                    let horizontal = Int(dx / 12)
+                    let vertical = Int(dy / 20)
+                    let xSteps = horizontal - session.cursorSteps
+                    let yRows = vertical - session.cursorRows
+                    if xSteps != 0 { onCursor?(xSteps) }
+                    if yRows != 0 { onCursorVertical?(yRows) }
+                    session.cursorSteps = horizontal
+                    session.cursorRows = vertical
                     sessions[id] = session
                     continue
                 }
