@@ -32,6 +32,7 @@ fetch() {
 }
 
 fetch "Core/KeyboardModel.swift"
+fetch "App/ContentView.swift"
 fetch "KeyboardExtension/ScratchpadView.swift"
 fetch "KeyboardExtension/KeyboardViewController.swift"
 fetch "SharedUI/SuggestionBar.swift"
@@ -41,4 +42,6 @@ fetch "App/Info.plist"
 echo ""
 echo "Updated. Keep your existing Xcode project and signing team."
 echo "In Xcode: Product > Clean Build Folder, then Run (Command-R)."
-echo "On iPhone: Settings > General > Keyboard > Keyboards > Key Scratch > Allow Full Access for clipboard."
+echo "Open Key Scratch on iPhone: Experiment Lab > choose a color > Apply and test."
+echo "Use the globe key to select Key Scratch again after a settings change."
+echo "Clipboard is optional: Settings > General > Keyboard > Keyboards > Key Scratch > Allow Full Access."
