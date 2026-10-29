@@ -5,9 +5,11 @@ import CoreGraphics
 final class KeyboardCoreTests: XCTestCase {
     func testOptionalYiLongPressPreservesAlphabetAndWidensFirstRow() throws {
         let defaults = KeyboardPreferences()
+        var ukrainianState = InputState()
+        ukrainianState.language = .ukrainian
         var preferences = defaults
         preferences.yiOnLongPress = true
-        let rows = KeyboardLayout.rows(state: InputState(), needsGlobe: false, preferences: preferences)
+        let rows = KeyboardLayout.rows(state: ukrainianState, needsGlobe: false, preferences: preferences)
         XCTAssertEqual(rows[0].count, 11)
         let keys = rows.flatMap { $0 }
         XCTAssertFalse(keys.contains { $0.action == .text("ї") })
@@ -17,8 +19,8 @@ final class KeyboardCoreTests: XCTestCase {
             return []
         }
         XCTAssertEqual(Set(available), Set("абвгґдеєжзиіїйклмнопрстуфхцчшщьюя".map(String.init)))
-        let normal = KeyboardGeometry.cells(width: 393, state: InputState(), preferences: defaults, needsGlobe: false)
-        let compact = KeyboardGeometry.cells(width: 393, state: InputState(), preferences: preferences, needsGlobe: false)
+        let normal = KeyboardGeometry.cells(width: 393, state: ukrainianState, preferences: defaults, needsGlobe: false)
+        let compact = KeyboardGeometry.cells(width: 393, state: ukrainianState, preferences: preferences, needsGlobe: false)
         XCTAssertGreaterThan(compact[0].hitFrame.width, normal[0].hitFrame.width)
         XCTAssertEqual(try JSONDecoder().decode(KeyboardPreferences.self, from: JSONEncoder().encode(preferences)), preferences)
         XCTAssertFalse(try JSONDecoder().decode(KeyboardPreferences.self, from: Data(#"{"schemaVersion":2,"keyHeight":65}"#.utf8)).yiOnLongPress)
@@ -46,8 +48,10 @@ final class KeyboardCoreTests: XCTestCase {
         XCTAssertEqual(DeleteRepeat.interval(heldFor: 0), 0.12, accuracy: 0.001, "A new hold starts slowly again")
     }
 
-    func testDefaultUkrainianHasEveryLetterWithoutDotOrComma() {
-        let rows = KeyboardLayout.rows(state: InputState(), needsGlobe: false).prefix(3)
+    func testOptionalUkrainianHasEveryLetterWithoutDotOrComma() {
+        var state = InputState()
+        state.language = .ukrainian
+        let rows = KeyboardLayout.rows(state: state, needsGlobe: false).prefix(3)
         XCTAssertEqual(rows.map(\.count), [12, 11, 11])
         let letters = rows.flatMap { $0 }.compactMap { key -> String? in
             if case .text(let text) = key.action { return text }; return nil
@@ -72,7 +76,9 @@ final class KeyboardCoreTests: XCTestCase {
         for language in KeyboardLanguage.allCases {
             for page in [KeyboardPage.letters, .numbers, .symbols] {
                 var state = InputState(); state.language = language; state.page = page
-                let rows = KeyboardLayout.rows(state: state, needsGlobe: true, preferences: KeyboardPreset.original.preferences)
+                var original = KeyboardPreset.original.preferences
+                original.iphoneKeyPositions = false
+                let rows = KeyboardLayout.rows(state: state, needsGlobe: true, preferences: original)
                 let expected = page == .letters ? letters[language]! : [10, 10, 10]
                 XCTAssertEqual(rows.prefix(3).map(\.count), expected)
                 XCTAssertTrue(rows.last!.contains { $0.action == .globe })
@@ -103,6 +109,7 @@ final class KeyboardCoreTests: XCTestCase {
 
     func testVisibleOnlyModeLeavesGapsAndNoTouchesOutside() {
         var p = KeyboardPreset.original.preferences
+        p.iphoneKeyPositions = false
         p.fillGaps = false
         p.suggestionsEnabled = false
         let cells = KeyboardGeometry.cells(width: 360, state: InputState(), preferences: p, needsGlobe: false)
@@ -322,11 +329,12 @@ final class KeyboardCoreTests: XCTestCase {
     func testEnglishLayoutsRearrangeOnlyEnglish() {
         var english = InputState(); english.language = .english
         var seen = Set<[String]>()
+        var ukrainian = InputState(); ukrainian.language = .ukrainian
         for layout in EnglishLayout.allCases {
             let p = KeyboardPreferences(showApostrophe: false, englishLayout: layout)
             XCTAssertTrue(seen.insert(letters(KeyboardLayout.rows(state: english, needsGlobe: false, preferences: p))).inserted)
-            XCTAssertEqual(KeyboardLayout.rows(state: InputState(), needsGlobe: false, preferences: p).map { $0.map(\.action) },
-                           KeyboardLayout.rows(state: InputState(), needsGlobe: false).map { $0.map(\.action) })
+            XCTAssertEqual(KeyboardLayout.rows(state: ukrainian, needsGlobe: false, preferences: p).map { $0.map(\.action) },
+                           KeyboardLayout.rows(state: ukrainian, needsGlobe: false).map { $0.map(\.action) })
         }
         let colemak = KeyboardLayout.rows(state: english, needsGlobe: false, preferences: .init(showApostrophe: false, englishLayout: .colemakDH))
         XCTAssertEqual(letters([colemak[1]]).joined(), "arstgmneio")
