@@ -32,6 +32,7 @@ fetch() {
 }
 
 fetch "Core/KeyboardModel.swift"
+fetch "Core/PunctuationSpacing.swift"
 fetch "Core/Suggestions.swift"
 fetch "Core/TextNavigation.swift"
 fetch "SharedUI/KeyboardView.swift"
