@@ -7,7 +7,7 @@ import UIKit
 // UIKit presents edit menus on the main thread, but this delegate's protocol
 // requirements are not consistently declared MainActor-isolated across SDKs.
 // Keep the view main-actor confined and check callback isolation at runtime.
-final class ScratchpadView: UIView, UITextViewDelegate, @preconcurrency UIEditMenuInteractionDelegate {
+final class ScratchpadView: UIView, UITextViewDelegate, UIEditMenuInteractionDelegate {
     private let editor = UITextView()
     private let caret = UIView()
     private lazy var editMenu = UIEditMenuInteraction(delegate: self)
@@ -381,9 +381,16 @@ final class ScratchpadView: UIView, UITextViewDelegate, @preconcurrency UIEditMe
 
     /// Only these actions should appear for the local scratchpad. We do not
     /// borrow UIKit's host-app menu: it edits a different text destination.
-    func editMenuInteraction(_ interaction: UIEditMenuInteraction,
-                             menuFor configuration: UIEditMenuConfiguration,
-                             suggestedActions: [UIMenuElement]) -> UIMenu? {
+    nonisolated func editMenuInteraction(_ interaction: UIEditMenuInteraction,
+                                        menuFor configuration: UIEditMenuConfiguration,
+                                        suggestedActions: [UIMenuElement]) -> UIMenu? {
+        // This UIKit delegate requirement is nonisolated in some iOS SDKs.
+        // UIKit calls it on the main thread. Keep all view/UI work isolated,
+        // while making the protocol entry point explicitly nonisolated.
+        MainActor.assumeIsolated { self.makeNoteEditMenu() }
+    }
+
+    private func makeNoteEditMenu() -> UIMenu? {
         var actions: [UIMenuElement] = []
         let selected = selectedNoteText
         let hasText = !(editor.text ?? "").isEmpty
