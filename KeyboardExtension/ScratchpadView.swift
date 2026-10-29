@@ -10,6 +10,7 @@ final class ScratchpadView: UIView, UITextViewDelegate {
     private let modeButton = UIButton(type: .system)
     private let message = UILabel()
     private let storeKey = "key-scratch.local-note.v1"
+    private var modeColor: UIColor = .systemGreen
     private(set) var isEditingNote = false
 
     var onInsert: ((String) -> Void)?
@@ -50,7 +51,7 @@ final class ScratchpadView: UIView, UITextViewDelegate {
         guard !isEditingNote else { return }
         isEditingNote = true
         modeButton.setTitle("App", for: .normal)
-        layer.borderColor = UIColor.systemBlue.cgColor
+        layer.borderColor = modeColor.cgColor
         layer.borderWidth = 1
         onEditingChange?(true)
         updateCaret()
@@ -60,9 +61,34 @@ final class ScratchpadView: UIView, UITextViewDelegate {
         guard isEditingNote else { return }
         isEditingNote = false
         modeButton.setTitle("Notes", for: .normal)
-        layer.borderColor = UIColor.separator.cgColor
+        layer.borderColor = modeColor.withAlphaComponent(0.6).cgColor
         layer.borderWidth = 0.5
         onEditingChange?(false)
+        updateCaret()
+    }
+
+    /// Applies the current experiment's typography and color identification.
+    func configure(mode: KeyScratchMode, font: KeyScratchNoteFont, size: Double) {
+        modeColor = UIColor(keyboardHex: mode.colorHex)
+        layer.borderColor = modeColor.withAlphaComponent(isEditingNote ? 1.0 : 0.6).cgColor
+        layer.borderWidth = isEditingNote ? 1 : 0.5
+        let size = CGFloat(size)
+        let base = UIFont.systemFont(ofSize: size, weight: .medium)
+        switch font {
+        case .text:
+            editor.font = base
+        case .rounded, .serif, .monospaced:
+            let design: UIFontDescriptor.SystemDesign
+            switch font {
+            case .rounded: design = .rounded
+            case .serif: design = .serif
+            case .monospaced: design = .monospaced
+            case .text: design = .rounded // Unreachable: handled by the outer switch.
+            }
+            let descriptor = base.fontDescriptor.withDesign(design)
+            editor.font = descriptor.map { UIFont(descriptor: $0, size: size) } ?? base
+        }
+        editor.setNeedsLayout()
         updateCaret()
     }
 
