@@ -235,18 +235,26 @@ final class ScratchpadView: UIView, UITextViewDelegate {
         editor.textContainerInset = UIEdgeInsets(top: 2, left: 2, bottom: 2, right: 2)
         editor.text = UserDefaults.standard.string(forKey: storeKey) ?? ""
         editor.accessibilityLabel = "Scratchpad note. Tap to type with Key Scratch."
-        let tap = UITapGestureRecognizer(target: self, action: #selector(noteTapped(_:)))
-        tap.cancelsTouchesInView = false
-        editor.addGestureRecognizer(tap)
-        // A selectable but non-first-responder editor doesn't get all of the
-        // system keyboard's multi-tap selection gestures. Supply our own.
-        let wordTap = UITapGestureRecognizer(target: self, action: #selector(selectWordAtTap(_:)))
-        wordTap.numberOfTapsRequired = 2
+        // Recognize multi-taps before moving the caret. Without this failure
+        // hierarchy, the single-tap cursor handler can undo the selection
+        // created by a double or triple tap.
         let paragraphTap = UITapGestureRecognizer(target: self, action: #selector(selectParagraphAtTap(_:)))
         paragraphTap.numberOfTapsRequired = 3
+        paragraphTap.cancelsTouchesInView = true
+
+        let wordTap = UITapGestureRecognizer(target: self, action: #selector(selectWordAtTap(_:)))
+        wordTap.numberOfTapsRequired = 2
+        wordTap.cancelsTouchesInView = true
         wordTap.require(toFail: paragraphTap)
-        editor.addGestureRecognizer(wordTap)
+
+        let tap = UITapGestureRecognizer(target: self, action: #selector(noteTapped(_:)))
+        tap.numberOfTapsRequired = 1
+        tap.cancelsTouchesInView = true
+        tap.require(toFail: wordTap)
+
         editor.addGestureRecognizer(paragraphTap)
+        editor.addGestureRecognizer(wordTap)
+        editor.addGestureRecognizer(tap)
 
         message.font = .systemFont(ofSize: 9)
         message.textColor = .secondaryLabel
