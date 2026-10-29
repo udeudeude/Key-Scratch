@@ -4,7 +4,10 @@ import UIKit
 /// The Ortholinear keys edit this text view directly via its selected range.
 /// It intentionally never becomes first responder: that would summon a second keyboard.
 @MainActor
-final class ScratchpadView: UIView, UITextViewDelegate, UIEditMenuInteractionDelegate {
+// UIKit presents edit menus on the main thread, but this delegate's protocol
+// requirements are not consistently declared MainActor-isolated across SDKs.
+// Keep the view main-actor confined and check callback isolation at runtime.
+final class ScratchpadView: UIView, UITextViewDelegate, @preconcurrency UIEditMenuInteractionDelegate {
     private let editor = UITextView()
     private let caret = UIView()
     private lazy var editMenu = UIEditMenuInteraction(delegate: self)
