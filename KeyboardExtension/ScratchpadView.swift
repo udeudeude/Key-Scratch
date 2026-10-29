@@ -49,7 +49,7 @@ final class ScratchpadView: UIView {
         guard !isEditingNote else { return }
         isEditingNote = true
         modeButton.setTitle("App", for: .normal)
-        layer.borderColor = UIColor.tintColor.cgColor
+        layer.borderColor = UIColor.systemBlue.cgColor
         layer.borderWidth = 1
         onEditingChange?(true)
     }
