@@ -249,7 +249,9 @@ enum KeyboardLayout {
         case .letters: result = letterKeys(state.language, preferences: preferences)
         case .numbers: result = numberKeys(state.language)
         case .symbols:
-            result = textKeys(["[]{}#%^*+=", "_\\|~<>€£¥•", ".,?!'`:;₴…"])
+            result = preferences.iphoneKeyPositions
+                ? textKeys(["[]{}#%^*+=", "_\\|~<>€£¥•", ".,?!'₴…"])
+                : textKeys(["[]{}#%^*+=", "_\\|~<>€£¥•", ".,?!'`:;₴…"])
         case .layer(let id):
             // A layer deleted while it was open shows the numbers instead.
             if let layer = preferences.shownLayers.first(where: { $0.id == id }) {
@@ -265,7 +267,10 @@ enum KeyboardLayout {
         }
         // Delete follows the last letter, ahead of any optional punctuation. A custom
         // last row of punctuation alone still gets Delete, at its end.
-        if state.page == .letters {
+        if preferences.iphoneKeyPositions {
+            result[2].insert(Key(action: .shift, weight: 1.45), at: 0)
+            result[2].append(Key(action: .backspace, weight: 1.45))
+        } else if state.page == .letters {
             let lastLetter = result[2].lastIndex { key in
                 guard case .text(let value) = key.action else { return false }
                 return value == "'" || value.first?.isLetter == true
@@ -277,10 +282,12 @@ enum KeyboardLayout {
         if state.page == .letters && preferences.showLayerKey && firstLayerPage(preferences) != nil {
             controls.append(Key(action: .layers, weight: 1.25))
         }
-        if state.page == .letters && preferences.shiftPlacement == .beforeLastRow {
-            result[2].insert(Key(action: .shift, weight: 0.8), at: 0)
-        } else {
-            controls.append(Key(action: .shift, weight: 1.25))
+        if !preferences.iphoneKeyPositions {
+            if state.page == .letters && preferences.shiftPlacement == .beforeLastRow {
+                result[2].insert(Key(action: .shift, weight: 0.8), at: 0)
+            } else {
+                controls.append(Key(action: .shift, weight: 1.25))
+            }
         }
         if needsGlobe { controls.append(Key(action: .globe)) }
         // With a single language there is nothing to switch to, unless a URL or
@@ -290,7 +297,7 @@ enum KeyboardLayout {
         }
         controls += [Key(action: .space, weight: 3.8),
                      Key(action: .enter, weight: preferences.validated.actionKeyWidth)]
-        if state.page != .letters {
+        if state.page != .letters && !preferences.iphoneKeyPositions {
             controls.append(Key(action: .backspace, weight: preferences.validated.actionKeyWidth))
         }
         result.append(controls)
@@ -309,7 +316,13 @@ enum KeyboardLayout {
                               flicks: preferences.extrasEnabled ? $0.usableFlicks : [:]) }
             }
         }
-        return letterRows(language, preferences: preferences).map { row in
+        let baseRows: [String]
+        if preferences.iphoneKeyPositions && language == .english && preferences.englishLayout == .qwerty {
+            baseRows = ["qwertyuiop", "asdfghjkl", "zxcvbnm"]
+        } else {
+            baseRows = letterRows(language, preferences: preferences)
+        }
+        return baseRows.map { row in
             row.map { character in
                 Key(action: .text(String(character)),
                     letterAlternatives: letterAlternatives(character, language: language, preferences: preferences))
