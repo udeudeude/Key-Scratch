@@ -27,7 +27,7 @@ struct ContentView: View {
             VStack(alignment: .leading, spacing: 26) {
                 HStack(spacing: 10) {
                     GridMark().frame(width: 30, height: 30)
-                    Text("ortholinear").font(.system(size: 23, weight: .semibold, design: .rounded))
+                    Text("key scratch").font(.system(size: 23, weight: .semibold, design: .rounded))
                     Spacer()
                     Text(languageBadge).font(.system(size: 10, weight: .semibold, design: .monospaced))
                         .padding(.horizontal, 10).padding(.vertical, 7)
@@ -66,10 +66,10 @@ struct ContentView: View {
                 .accessibilityIdentifier("key-scratch-experiment-lab")
 
                 VStack(alignment: .leading, spacing: 12) {
-                    Text("Room for\nbigger letters.")
+                    Text("Notes alongside\nyour keyboard.")
                         .font(.system(size: 43, weight: .medium, design: .rounded)).tracking(-2)
                         .lineSpacing(-5).fixedSize(horizontal: false, vertical: true)
-                    Text("Give the letters more space. Make everything else optional.")
+                    Text("Test swipe typing, split geometry and tiny notes on your iPhone.")
                         .font(.system(size: 16)).foregroundStyle(.secondary).lineSpacing(4)
                 }
 
@@ -78,13 +78,13 @@ struct ContentView: View {
                     Text("·")
                     Text("No tracking")
                     Text("·")
-                    Text("Tap-only suggestions")
+                    Text("Local notes")
                 }
                 .font(.system(size: 11, weight: .medium)).foregroundStyle(accent)
 
                 VStack(alignment: .leading, spacing: 12) {
                     HStack {
-                        Text("YOUR TEST DRIVE").font(.system(size: 10, weight: .semibold, design: .monospaced)).tracking(2)
+                        Text("ORTHOLINEAR PREVIEW").font(.system(size: 10, weight: .semibold, design: .monospaced)).tracking(2)
                         Spacer()
                         Button("Clear") { NotificationCenter.default.post(name: .clearKeyboardPreview, object: nil) }
                             .font(.system(size: 12, weight: .medium)).accessibilityIdentifier("clear-preview")
@@ -124,7 +124,7 @@ struct ContentView: View {
                     Divider().padding(.vertical, 17)
                     detailRow("02", title: "Make the space yours.", subtitle: "Size letters and controls separately. Choose which punctuation earns a key.")
                     Divider().padding(.vertical, 17)
-                    detailRow("03", title: "Your words stay yours.", subtitle: "No network access, tracking, or Full Access. Your typing stays on your device.")
+                    detailRow("03", title: "Your words stay yours.", subtitle: "Offline by default. Full Access is optional for clipboard use.")
                 }
                 .padding(20).background(.primary.opacity(0.035), in: RoundedRectangle(cornerRadius: 14))
 
@@ -135,7 +135,7 @@ struct ContentView: View {
                     Link("Support", destination: URL(string: "https://github.com/IgorVaryvoda/Ortholinear/blob/main/SUPPORT.md")!)
                 }
                 .font(.system(size: 13, weight: .medium))
-                Text("BUILT FOR YOUR HANDS.  /  V0.6.1")
+                Text("KEY SCRATCH / EXPERIMENTAL")
                     .font(.system(size: 9, weight: .medium, design: .monospaced)).tracking(1.5)
                     .foregroundStyle(.tertiary).padding(.bottom, 20)
             }
@@ -689,7 +689,7 @@ private struct KeyScratchExperimentLab: View {
                         .focused($testing)
                         .frame(height: 105)
                         .accessibilityIdentifier("experiment-system-editor")
-                    Text("This is a real iOS text field. Use the globe key to select Key Scratch. To reload changed settings, switch away from the keyboard and back. You can also test in Safari, Messages or Notes.")
+                    Text("This is a real iOS text field, not a mockup. Use the globe key to choose Key Scratch. After applying a change, switch away and back to reload it. Try the same words in each color mode.")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 } header: {
