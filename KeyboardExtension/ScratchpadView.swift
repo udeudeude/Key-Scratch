@@ -395,19 +395,47 @@ final class ScratchpadView: UIView, UITextViewDelegate, UIEditMenuInteractionDel
                                 attributes: canUseClipboard ? [] : [.disabled]) { [weak self] _ in
             self?.pasteClipboard()
         })
-        if hasText && (editor.selectedRange.length != (editor.text as NSString).length) {
+        if hasText {
+            actions.append(UIAction(title: "Select Paragraph") { [weak self] _ in
+                guard let self else { return }
+                let text = self.editor.text as NSString
+                let position = min(self.safeSelection().location, max(0, text.length - 1))
+                self.editor.selectedRange = text.paragraphRange(
+                    for: NSRange(location: position, length: 0))
+                self.updateCaret()
+                self.onTextChange?()
+                self.editMenu.reloadVisibleMenu()
+            })
+        }
+        if hasText && editor.selectedRange.length != (editor.text as NSString).length {
             actions.append(UIAction(title: "Select All") { [weak self] _ in
                 guard let self else { return }
                 self.editor.selectedRange = NSRange(location: 0,
                                                     length: (self.editor.text as NSString).length)
                 self.updateCaret()
                 self.onTextChange?()
+                self.editMenu.reloadVisibleMenu()
             })
         }
         if hasText {
             actions.append(UIAction(title: "Insert in App", image: UIImage(systemName: "arrow.up.forward.square")) { [weak self] _ in
                 self?.insertNote()
             })
+        }
+        if hasText {
+            let erase = UIAction(title: "Erase note (cannot undo)",
+                                 image: UIImage(systemName: "trash"),
+                                 attributes: [.destructive]) { [weak self] _ in
+                guard let self else { return }
+                self.editor.text = ""
+                self.editor.selectedRange = NSRange(location: 0, length: 0)
+                self.save()
+                self.updateCaret()
+                self.onTextChange?()
+            }
+            // A deliberate second menu choice guards against accidental erasure.
+            actions.append(UIMenu(title: "Clear…", image: UIImage(systemName: "trash"),
+                                  children: [erase]))
         }
         if !canUseClipboard {
             actions.append(UIAction(title: "Clipboard needs Full Access",
