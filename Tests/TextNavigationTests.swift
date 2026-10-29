@@ -66,4 +66,56 @@ final class TextNavigationTests: XCTestCase {
         XCTAssertNil(decoded?.command, "Unknown commands are dropped, not fatal")
         XCTAssertEqual(decoded?.cursorBack, 0)
     }
+    func testSpaceTrackpadMovesAcrossHardLineBreaks() {
+        XCTAssertEqual(TextNavigation.verticalOffset(rows: -1, before: "hello\nabc", after: ""), -6)
+        XCTAssertEqual(TextNavigation.verticalOffset(rows: 1, before: "hello\nabc", after: "\n123456"), 4)
+        XCTAssertNil(TextNavigation.verticalOffset(rows: -1, before: "only one line", after: ""))
+        XCTAssertNil(TextNavigation.verticalOffset(rows: 1, before: "only one", after: " line"))
+        XCTAssertEqual(TextNavigation.verticalOffset(rows: 1, before: "a\nlast", after: "\nx"), 2,
+                       "The next shorter line clamps the column")
+    }
+
+    func testIPhonePlacementDoesNotMoveDeleteOrReturnOnPageChanges() {
+        var preferences = KeyboardPreferences()
+        preferences.iphoneKeyPositions = true
+        var input = InputState()
+        input.language = .english
+        for page: KeyboardPage in [.letters, .numbers, .symbols] {
+            input.page = page
+            let rows = KeyboardLayout.rows(state: input, needsGlobe: true, preferences: preferences)
+            XCTAssertEqual(rows[2].first?.action, .shift)
+            XCTAssertEqual(rows[2].last?.action, .backspace)
+            XCTAssertEqual(rows[3].last?.action, .enter)
+            XCTAssertEqual(rows[3].first?.action, .page)
+        }
+    }
+
+    func testEnglishIPhoneRowsHaveNativeQwertyPositions() {
+        var preferences = KeyboardPreferences()
+        preferences.iphoneKeyPositions = true
+        preferences.showApostrophe = true // The iPhone layout overrides extra letter-row keys.
+        let rows = KeyboardLayout.letterKeys(.english, preferences: preferences)
+        XCTAssertEqual(rows.map(\.count), [10, 9, 7])
+        XCTAssertEqual(rows[1].first?.action, .text("a"))
+        XCTAssertEqual(rows[2].last?.action, .text("m"))
+        XCTAssertTrue(rows[1].allSatisfy { $0.action != .text("'") })
+        let geometry = KeyboardGeometry.cells(width: 320, state: {
+            var input = InputState(); input.language = .english; return input
+        }(), preferences: preferences, needsGlobe: true)
+        let a = geometry.first { $0.key.action == .text("a") }
+        let q = geometry.first { $0.key.action == .text("q") }
+        XCTAssertGreaterThan(a?.hitFrame.minX ?? 0, q?.hitFrame.minX ?? 0,
+                             "The second row is inset by half a key")
+    }
+
+    func testEnglishAccentOptionsAreAvailableByHoldingLetters() {
+        let preferences = KeyboardPreferences()
+        let rows = KeyboardLayout.letterKeys(.english, preferences: preferences)
+        let a = rows.flatMap { $0 }.first { $0.action == .text("a") }
+        let e = rows.flatMap { $0 }.first { $0.action == .text("e") }
+        XCTAssertTrue(a?.alternatives.contains("æ") == true)
+        XCTAssertTrue(a?.alternatives.contains("á") == true)
+        XCTAssertTrue(e?.alternatives.contains("é") == true)
+    }
+
 }
