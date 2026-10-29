@@ -639,7 +639,6 @@ struct KeyboardPreferences: Codable, Equatable, Sendable {
         var seen = Set<KeyboardLanguage>()
         let enabled = languages.filter {
             KeyboardLanguage.allCases.contains($0)
-            && ($0 != .russian || invasionAnswer == .opposes)
             && seen.insert($0).inserted
         }
         result.languages = enabled.isEmpty ? Self().languages : enabled
