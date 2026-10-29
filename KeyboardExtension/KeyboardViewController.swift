@@ -82,6 +82,12 @@ final class KeyboardViewController: UIInputViewController {
         suggestions.snapshot = { [weak self] in self?.suggestionSnapshot() }
         suggestions.apply = { [weak self] edit, snapshot in self?.applySuggestion(edit, snapshot: snapshot) }
         suggestions.insertWord = { [weak self] in self?.insertGlided($0) }
+        suggestions.onGlideLatency = { [weak self] milliseconds in
+            guard let self else { return }
+            let mode = self.keyboard.preferences.keyScratchMode
+            self.modeLabel.text = "\(mode.colorName.uppercased()) · \(Int(milliseconds.rounded())) ms"
+            self.modeLabel.accessibilityLabel = "\(mode.title), glide latency \(Int(milliseconds.rounded())) milliseconds"
+        }
         suggestions.glideContext = { [weak self] in self?.glideContext() }
         suggestions.switchLanguage = { [weak self] in self?.switchLanguage(to: $0) }
         keyboard.onAction = { [weak self] in self?.handle($0) }
@@ -126,6 +132,7 @@ final class KeyboardViewController: UIInputViewController {
                              font: preferences.keyScratchNoteFont,
                              size: preferences.keyScratchNoteFontSize)
         modeLabel.text = preferences.keyScratchMode.title.uppercased()
+        modeLabel.accessibilityLabel = preferences.keyScratchMode.title
         modeLabel.backgroundColor = UIColor(keyboardHex: preferences.keyScratchMode.colorHex)
         keyboard.preferences = preferences
         view.setNeedsLayout()
