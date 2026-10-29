@@ -275,9 +275,9 @@ final class KeyboardViewController: UIInputViewController {
         let before = inNotes ? scratchpad.beforeCaret : (textDocumentProxy.documentContextBeforeInput ?? "")
         let after = inNotes ? scratchpad.afterCaret : (textDocumentProxy.documentContextAfterInput ?? "")
         let selected = inNotes ? scratchpad.selectedNoteText : (textDocumentProxy.selectedText ?? "")
-        let needsLeadingSpace = selected.isEmpty && before.last.map {
+        let needsLeadingSpace = selected.isEmpty && (before.last.map {
             !$0.isWhitespace && !"([{«„“'\"".contains($0)
-        } ?? false
+        } ?? false)
         let needsTrailingSpace = after.first.map {
             !$0.isWhitespace && !".,!?;:)]}\"'".contains($0)
         } ?? true
@@ -333,7 +333,7 @@ final class KeyboardViewController: UIInputViewController {
               incoming == " " || incoming == "\n" || incoming == "'" || incoming == "’"
                   || incoming == "." || incoming == "," || incoming == "!" || incoming == "?" else { return }
         let previous = before.dropLast().last
-        guard previous == nil || !(previous!.isLetter || previous!.isNumber) else { return }
+        guard !(previous.map { $0.isLetter || $0.isNumber } ?? false) else { return }
         if inNotes {
             scratchpad.replaceBeforeCaret(characters: 1, with: "I")
         } else {
