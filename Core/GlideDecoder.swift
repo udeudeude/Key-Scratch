@@ -53,8 +53,17 @@ struct GlideDecoder: Sendable {
 
     init(lexicon: SuggestionLexicon, geometry: SuggestionGeometry) {
         self.lexicon = lexicon
-        let ys = Set(geometry.centers.values.map { ($0.y * 2).rounded() / 2 }).sorted()
-        let pitch = zip(ys, ys.dropFirst()).map { $1 - $0 }.filter { $0 > 1 }.min() ?? geometry.unit
+        var uniqueRows = Set<CGFloat>()
+        for center in geometry.centers.values {
+            let halfRow = (center.y * 2).rounded() / 2
+            uniqueRows.insert(halfRow)
+        }
+        let ys = uniqueRows.sorted()
+        var pitch = geometry.unit
+        for index in 1..<ys.count {
+            let separation = ys[index] - ys[index - 1]
+            if separation > 1 && (pitch <= 1 || separation < pitch) { pitch = separation }
+        }
         scale = SIMD2(1 / max(geometry.unit, 1), 1 / max(pitch, 1))
         var keyIndex: [Unicode.Scalar: Int] = [:], keys: [SIMD2<Double>] = []
         for (letter, center) in geometry.centers.sorted(by: { $0.key < $1.key }) {
@@ -166,8 +175,13 @@ struct GlideDecoder: Sendable {
             location /= Double(Self.samples)
             let shape = Self.shapeDistance(traceShape, template)
             let elastic = weights.elastic > 0 ? Self.warpedDistance(resampled, template, cost: &warp) : 0
-            return Double(frequency) / 100 * weights.frequency - location * weights.location
-                - shape * weights.shape - pass * weights.pass - elastic * weights.elastic
+            let frequencyReward = (Double(frequency) / 100.0) * weights.frequency
+            let locationPenalty = location * weights.location
+            let shapePenalty = shape * weights.shape
+            let passPenalty = pass * weights.pass
+            let elasticPenalty = elastic * weights.elastic
+            let totalPenalty = locationPenalty + shapePenalty + passPenalty + elasticPenalty
+            return frequencyReward - totalPenalty
         }
 
         var best: [String: Double] = [:]
@@ -191,9 +205,16 @@ struct GlideDecoder: Sendable {
             best[normalized] = max(best[normalized] ?? -.infinity, value)
         }
         if Task.isCancelled { return [] }
-        return best.map { Candidate(word: $0.key, score: $0.value) }
-            .sorted { $0.score == $1.score ? $0.word < $1.word : $0.score > $1.score }
-            .prefix(limit).map { $0 }
+        var candidates: [Candidate] = []
+        candidates.reserveCapacity(best.count)
+        for (word, score) in best {
+            candidates.append(Candidate(word: word, score: score))
+        }
+        candidates.sort { lhs, rhs in
+            if lhs.score == rhs.score { return lhs.word < rhs.word }
+            return lhs.score > rhs.score
+        }
+        return Array(candidates.prefix(limit))
     }
 
     // MARK: - Geometry
@@ -259,7 +280,8 @@ struct GlideDecoder: Sendable {
         guard let first = points.first else { return [] }
         var low = first, high = first, sum = SIMD2<Double>(0, 0)
         for p in points { low = pointwiseMin(low, p); high = pointwiseMax(high, p); sum += p }
-        let centroid = sum / Double(points.count), size = max(high.x - low.x, high.y - low.y)
+        let centroid = sum / Double(points.count)
+        let size = max(high.x - low.x, high.y - low.y)
         let factor = size > 1e-9 ? 1 / size : 1
         return points.map { ($0 - centroid) * factor }
     }
@@ -268,7 +290,8 @@ struct GlideDecoder: Sendable {
         guard let first = template.first else { return 0 }
         var low = first, high = first, sum = SIMD2<Double>(0, 0)
         for p in template { low = pointwiseMin(low, p); high = pointwiseMax(high, p); sum += p }
-        let centroid = sum / Double(template.count), size = max(high.x - low.x, high.y - low.y)
+        let centroid = sum / Double(template.count)
+        let size = max(high.x - low.x, high.y - low.y)
         let factor = size > 1e-9 ? 1 / size : 1
         var total = 0.0
         for i in template.indices { total += length(trace[i] - (template[i] - centroid) * factor) }
