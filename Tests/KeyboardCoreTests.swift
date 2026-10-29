@@ -255,7 +255,11 @@ final class KeyboardCoreTests: XCTestCase {
         }
     }
 
-    func testShiftIsImmediatelyBeforeZOrYaAndActionsAreLarge() {
+    func testLegacyGridShiftIsImmediatelyBeforeZOrYaAndActionsAreLarge() {
+        // Verify Ortholinear's optional classic arrangement, not the new
+        // iPhone default where Delete stays in the same third-row position.
+        var legacyPreferences = KeyboardPreferences()
+        legacyPreferences.iphoneKeyPositions = false
         let bottom: [KeyboardLanguage: (first: String, last: String)] = [
             .ukrainian: ("я", "ю"), .english: ("z", "m"), .polish: ("z", "m"),
             .german: ("y", "m"), .french: ("w", "'"), .spanish: ("z", "m"),
@@ -264,11 +268,13 @@ final class KeyboardCoreTests: XCTestCase {
         ]
         for language in KeyboardLanguage.allCases {
             var state = InputState(); state.language = language
-            let rows = KeyboardLayout.rows(state: state, needsGlobe: false)
+            let rows = KeyboardLayout.rows(state: state, needsGlobe: false,
+                                           preferences: legacyPreferences)
             XCTAssertEqual(rows[2][0].action, .shift)
             XCTAssertEqual(rows[2][1].action, .text(bottom[language]!.first))
             XCTAssertFalse(rows[3].contains { $0.action == .shift })
-            let cells = KeyboardGeometry.cells(width: 393, state: state, preferences: .init(), needsGlobe: false)
+            let cells = KeyboardGeometry.cells(width: 393, state: state,
+                                               preferences: legacyPreferences, needsGlobe: false)
             let shift = cells.first { $0.key.action == .shift }!
             let letter = cells.first { $0.key.action == rows[2][1].action }!
             XCTAssertEqual(shift.hitFrame.minY, letter.hitFrame.minY)
@@ -276,7 +282,7 @@ final class KeyboardCoreTests: XCTestCase {
             for action in [KeyAction.enter, .backspace] {
                 let cell = cells.first { $0.key.action == action }!
                 XCTAssertGreaterThan(cell.visualFrame.width, 69)
-                XCTAssertEqual(cell.visualFrame.height, action == .backspace ? 72 : 56)
+                XCTAssertEqual(cell.visualFrame.height, action == .backspace ? 62 : 48)
             }
             let lastLetter = cells.first { $0.key.action == .text(bottom[language]!.last) }!
             let delete = cells.first { $0.key.action == .backspace }!
@@ -284,8 +290,8 @@ final class KeyboardCoreTests: XCTestCase {
             XCTAssertEqual(delete.hitFrame.minX, lastLetter.hitFrame.maxX, accuracy: 0.001)
             XCTAssertFalse(rows[3].contains { $0.action == .backspace })
             state.page = .numbers
-            XCTAssertTrue(KeyboardLayout.rows(state: state, needsGlobe: false)[3].contains { $0.action == .shift })
-            XCTAssertTrue(KeyboardLayout.rows(state: state, needsGlobe: false)[3].contains { $0.action == .backspace })
+            XCTAssertTrue(KeyboardLayout.rows(state: state, needsGlobe: false, preferences: legacyPreferences)[3].contains { $0.action == .shift })
+            XCTAssertTrue(KeyboardLayout.rows(state: state, needsGlobe: false, preferences: legacyPreferences)[3].contains { $0.action == .backspace })
         }
     }
 
@@ -304,7 +310,8 @@ final class KeyboardCoreTests: XCTestCase {
                     let p = KeyboardPreferences(yiOnLongPress: yi, englishLayout: layout)
                     let rows = KeyboardLayout.rows(state: state, needsGlobe: false, preferences: p)
                     let keys = letters(rows)
-                    let held = rows.prefix(3).flatMap { $0 }.flatMap(\.alternatives).filter { $0.lowercased() != $0.uppercased() }
+                    let alphabet = Set(language.alphabet.map(String.init))
+                    let held = rows.prefix(3).flatMap { $0 }.flatMap(\.alternatives).filter { alphabet.contains($0) }
                     XCTAssertEqual(keys.count, Set(keys).count, "\(language) \(layout) repeats a letter")
                     XCTAssertEqual(Set(keys + held), Set(language.alphabet.map(String.init)), "\(language) \(layout)")
                 }
@@ -336,15 +343,16 @@ final class KeyboardCoreTests: XCTestCase {
 
     func testLanguageKeyCyclesThroughEnabledLanguagesInOrder() {
         let p = KeyboardPreferences(defaultLanguage: .spanish, languages: [.german, .ukrainian, .english, .german]).validated
-        XCTAssertEqual(p.languages, [.ukrainian, .english, .german])
-        XCTAssertEqual(p.defaultLanguage, .ukrainian, "A starting language that is off falls back to the first enabled")
+        XCTAssertEqual(p.languages, [.german, .ukrainian, .english])
+        XCTAssertEqual(p.defaultLanguage, .german, "A starting language that is off falls back to the first enabled")
         XCTAssertEqual(p.language(after: .ukrainian), .english)
         XCTAssertEqual(p.language(after: .english), .german)
         XCTAssertEqual(p.language(after: .german), .ukrainian)
-        XCTAssertEqual(p.language(after: .french), .ukrainian)
-        XCTAssertEqual(KeyboardPreferences(languages: []).validated.languages, [.ukrainian, .english])
+        XCTAssertEqual(p.language(after: .french), .german)
+        XCTAssertEqual(KeyboardPreferences(languages: []).validated.languages, [.english])
 
-        let single = KeyboardPreferences(defaultLanguage: .polish, languages: [.polish])
+        let single = KeyboardPreferences(defaultLanguage: .polish, languages: [.polish],
+                                         keyScratchMode: .reference)
         var state = InputState(); state.language = .polish
         XCTAssertFalse(KeyboardLayout.rows(state: state, needsGlobe: false, preferences: single).flatMap { $0 }.contains { $0.action == .language },
                        "One language has nothing to switch to")
@@ -357,13 +365,13 @@ final class KeyboardCoreTests: XCTestCase {
     func testLanguageSettingsDecodeTolerantlyAndSurvivePresets() throws {
         let saved = Data(#"{"schemaVersion":3,"languages":["polish","klingon","english"],"englishLayout":"dvorak","defaultLanguage":"klingon","rememberLanguage":false}"#.utf8)
         let p = try JSONDecoder().decode(KeyboardPreferences.self, from: saved)
-        XCTAssertEqual(p.languages, [.english, .polish])
-        XCTAssertEqual(p.defaultLanguage, .english)
+        XCTAssertEqual(p.languages, [.polish, .english])
+        XCTAssertEqual(p.defaultLanguage, .polish)
         XCTAssertEqual(p.englishLayout, .dvorak)
         XCTAssertFalse(p.rememberLanguage)
         XCTAssertEqual(try JSONDecoder().decode(KeyboardPreferences.self, from: JSONEncoder().encode(p)), p)
         let legacy = try JSONDecoder().decode(KeyboardPreferences.self, from: Data(#"{"schemaVersion":3,"keyHeight":60}"#.utf8))
-        XCTAssertEqual(legacy.languages, [.ukrainian, .english])
+        XCTAssertEqual(legacy.languages, [.english])
         XCTAssertEqual(legacy.englishLayout, .qwerty)
         XCTAssertTrue(legacy.rememberLanguage)
         var custom = p
@@ -402,23 +410,17 @@ final class KeyboardCoreTests: XCTestCase {
         for language in KeyboardLanguage.allCases { XCTAssertEqual(KeyboardLanguage(languageCode: language.code), language) }
     }
 
-    func testRussianIsOfferedOnlyToThoseWhoOpposeTheInvasion() throws {
+    func testRussianIsAvailableAsAnOptionalLanguage() throws {
         var p = KeyboardPreferences(defaultLanguage: .russian, languages: [.ukrainian, .russian])
-        XCTAssertEqual(p.validated.languages, [.ukrainian])
-        XCTAssertEqual(p.validated.defaultLanguage, .ukrainian)
-        p.invasionAnswer = .supports
-        XCTAssertEqual(p.validated.languages, [.ukrainian])
-        XCTAssertEqual(p.language(after: .ukrainian), .ukrainian)
-        p.invasionAnswer = .opposes
         XCTAssertEqual(p.validated.languages, [.ukrainian, .russian])
         XCTAssertEqual(p.validated.defaultLanguage, .russian)
-        XCTAssertEqual(try JSONDecoder().decode(KeyboardPreferences.self, from: JSONEncoder().encode(p)), p)
-        p.apply(.original)
-        XCTAssertEqual(p.invasionAnswer, .opposes, "Presets keep the answer")
+        p.invasionAnswer = .supports // Legacy preference no longer hides a layout.
+        XCTAssertEqual(p.validated.languages, [.ukrainian, .russian])
+        XCTAssertEqual(try JSONDecoder().decode(KeyboardPreferences.self,
+                         from: JSONEncoder().encode(p)), p)
         let odd = try JSONDecoder().decode(KeyboardPreferences.self,
-                                          from: Data(#"{"languages":["russian"],"invasionAnswer":"maybe"}"#.utf8))
-        XCTAssertEqual(odd.invasionAnswer, .unanswered)
-        XCTAssertEqual(odd.languages, [.ukrainian, .english], "Nothing left after the gate falls back to the defaults")
+                            from: Data(#"{"languages":["russian"],"invasionAnswer":"maybe"}"#.utf8))
+        XCTAssertEqual(odd.languages, [.russian])
         var state = InputState(); state.language = .russian
         let keys = KeyboardLayout.rows(state: state, needsGlobe: false).flatMap { $0 }
         XCTAssertEqual(keys.first { $0.action == .text("е") }?.alternatives, ["ё"])
@@ -426,7 +428,8 @@ final class KeyboardCoreTests: XCTestCase {
     }
 
     func testDigitsFlickFromTheTopRowOrSitInANumberRow() throws {
-        let ukrainian = KeyboardLayout.rows(state: InputState(), needsGlobe: false)
+        var ukrainianState = InputState(); ukrainianState.language = .ukrainian
+        let ukrainian = KeyboardLayout.rows(state: ukrainianState, needsGlobe: false)
         XCTAssertEqual(ukrainian[0].prefix(10).map(\.flick), "1234567890".map { String($0) })
         XCTAssertNil(ukrainian[0][10].flick, "Only the first ten keys carry digits")
         XCTAssertTrue(ukrainian.dropFirst().joined().allSatisfy { $0.flick == nil })
