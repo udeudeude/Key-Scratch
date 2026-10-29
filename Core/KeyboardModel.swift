@@ -250,7 +250,7 @@ enum KeyboardLayout {
         case .numbers: result = numberKeys(state.language, iphone: preferences.iphoneKeyPositions)
         case .symbols:
             result = preferences.iphoneKeyPositions
-                ? textKeys(["[]{}#%^*+=", "_\\|~<>€£¥•", ".,?!'₴…"])
+                ? textKeys(["[]{}#%^*+=", "_\\|~<>€£¥•", ".,?!'"])
                 : textKeys(["[]{}#%^*+=", "_\\|~<>€£¥•", ".,?!'`:;₴…"])
         case .layer(let id):
             // A layer deleted while it was open shows the numbers instead.
@@ -331,7 +331,7 @@ enum KeyboardLayout {
     }
 
     private static func numberKeys(_ language: KeyboardLanguage, iphone: Bool = false) -> [[Key]] {
-        textKeys(["1234567890", "-/:;()$&@\"", (language == .ukrainian ? ".,?!ʼ" : ".,?!'") + (iphone ? "+%" : "[]=+%")])
+        textKeys(["1234567890", "-/:;()$&@\"", (language == .ukrainian ? ".,?!ʼ" : ".,?!'") + (iphone ? "" : "[]=+%")])
     }
 
     /// The pages the #+= / 123 key steps through: numbers, symbols, then each usable layer.
