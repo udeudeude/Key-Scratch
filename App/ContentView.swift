@@ -829,6 +829,7 @@ private struct KeyScratchFullNotes: View {
                     .padding(7)
                     .background(.secondary.opacity(0.08), in: RoundedRectangle(cornerRadius: 12))
                     .accessibilityIdentifier("full-scratchpad-editor")
+                    .disabled(!loaded)
                 if let notice {
                     Text(notice).font(.caption).foregroundStyle(.secondary)
                 }
@@ -868,12 +869,15 @@ private struct KeyScratchFullNotes: View {
             }
         }
         .onAppear {
+            // Do not write an empty new note over an older extension-only note.
+            // The extension imports that old note the first time it starts.
             if let shared = ScratchpadStore.load() {
                 note = shared
+                loaded = true
             } else {
-                notice = "Open the updated Key Scratch keyboard once to import your existing note."
+                loaded = false
+                notice = "Open the updated Key Scratch keyboard once to import your existing note, then reopen this editor."
             }
-            loaded = true
         }
         .onChange(of: note) { _, value in
             guard loaded else { return }
