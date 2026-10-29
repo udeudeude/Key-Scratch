@@ -5,12 +5,20 @@ private let paper = Color(uiColor: UIColor { $0.userInterfaceStyle == .dark
     ? UIColor(red: 0.08, green: 0.10, blue: 0.10, alpha: 1)
     : UIColor(red: 0.96, green: 0.95, blue: 0.92, alpha: 1) })
 
+private func keyScratchColor(_ mode: KeyScratchMode) -> Color {
+    let hex = mode.colorHex
+    return Color(red: Double((hex >> 16) & 255) / 255,
+                 green: Double((hex >> 8) & 255) / 255,
+                 blue: Double(hex & 255) / 255)
+}
+
 struct ContentView: View {
     /// The app's own copy keeps every extra on; the published copy is what the edition allows.
     @State private var preferences = { var loaded = PreferenceStore.load(); loaded.extrasEnabled = true; return loaded }()
     @State private var showGeometry = false
     @State private var showSetup = false
     @State private var showSystemTest = false
+    @State private var showKeyScratchLab = false
     @State private var saveError: String?
     @State private var triedGestures: Set<KeyboardGesture> = []
 
@@ -30,6 +38,32 @@ struct ContentView: View {
                     }.accessibilityLabel("Customize keyboard").accessibilityIdentifier("customize-keyboard")
                 }
                 .padding(.top, 12)
+
+                Button { showKeyScratchLab = true } label: {
+                    HStack(spacing: 12) {
+                        RoundedRectangle(cornerRadius: 5)
+                            .fill(keyScratchColor(preferences.keyScratchMode))
+                            .frame(width: 8, height: 56)
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("KEY SCRATCH EXPERIMENT LAB")
+                                .font(.system(size: 10, weight: .semibold, design: .monospaced))
+                                .foregroundStyle(.secondary)
+                            Text(preferences.keyScratchMode.title)
+                                .font(.system(size: 17, weight: .semibold))
+                                .foregroundStyle(.primary)
+                            Text("Change the configuration, then test the real keyboard")
+                                .font(.system(size: 12))
+                                .foregroundStyle(.secondary)
+                        }
+                        Spacer(minLength: 0)
+                        Image(systemName: "slider.horizontal.3")
+                            .foregroundStyle(.secondary)
+                    }
+                    .padding(14)
+                    .background(.primary.opacity(0.065), in: RoundedRectangle(cornerRadius: 13))
+                }
+                .buttonStyle(.plain)
+                .accessibilityIdentifier("key-scratch-experiment-lab")
 
                 VStack(alignment: .leading, spacing: 12) {
                     Text("Room for\nbigger letters.")
@@ -112,6 +146,7 @@ struct ContentView: View {
         .sheet(isPresented: $showGeometry) { GeometrySettings(preferences: $preferences) }
         .sheet(isPresented: $showSetup) { SetupView() }
         .sheet(isPresented: $showSystemTest) { SystemKeyboardTest() }
+        .sheet(isPresented: $showKeyScratchLab) { KeyScratchExperimentLab(preferences: $preferences) }
         .onChange(of: preferences) { _, value in
             do { try KeyboardPublisher.publish(value) }
             catch { saveError = "The preview was updated, but settings could not be shared with the extension. Check that both targets use the same App Group and signing team." }
@@ -545,5 +580,145 @@ struct SystemKeyboardTest: View {
     private func field(_ index: Int, _ title: String, _ type: UIKeyboardType) -> some View {
         TextField(title, text: $fields[index]).keyboardType(type).textInputAutocapitalization(.never)
             .autocorrectionDisabled().focused($focused, equals: index).accessibilityIdentifier("field-\(index)")
+    }
+}
+
+
+/// Controlled experiments, saved through the same App Group store Ortholinear uses.
+/// The inline text editor invokes the *installed* keyboard extension, not a mockup.
+private struct KeyScratchExperimentLab: View {
+    @Binding var preferences: KeyboardPreferences
+    @State private var draft: KeyboardPreferences
+    @State private var testText = ""
+    @State private var status = "Choose a mode, then Apply and test."
+    @FocusState private var testing: Bool
+    @Environment(\.dismiss) private var dismiss
+
+    init(preferences: Binding<KeyboardPreferences>) {
+        _preferences = preferences
+        _draft = State(initialValue: preferences.wrappedValue)
+    }
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section {
+                    ForEach(KeyScratchMode.allCases) { mode in
+                        Button {
+                            draft.keyScratchMode = mode
+                        } label: {
+                            HStack(spacing: 12) {
+                                RoundedRectangle(cornerRadius: 4)
+                                    .fill(keyScratchColor(mode))
+                                    .frame(width: 9, height: 52)
+                                VStack(alignment: .leading, spacing: 3) {
+                                    Text(mode.title).font(.body.weight(.semibold)).foregroundStyle(.primary)
+                                    Text(mode.purpose).font(.caption).foregroundStyle(.secondary)
+                                        .fixedSize(horizontal: false, vertical: true)
+                                }
+                                Spacer(minLength: 0)
+                                if draft.keyScratchMode == mode {
+                                    Image(systemName: "checkmark.circle.fill")
+                                        .foregroundStyle(keyScratchColor(mode))
+                                }
+                            }
+                            .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityIdentifier("experiment-\(mode.rawValue)")
+                    }
+                } header: {
+                    Text("Modes of attack")
+                } footer: {
+                    Text("Colors are stable identifiers. Blue is a full-width reference; Green, Amber and Purple vary different parts of the split design.")
+                }
+
+                Section("Scratchpad") {
+                    HStack {
+                        Text("Notes width")
+                        Spacer()
+                        Text("\(Int(draft.keyScratchMode.noteFraction(userWidth: draft.keyScratchNoteWidth) * 100))%")
+                            .monospacedDigit().foregroundStyle(.secondary)
+                    }
+                    Slider(value: $draft.keyScratchNoteWidth, in: 0.18...0.42, step: 0.02)
+                        .accessibilityLabel("Split notes width")
+                        .disabled(draft.keyScratchMode == .reference)
+                    HStack {
+                        Text("Note text size")
+                        Spacer()
+                        Text("\(Int(draft.keyScratchNoteFontSize)) pt")
+                            .monospacedDigit().foregroundStyle(.secondary)
+                    }
+                    Slider(value: $draft.keyScratchNoteFontSize, in: 9...16, step: 1)
+                        .accessibilityLabel("Note text size")
+                    Picker("Note typeface", selection: $draft.keyScratchNoteFont) {
+                        ForEach(KeyScratchNoteFont.allCases) { font in
+                            Text(font.title).tag(font)
+                        }
+                    }
+                }
+
+                Section("Keyboard dimensions") {
+                    adjustment("Letter row", value: $draft.keyHeight, bounds: 36...88)
+                    adjustment("Control row", value: $draft.controlHeight, bounds: 36...72)
+                    adjustment("Row spacing", value: $draft.rowSpacing, bounds: 0...12)
+                }
+
+                Section {
+                    Button {
+                        let next = draft.validated
+                        do {
+                            try KeyboardPublisher.publish(next)
+                            preferences = next
+                            status = "Applied: \(next.keyScratchMode.title). Switch to Key Scratch with the globe key."
+                            testing = true
+                        } catch {
+                            status = "Couldn't share settings with the keyboard. Check App Groups for both Xcode targets."
+                        }
+                    } label: {
+                        HStack {
+                            Image(systemName: "checkmark.circle")
+                            Text("Apply and test")
+                                .fontWeight(.semibold)
+                        }.frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .accessibilityIdentifier("apply-key-scratch-experiment")
+                    Text(status).font(.caption).foregroundStyle(.secondary)
+                    TextEditor(text: $testText)
+                        .focused($testing)
+                        .frame(height: 105)
+                        .accessibilityIdentifier("experiment-system-editor")
+                    Text("This is a real iOS text field. Use the globe key to select Key Scratch. To reload changed settings, switch away from the keyboard and back. You can also test in Safari, Messages or Notes.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                } header: {
+                    Text("Try it immediately")
+                }
+            }
+            .navigationTitle("Key Scratch Lab")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Close") { dismiss() }
+                }
+            }
+        }
+        .tint(accent)
+    }
+
+    private func adjustment(_ title: String, value: Binding<Double>,
+                            bounds: ClosedRange<Double>) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            HStack {
+                Text(title)
+                Spacer()
+                Text("\(Int(value.wrappedValue)) pt")
+                    .monospacedDigit()
+                    .foregroundStyle(.secondary)
+            }
+            Slider(value: value, in: bounds, step: 1)
+                .accessibilityLabel(title)
+        }
     }
 }
