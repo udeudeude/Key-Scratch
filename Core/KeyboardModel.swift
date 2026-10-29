@@ -467,14 +467,14 @@ enum KeyboardLayout {
 }
 
 struct KeyboardPreferences: Codable, Equatable, Sendable {
-    let schemaVersion = 4
-    var keyHeight: Double = 72
+    let schemaVersion = 5
+    var keyHeight: Double = 62
     var columnSpacing: Double = 2
-    var rowSpacing: Double = 3
+    var rowSpacing: Double = 2
     var fillGaps: Bool = true
     var defaultLanguage: KeyboardLanguage = .ukrainian
-    var controlHeight: Double = 56
-    var letterSize: Double = 28
+    var controlHeight: Double = 48
+    var letterSize: Double = 24
     var actionKeyWidth: Double = 2.4
     var shiftPlacement: ShiftPlacement = .beforeLastRow
     var showPunctuation: Bool = false
@@ -528,9 +528,9 @@ struct KeyboardPreferences: Codable, Equatable, Sendable {
 
     var validated: Self {
         var result = self
-        result.keyHeight = keyHeight.isFinite ? min(88, max(36, keyHeight)) : 72
-        result.controlHeight = controlHeight.isFinite ? min(72, max(36, controlHeight)) : 56
-        result.letterSize = letterSize.isFinite ? min(36, max(18, letterSize)) : 28
+        result.keyHeight = keyHeight.isFinite ? min(88, max(36, keyHeight)) : 62
+        result.controlHeight = controlHeight.isFinite ? min(72, max(36, controlHeight)) : 48
+        result.letterSize = letterSize.isFinite ? min(36, max(18, letterSize)) : 24
         result.actionKeyWidth = actionKeyWidth.isFinite ? min(3.5, max(1.25, actionKeyWidth)) : 2.4
         result.columnSpacing = columnSpacing.isFinite ? min(8, max(0, columnSpacing)) : 2
         result.rowSpacing = rowSpacing.isFinite ? min(12, max(0, rowSpacing)) : 3
@@ -552,7 +552,7 @@ struct KeyboardPreferences: Codable, Equatable, Sendable {
     /// The colorway the keyboard draws, when extras are enabled.
     var shownKeycaps: KeycapStyle? { extrasEnabled ? keycaps : nil }
     var shownExpansions: [TextExpansion] { extrasEnabled ? expansions.filter(\.isUsable) : [] }
-    var suggestionHeight: Double { suggestionsEnabled ? 44 : 0 }
+    var suggestionHeight: Double { suggestionsEnabled ? (validated.keyHeight <= 62 ? 36 : 44) : 0 }
     var headerHeight: Double { suggestionHeight + (showHeader ? KeyboardGeometry.ribbonHeight : 0) }
     /// A shorter row: it costs about 45 pt at the default key height.
     var numberRowHeight: Double {
@@ -630,8 +630,15 @@ extension KeyboardPreferences {
             expansions = Array(saved.compactMap(\.value).prefix(TextExpansion.maximumCount))
         }
         extrasEnabled = try c.decodeIfPresent(Bool.self, forKey: .extrasEnabled) ?? extrasEnabled
-        // Upgrade the old default height; keep heights the user actually customized.
+        // Legacy Ortholinear configurations using untouched factory geometry migrate
+        // to Key Scratch's more compact defaults. Deliberately customized sizes survive.
         if !c.contains(.schemaVersion), keyHeight == 48 { keyHeight = 72 }
+        if keyHeight == 72 && controlHeight == 56 && rowSpacing == 3 && letterSize == 28 {
+            keyHeight = 62
+            controlHeight = 48
+            rowSpacing = 2
+            letterSize = 24
+        }
         self = validated
     }
 }
@@ -655,7 +662,8 @@ enum KeyboardPreset: String, CaseIterable, Identifiable {
     }
     var preferences: KeyboardPreferences {
         switch self {
-        case .bigLetters: KeyboardPreferences()
+        case .bigLetters: KeyboardPreferences(keyHeight: 72, rowSpacing: 3,
+                                                     controlHeight: 56, letterSize: 28)
         case .balanced: KeyboardPreferences(keyHeight: 60, columnSpacing: 3, rowSpacing: 4, controlHeight: 48, letterSize: 24, actionKeyWidth: 2)
         case .original: KeyboardPreferences(keyHeight: 48, columnSpacing: 3, rowSpacing: 5, controlHeight: 48,
                                             letterSize: 21, actionKeyWidth: 1.4, shiftPlacement: .controlRow,
