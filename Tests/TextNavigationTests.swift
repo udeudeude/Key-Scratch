@@ -117,5 +117,31 @@ final class TextNavigationTests: XCTestCase {
         XCTAssertTrue(a?.alternatives.contains("á") == true)
         XCTAssertTrue(e?.alternatives.contains("é") == true)
     }
+    func testFocusToggleReplacesLanguageKeyInSplitModes() {
+        let p = KeyboardPreferences()
+        XCTAssertEqual(p.defaultLanguage, .english)
+        XCTAssertEqual(p.languages, [.english])
+        for mode in [KeyScratchMode.split, .legacy, .quiet, .narrow] {
+            var options = p
+            options.keyScratchMode = mode
+            let rows = KeyboardLayout.rows(state: InputState(), needsGlobe: true, preferences: options)
+            XCTAssertEqual(rows[3].filter { $0.action == .noteFocus }.count, 1)
+            XCTAssertFalse(rows[3].contains { $0.action == .language })
+            XCTAssertEqual(rows[3].last?.action, .enter)
+        }
+        var reference = p
+        reference.keyScratchMode = .reference
+        let rows = KeyboardLayout.rows(state: InputState(), needsGlobe: true, preferences: reference)
+        XCTAssertFalse(rows[3].contains { $0.action == .noteFocus },
+                       "Blue reference has no notes panel and should not offer an inert focus key")
+    }
+
+    func testLanguageOrderRemainsUserControlled() {
+        var options = KeyboardPreferences()
+        options.languages = [.english, .ukrainian, .german]
+        XCTAssertEqual(options.validated.languages, [.english, .ukrainian, .german])
+        XCTAssertEqual(options.language(after: .english), .ukrainian)
+        XCTAssertEqual(options.language(after: .german), .english)
+    }
 
 }
