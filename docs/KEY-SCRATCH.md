@@ -8,6 +8,16 @@ Five color-coded modes remain available in the companion app's **Key Scratch Lab
 
 Mode comparisons: Blue ↔ Red tests the added panel; Red ↔ Green tests the independent glide worker; Green ↔ Amber tests live prediction; Green ↔ Purple tests panel width. Treat the milliseconds as individual local timing samples, not statistical benchmarks.
 
+## iPhone-style controls and language switching
+
+The key formerly marked UA / EN now says **Notes** when the host app is receiving typing, and **App** when the scratchpad is receiving typing. Tap once to toggle the writing destination. Hold that same key to cycle the languages enabled under Key Scratch → Keyboard Settings → Languages. The full-width Blue reference mode has no notes area, so it doesn't display a nonfunctional Notes/App key.
+
+The space bar reads **space**. The system globe still opens the next enabled iOS keyboard or a keyboard chooser on hold. To use Apple's Emoji keyboard, enable that keyboard in iOS Settings and switch to it with the globe. Key Scratch cannot open Apple's Emoji keyboard directly, and does not pretend otherwise.
+
+English is now the default for new installs. Existing default UA+EN setups migrate to English first while retaining Ukrainian as an enabled optional language. Additional layouts remain available in Settings, with no unrelated language gate.
+
+iPhone-style light/dark keyboard colors and keycap shadows are the default; alternate themes remain under Appearance. The companion app now uses iOS system colors and a distinct blue notebook-and-keys icon. A visible blue selection highlight is drawn over ranges selected in the compact notes editor.
+
 ## Note editing
 
 - Tap text in the narrow notes area to direct Ortholinear typing and swipe recognition to that area. Keyboard suggestions and text replacements also apply to notes.
