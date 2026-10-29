@@ -50,6 +50,7 @@ final class ScratchpadView: UIView, UITextViewDelegate, UIEditMenuInteractionDel
 
     func activate() {
         guard !isEditingNote else { return }
+        reloadSharedNote()
         isEditingNote = true
         returnToApp.isHidden = false
         layer.borderColor = modeColor.cgColor
