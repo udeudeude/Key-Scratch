@@ -15,6 +15,7 @@ final class KeyboardViewController: UIInputViewController {
     private var pendingGlide: (inserted: String, inNotes: Bool)?
     private var expander = TextExpander()
     private var lastKeyboardType: UIKeyboardType?
+    private var lastHostDocument: UUID?
     private var reportedLanguage: KeyboardLanguage?
     /// iOS builds a new controller each time the keyboard appears and may unload the
     /// process between uses, so the language memory is kept in the keyboard's defaults.
@@ -439,6 +440,14 @@ final class KeyboardViewController: UIInputViewController {
 
     private func synchronize() {
         guard isViewLoaded else { return }
+        // Switching to a different host text field is always a request to type
+        // there, even if the scratchpad had previously been active.
+        if let current = documentIdentifier {
+            if let previous = lastHostDocument, previous != current, scratchpad.isEditingNote {
+                scratchpad.deactivate()
+            }
+            lastHostDocument = current
+        }
         let type = textDocumentProxy.keyboardType ?? .default
         // The proxy is not attached to a document during viewDidLoad. In particular,
         // documentIdentifier can be nil in Objective-C despite its nonoptional Swift API.
