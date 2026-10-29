@@ -49,7 +49,9 @@ final class KeyboardViewController: UIInputViewController {
             self?.suggestions.refresh(force: true)
         }
         scratchpad.onTextChange = { [weak self] in
-            self?.suggestions.refresh(force: true)
+            // Ordinary input already changes the snapshot; do not force-rebuild
+            // the suggestions UI for every character or during a glide insertion.
+            self?.suggestions.refresh()
         }
         scratchpad.canUseClipboard = hasFullAccess
         NSLayoutConstraint.activate([
@@ -344,6 +346,7 @@ final class KeyboardViewController: UIInputViewController {
         guard reportedLanguage != inputState.language else { return }
         reportedLanguage = inputState.language
         primaryLanguage = inputState.language.code
+        suggestions.prepareGlide(for: inputState.language)
     }
 
     private var returnLabel: String {
