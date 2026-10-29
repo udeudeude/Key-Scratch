@@ -19,6 +19,7 @@ struct ContentView: View {
     @State private var showSetup = false
     @State private var showSystemTest = false
     @State private var showKeyScratchLab = false
+    @State private var showFullNotes = false
     @State private var saveError: String?
     @State private var triedGestures: Set<KeyboardGesture> = []
 
@@ -64,6 +65,29 @@ struct ContentView: View {
                 }
                 .buttonStyle(.plain)
                 .accessibilityIdentifier("key-scratch-experiment-lab")
+
+                Button { showFullNotes = true } label: {
+                    HStack(spacing: 12) {
+                        Image(systemName: "note.text")
+                            .font(.title3)
+                            .frame(width: 30)
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("Scratchpad")
+                                .font(.system(size: 17, weight: .semibold))
+                                .foregroundStyle(.primary)
+                            Text("Edit your keyboard notes full-size, copy, or export")
+                                .font(.system(size: 12))
+                                .foregroundStyle(.secondary)
+                        }
+                        Spacer(minLength: 0)
+                        Image(systemName: "chevron.right")
+                            .foregroundStyle(.secondary)
+                    }
+                    .padding(14)
+                    .background(.primary.opacity(0.065), in: RoundedRectangle(cornerRadius: 13))
+                }
+                .buttonStyle(.plain)
+                .accessibilityIdentifier("open-key-scratch-notes")
 
                 VStack(alignment: .leading, spacing: 12) {
                     Text("Notes alongside\nyour keyboard.")
@@ -147,6 +171,7 @@ struct ContentView: View {
         .sheet(isPresented: $showSetup) { SetupView() }
         .sheet(isPresented: $showSystemTest) { SystemKeyboardTest() }
         .sheet(isPresented: $showKeyScratchLab) { KeyScratchExperimentLab(preferences: $preferences) }
+        .sheet(isPresented: $showFullNotes) { KeyScratchFullNotes() }
         .onChange(of: preferences) { _, value in
             do { try KeyboardPublisher.publish(value) }
             catch { saveError = "The preview was updated, but settings could not be shared with the extension. Check that both targets use the same App Group and signing team." }
@@ -775,6 +800,95 @@ private struct KeyScratchExperimentLab: View {
             }
             Slider(value: value, in: bounds, step: 1)
                 .accessibilityLabel(title)
+        }
+    }
+}
+
+
+/// Full-size companion editor for the very same local note shown in the keyboard.
+/// The keyboard extension is short-lived; the App Group note is shared locally
+/// without accounts, synchronization services, or network access.
+private struct KeyScratchFullNotes: View {
+    @Environment(\.dismiss) private var dismiss
+    @State private var note = ""
+    @State private var loaded = false
+    @State private var showClearConfirmation = false
+    @State private var notice: String?
+    @FocusState private var focused: Bool
+
+    var body: some View {
+        NavigationStack {
+            VStack(alignment: .leading, spacing: 12) {
+                Text("The note shown beside your keyboard, with room to edit it.")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                TextEditor(text: $note)
+                    .focused($focused)
+                    .font(.system(size: 16))
+                    .scrollContentBackground(.hidden)
+                    .padding(7)
+                    .background(.secondary.opacity(0.08), in: RoundedRectangle(cornerRadius: 12))
+                    .accessibilityIdentifier("full-scratchpad-editor")
+                if let notice {
+                    Text(notice).font(.caption).foregroundStyle(.secondary)
+                }
+                HStack(spacing: 12) {
+                    Button {
+                        UIPasteboard.general.string = note
+                        notice = "Copied all note text"
+                    } label: {
+                        Label("Copy all", systemImage: "doc.on.doc")
+                    }
+                    .disabled(note.isEmpty)
+                    ShareLink(item: note) {
+                        Label("Share / export", systemImage: "square.and.arrow.up")
+                    }
+                    .disabled(note.isEmpty)
+                    Spacer()
+                    Button(role: .destructive) {
+                        showClearConfirmation = true
+                    } label: {
+                        Image(systemName: "trash")
+                    }
+                    .disabled(note.isEmpty)
+                    .accessibilityLabel("Clear entire note")
+                }
+                .buttonStyle(.bordered)
+                Text("For normal selection, Cut, Copy, Paste, and Select All, touch and hold inside the editor. Changes save on this iPhone and appear in the keyboard when it opens again.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            .padding()
+            .navigationTitle("Scratchpad")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Done") { dismiss() }
+                }
+            }
+        }
+        .onAppear {
+            if let shared = ScratchpadStore.load() {
+                note = shared
+            } else {
+                notice = "Open the updated Key Scratch keyboard once to import your existing note."
+            }
+            loaded = true
+        }
+        .onChange(of: note) { _, value in
+            guard loaded else { return }
+            if !ScratchpadStore.save(value) {
+                notice = "Shared note storage is unavailable. Check App Group signing before closing."
+            } else {
+                notice = nil
+            }
+        }
+        .confirmationDialog("Erase the entire scratchpad?", isPresented: $showClearConfirmation,
+                            titleVisibility: .visible) {
+            Button("Erase note", role: .destructive) { note = "" }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("This cannot be undone. Use Share / export if you want a backup first.")
         }
     }
 }
