@@ -66,6 +66,11 @@ final class SuggestionTests: XCTestCase {
         XCTAssertEqual(edit.moveRight, 0)
         XCTAssertEqual(edit.left, "hello")
         XCTAssertEqual(edit.text, "help")
+        let withAutoSpace = snapshot("the hello ")
+        let replacement = try XCTUnwrap(SuggestionEdit.replacingGlide(
+            correction, inserted: "hello", offered: withAutoSpace, current: withAutoSpace))
+        XCTAssertEqual(replacement.left, "hello ")
+        XCTAssertEqual(replacement.text, "help ")
         XCTAssertNil(SuggestionEdit.replacingGlide(correction, inserted: "world", offered: s, current: s))
         let selected = snapshot("the hello", after: "cat", selected: "word")
         XCTAssertNil(SuggestionEdit.replacingGlide(correction, inserted: "hello", offered: selected, current: selected))
