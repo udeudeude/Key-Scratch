@@ -132,6 +132,22 @@ final class ScratchpadView: UIView, UITextViewDelegate {
         }
     }
 
+    /// Use the actual rendered UITextView layout for up/down trackpad movement,
+    /// including soft-wrapped lines that a host app doesn't expose to extensions.
+    func moveCaretVertically(rows: Int) {
+        guard isEditingNote, rows != 0,
+              let selected = editor.selectedTextRange else { return }
+        let rect = editor.caretRect(for: selected.start)
+        let height = max(editor.font?.lineHeight ?? 14, 12)
+        let destination = CGPoint(x: rect.minX, y: rect.midY + CGFloat(rows) * height)
+        guard let position = editor.closestPosition(to: destination),
+              let range = editor.textRange(from: position, to: position) else { return }
+        editor.selectedTextRange = range
+        editor.scrollRangeToVisible(editor.selectedRange)
+        updateCaret()
+        onTextChange?()
+    }
+
     func moveCaret(steps: Int) {
         guard isEditingNote, steps != 0,
               let start = editor.selectedTextRange?.start,
@@ -195,7 +211,9 @@ final class ScratchpadView: UIView, UITextViewDelegate {
         add("Copy", action: #selector(copyNote), to: bottom)
 
         let erase = UIButton(type: .system)
-        erase.setTitle("Hold Clear", for: .normal)
+        erase.setTitle("Clear", for: .normal)
+        erase.accessibilityLabel = "Clear note"
+        erase.accessibilityHint = "Press and hold to erase the entire note."
         erase.titleLabel?.font = .systemFont(ofSize: 9)
         erase.addGestureRecognizer(UILongPressGestureRecognizer(target: self, action: #selector(clearNoteOnHold(_:))))
         bottom.addArrangedSubview(erase)
@@ -220,10 +238,19 @@ final class ScratchpadView: UIView, UITextViewDelegate {
         let tap = UITapGestureRecognizer(target: self, action: #selector(noteTapped(_:)))
         tap.cancelsTouchesInView = false
         editor.addGestureRecognizer(tap)
+        // A selectable but non-first-responder editor doesn't get all of the
+        // system keyboard's multi-tap selection gestures. Supply our own.
+        let wordTap = UITapGestureRecognizer(target: self, action: #selector(selectWordAtTap(_:)))
+        wordTap.numberOfTapsRequired = 2
+        let paragraphTap = UITapGestureRecognizer(target: self, action: #selector(selectParagraphAtTap(_:)))
+        paragraphTap.numberOfTapsRequired = 3
+        wordTap.require(toFail: paragraphTap)
+        editor.addGestureRecognizer(wordTap)
+        editor.addGestureRecognizer(paragraphTap)
 
         message.font = .systemFont(ofSize: 9)
         message.textColor = .secondaryLabel
-        message.numberOfLines = 2
+        message.numberOfLines = 3
         message.isHidden = true
 
         let stack = UIStackView(arrangedSubviews: [toolbar, message, editor])
@@ -249,6 +276,39 @@ final class ScratchpadView: UIView, UITextViewDelegate {
         if let position = editor.closestPosition(to: location) {
             editor.selectedTextRange = editor.textRange(from: position, to: position)
         }
+        updateCaret()
+        onTextChange?()
+    }
+
+    @objc private func selectWordAtTap(_ gesture: UITapGestureRecognizer) {
+        guard gesture.state == .ended else { return }
+        activate()
+        let text = editor.text ?? ""
+        guard !text.isEmpty, let position = editor.closestPosition(to: gesture.location(in: editor)) else { return }
+        let utf16Position = editor.offset(from: editor.beginningOfDocument, to: position)
+        var found: NSRange?
+        text.enumerateSubstrings(in: text.startIndex..<text.endIndex, options: .byWords) {
+            _, range, _, stop in
+            let candidate = NSRange(range, in: text)
+            if NSLocationInRange(min(utf16Position, max(0, (text as NSString).length - 1)), candidate) {
+                found = candidate
+                stop = true
+            }
+        }
+        if let found { editor.selectedRange = found }
+        updateCaret()
+        onTextChange?()
+    }
+
+    @objc private func selectParagraphAtTap(_ gesture: UITapGestureRecognizer) {
+        guard gesture.state == .ended else { return }
+        activate()
+        let text = editor.text as NSString
+        guard text.length > 0,
+              let position = editor.closestPosition(to: gesture.location(in: editor)) else { return }
+        let offset = min(max(0, editor.offset(from: editor.beginningOfDocument, to: position)),
+                         text.length - 1)
+        editor.selectedRange = text.paragraphRange(for: NSRange(location: offset, length: 0))
         updateCaret()
         onTextChange?()
     }
@@ -288,7 +348,7 @@ final class ScratchpadView: UIView, UITextViewDelegate {
     @objc private func pasteClipboard() {
         activate()
         guard canUseClipboard else {
-            inform("Paste: enable Allow Full Access in iPhone keyboard settings")
+            inform("Enable Full Access to paste")
             return
         }
         guard let value = UIPasteboard.general.string, !value.isEmpty else {
@@ -301,7 +361,7 @@ final class ScratchpadView: UIView, UITextViewDelegate {
 
     @objc private func copyNote() {
         guard canUseClipboard else {
-            inform("Copy: enable Allow Full Access in iPhone keyboard settings")
+            inform("Enable Full Access to copy")
             return
         }
         let value = selectedNoteText.isEmpty ? editor.text ?? "" : selectedNoteText
