@@ -25,6 +25,8 @@ These are individual badge observations, not a statistical latency benchmark. De
 
 ### Additional notes fixes
 
+- **Touch-first scratchpad clipboard:** the Copy/Paste menu words have been removed from the panel. A finger held on text selects a word and opens iOS's floating edit menu with Copy, Cut, Paste, Select All, and Insert in App. The action menu belongs only to the scratchpad, never the host field. Hold empty note space to paste at the caret. Copy/Cut/Paste require optional iOS **Allow Full Access** for the keyboard extension; otherwise the actions are disabled and the menu identifies the missing permission. As with native editing, iOS may ask permission to paste from another app.
+- **Automatic host focus:** changes to the host text input, selection, and document identifier cause the scratchpad to stop intercepting typing. An unchanged-caret tap in an already-focused host field may not generate any keyboard-extension notification. In that exceptional case only, a small upper-right icon returns typing to the host. We cannot make arbitrary host taps observable through public keyboard APIs.
 - The scratchpad now shares the same punctuation/double-space-period processing as the host app.
 - Two taps can select a word, three taps can select a paragraph. These gesture recognizers require physical-device testing.
 - Changes to host text input focus are used to switch away from scratchpad editing when possible. The OS does **not** report every tap in the app above a third-party keyboard, especially a tap that leaves the caret unchanged. The App switch stays available as a reliable fallback.
@@ -42,7 +44,7 @@ Use the Green configuration with English enabled and the iPhone key-positions to
 - Type two spaces quickly after a manually typed word in notes: expect a period and one space.
 - Drag from Space left/right/up/down through several visual lines in the notes field; then test across explicit newlines in the host. Soft-wrapped host lines are a platform limitation.
 - Visit letters, 123, #+= and back: Shift / symbols and Delete occupy the same third-row positions, Return is always bottom right. Check that symbols are legible and can be tapped.
-- Double tap a note word, then triple tap a note paragraph, and try Copy. Turn on iOS Allow Full Access to enable the keyboard clipboard buttons if desired.
-- Tap the host app field after working in notes. If the host doesn't notify the extension of an input change, use the explicit App button; record which host apps exhibit this.
+- Double tap a note word or triple tap a paragraph. Hold a finger on text and use the floating Copy/Cut menu; hold empty space for Paste. First enable **Allow Full Access** on the iPhone's keyboard settings. No permanent Copy/Paste toolbar should appear.
+- Tap the host app text field after working in notes. Typing should return there automatically when the app reports a focus/selection change. If the app gives no notification, use the small fallback icon, and record which host apps exhibit this.
 
 **Status:** Source changes are committed on the feature branch. Do not merge into main until the iOS build and physical-device tests pass.
