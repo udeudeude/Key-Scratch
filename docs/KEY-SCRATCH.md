@@ -12,6 +12,18 @@ An experimental fork of Ortholinear for iPhone. The notes occupy the left 30% of
 - **Hold Clear** requires a long press and permanently erases the note (no undo yet).
 - The note persists in the keyboard extension's local UserDefaults, not in the containing app. There is no cross-device synchronization.
 
+## Compact layout and typography
+
+- Key Scratch's ordinary letter rows are now **62 pt** instead of 72 pt; the control row is **48 pt** instead of 56 pt, and the suggestion strip is **36 pt** instead of 44 pt. Row spacing is also reduced. In its standard configuration the combined keyboard is approximately **278 pt** tall instead of **328 pt** (about **15% shorter**).
+- Existing geometry that matches untouched Ortholinear factory defaults migrates to these shorter values. Deliberately customized sizes are retained. The **Big letters** preset still offers the original 72 pt rows.
+- The notes now use **11 pt San Francisco system text (medium weight)** rather than 10 pt monospaced text. Smaller insets preserve room for more characters in the narrow panel.
+- The notes control bar is 42 pt instead of 48 pt.
+- You can adjust row and key heights later through the companion app's keyboard geometry settings. If you choose larger rows, the suggestion strip returns to 44 pt.
+
+## Lag investigation
+
+The unmodified Ortholinear app is responsive on the same iPhone XS Max. That makes Key Scratch's added geometry, note UI, or suggestion routing the likely regression. Our current hypothesis is that suggestions and swipe decoding contend for work. The fork now runs glide decoding independently at high priority, warms its dictionary when the language changes, and avoids forced suggestion rebuilds on every note character. This is **not yet a measured fix**: compare original Ortholinear and the new Key Scratch directly on-device using the same phrases, and inspect the Xcode console for non-text glide-to-insertion timing.
+
 ## Clipboard permission
 
 Apple's keyboard sandbox requires the optional **Allow Full Access** permission for system clipboard operations. Key Scratch requests eligibility for that permission, but local typing and notes continue to work without it.
