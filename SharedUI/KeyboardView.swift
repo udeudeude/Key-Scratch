@@ -301,6 +301,23 @@ final class KeyboardView: UIControl {
                                                 increasedContrast: increasedContrast))
     }
 
+    /// Position accent choices next to the held key instead of requiring a
+    /// long journey into the suggestion ribbon. Clamp inside the extension.
+    private func heldAlternativesFrame(owner: ObjectIdentifier, count: Int) -> CGRect {
+        let keyCenter: CGPoint
+        let top: CGFloat
+        if let index = sessions[owner]?.startCell, cells.indices.contains(index) {
+            keyCenter = CGPoint(x: cells[index].visualFrame.midX, y: cells[index].visualFrame.midY)
+            top = cells[index].visualFrame.minY
+        } else {
+            keyCenter = CGPoint(x: bounds.midX, y: 38)
+            top = 38
+        }
+        let width = min(max(1, bounds.width - 8), CGFloat(count) * 38)
+        let x = min(max(4, keyCenter.x - width / 2), max(4, bounds.width - width - 4))
+        return CGRect(x: x, y: max(1, top - 37), width: width, height: 34)
+    }
+
     override func draw(_ rect: CGRect) {
         let palette = palette
         palette.background.setFill()
@@ -388,11 +405,11 @@ final class KeyboardView: UIControl {
             trail.stroke()
         }
         if let popup {
-            let width = min(bounds.width - 12, CGFloat(popup.values.count) * 52)
-            let origin = (bounds.width - width) / 2
+            let ribbon = heldAlternativesFrame(owner: popup.owner, count: popup.values.count)
             for (index, value) in popup.values.enumerated() {
-                let frame = CGRect(x: origin + CGFloat(index) * width / CGFloat(popup.values.count),
-                                   y: 2, width: width / CGFloat(popup.values.count), height: 34)
+                let frame = CGRect(x: ribbon.minX + CGFloat(index) * ribbon.width / CGFloat(popup.values.count),
+                                   y: ribbon.minY, width: ribbon.width / CGFloat(popup.values.count),
+                                   height: ribbon.height)
                 let path = UIBezierPath(roundedRect: frame.insetBy(dx: 1, dy: 0), cornerRadius: 8)
                 palette.key.setFill(); path.fill()
                 if index == popup.selected {
@@ -400,7 +417,8 @@ final class KeyboardView: UIControl {
                 }
                 (index == popup.selected ? palette.accent : palette.border).setStroke()
                 path.lineWidth = max(1, palette.borderWidth); path.stroke()
-                drawText(title(.text(value)), in: frame, font: palette.legend(ofSize: 22, weight: .regular), color: palette.text)
+                let pointSize = min(21, max(12, frame.width * 0.65))
+                drawText(title(.text(value)), in: frame, font: palette.legend(ofSize: pointSize, weight: .regular), color: palette.text)
             }
         } else if preferences.showHeader {
             palette.accent.withAlphaComponent((dismissButton.isHighlighted ? 1 : feedbackOpacity(for: .dismiss)) * palette.highlightOpacity).setFill()
@@ -507,7 +525,10 @@ final class KeyboardView: UIControl {
             setNeedsDisplay()
         } else if popup == nil {
             sessions[id]?.trace = nil
-            popup = (id, key.alternatives, 0)
+            guard case .text(let original) = key.action else { return }
+            // Releasing without moving still types the original letter.
+            // Swipe left or right across the floating strip to pick an accent.
+            popup = (id, [original] + key.alternatives, 0)
             setNeedsDisplay()
         }
     }
@@ -553,11 +574,13 @@ final class KeyboardView: UIControl {
                 continue
             }
             if var current = popup, current.owner == id {
-                let width = min(bounds.width - 12, CGFloat(current.values.count) * 52)
-                let origin = (bounds.width - width) / 2
-                // Drag up into the ribbon to choose an alternative; release in place for the first.
-                if point.y < KeyboardGeometry.ribbonHeight {
-                    current.selected = min(current.values.count - 1, max(0, Int((point.x - origin) / (width / CGFloat(current.values.count)))))
+                let ribbon = heldAlternativesFrame(owner: id, count: current.values.count)
+                // Horizontal dragging works even if the finger remains near the
+                // held key, rather than reaching the top of the keyboard.
+                if abs(point.x - session.start.x) > 10 || ribbon.contains(point) {
+                    let unit = ribbon.width / CGFloat(current.values.count)
+                    current.selected = min(current.values.count - 1,
+                                           max(0, Int((point.x - ribbon.minX) / unit)))
                     popup = current
                 }
                 continue
