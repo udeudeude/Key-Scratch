@@ -630,7 +630,7 @@ private struct KeyScratchExperimentLab: View {
                 } header: {
                     Text("Modes of attack")
                 } footer: {
-                    Text("Colors are stable identifiers. Blue is a full-width reference; Green, Amber and Purple vary different parts of the split design.")
+                    Text("Colors identify controlled comparisons. Blue vs Red tests the notes panel; Red vs Green tests the glide worker; Green vs Amber tests suggestions; Green vs Purple tests notes width.")
                 }
 
                 Section("Scratchpad") {
