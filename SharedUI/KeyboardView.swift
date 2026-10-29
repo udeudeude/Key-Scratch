@@ -470,8 +470,8 @@ final class KeyboardView: UIControl {
         case .dismiss:
             drawSymbol("keyboard.chevron.compact.down", in: frame, size: 21, color: color)
         case .noteFocus:
-            // A text label makes the destination explicit and VoiceOver-friendly.
-            break
+            // Draw the contextual "Notes" or "App" label via normal key text.
+            return false
         case .globe: break // Native button keeps Apple's tap-and-hold behavior.
         default: return false
         }
