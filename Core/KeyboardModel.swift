@@ -634,7 +634,14 @@ struct KeyboardPreferences: Codable, Equatable, Sendable {
         result.rowSpacing = rowSpacing.isFinite ? min(12, max(0, rowSpacing)) : 2
         result.keyScratchNoteWidth = keyScratchNoteWidth.isFinite ? min(0.42, max(0.18, keyScratchNoteWidth)) : 0.30
         result.keyScratchNoteFontSize = keyScratchNoteFontSize.isFinite ? min(16, max(9, keyScratchNoteFontSize)) : 11
-        let enabled = KeyboardLanguage.allCases.filter { languages.contains($0) && ($0 != .russian || invasionAnswer == .opposes) }
+        // Preserve the user's preferred language order. Older Ortholinear
+        // always reordered entries by allCases, which put Ukrainian first.
+        var seen = Set<KeyboardLanguage>()
+        let enabled = languages.filter {
+            KeyboardLanguage.allCases.contains($0)
+            && ($0 != .russian || invasionAnswer == .opposes)
+            && seen.insert($0).inserted
+        }
         result.languages = enabled.isEmpty ? Self().languages : enabled
         if !result.languages.contains(defaultLanguage) { result.defaultLanguage = result.languages[0] }
         return result
@@ -745,7 +752,8 @@ extension KeyboardPreferences {
         // chosen Ukrainian or other enabled-language combinations are preserved.
         let previousSchema = (try? c.decodeIfPresent(Int.self, forKey: .schemaVersion)) ?? 0
         if previousSchema < 7, defaultLanguage == .ukrainian,
-           languages == [.ukrainian, .english] {
+           Set(languages) == Set([KeyboardLanguage.ukrainian, .english]),
+           languages.count == 2 {
             defaultLanguage = .english
             languages = [.english, .ukrainian]
             languageMemoryGeneration += 1
