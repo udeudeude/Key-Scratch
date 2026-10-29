@@ -488,35 +488,36 @@ final class KeyboardViewController: UIInputViewController {
 
     private func handle(_ action: KeyAction) {
         if scratchpad.isEditingNote {
+            if action != .backspace && action != .shift { pendingGlide = nil }
             switch action {
             case .text(let value):
                 let typed = inputState.consume(value)
                 expandNote(before: typed)
-                scratchpad.type(typed)
-                expander.triggerTyped(as: typed)
+                expander.triggerTyped(as: insertNote(typed))
                 updateAutoShift()
                 keyboard.inputState = inputState
                 return
             case .space:
                 expandNote(before: " ")
-                scratchpad.type(" ")
-                expander.triggerTyped(as: " ")
+                expander.triggerTyped(as: insertNote(" "))
                 updateAutoShift()
                 keyboard.inputState = inputState
                 return
             case .enter:
                 expandNote(before: "\n")
-                scratchpad.type("\n")
-                expander.triggerTyped(as: "\n")
+                expander.triggerTyped(as: insertNote("\n"))
                 updateAutoShift()
                 keyboard.inputState = inputState
                 return
             case .backspace:
-                if let edit = expander.revert(before: scratchpad.beforeCaret,
-                                              selected: scratchpad.selectedNoteText) {
-                    scratchpad.replaceBeforeCaret(characters: edit.deleteCount, with: edit.insert)
-                } else {
-                    scratchpad.deleteBackward()
+                if !deleteRecentGlide(inNotes: true) {
+                    noteSpacing.reset()
+                    if let edit = expander.revert(before: scratchpad.beforeCaret,
+                                                  selected: scratchpad.selectedNoteText) {
+                        scratchpad.replaceBeforeCaret(characters: edit.deleteCount, with: edit.insert)
+                    } else {
+                        scratchpad.deleteBackward()
+                    }
                 }
                 updateAutoShift()
                 keyboard.inputState = inputState
@@ -540,6 +541,7 @@ final class KeyboardViewController: UIInputViewController {
             }
         }
         suggestions.cancelGlide()
+        if action != .backspace && action != .shift { pendingGlide = nil }
         switch action {
         case .text, .space, .enter, .backspace: break
         default: expander.forget()
@@ -551,13 +553,15 @@ final class KeyboardViewController: UIInputViewController {
             expander.triggerTyped(as: insert(typed))
         case .space: expand(before: " "); expander.triggerTyped(as: insert(" "))
         case .backspace:
-            punctuationSpacing.reset()
-            if let edit = expander.revert(before: textDocumentProxy.documentContextBeforeInput ?? "",
-                                           selected: textDocumentProxy.selectedText ?? "") {
-                for _ in 0..<edit.deleteCount { textDocumentProxy.deleteBackward() }
-                textDocumentProxy.insertText(edit.insert)
-            } else {
-                textDocumentProxy.deleteBackward()
+            if !deleteRecentGlide(inNotes: false) {
+                punctuationSpacing.reset()
+                if let edit = expander.revert(before: textDocumentProxy.documentContextBeforeInput ?? "",
+                                               selected: textDocumentProxy.selectedText ?? "") {
+                    for _ in 0..<edit.deleteCount { textDocumentProxy.deleteBackward() }
+                    textDocumentProxy.insertText(edit.insert)
+                } else {
+                    textDocumentProxy.deleteBackward()
+                }
             }
         case .enter: expand(before: "\n"); expander.triggerTyped(as: insert("\n"))
         case .shift:
@@ -628,6 +632,10 @@ final class KeyboardViewController: UIInputViewController {
     @discardableResult
     private func insert(_ value: String) -> String {
         if hasSelection { punctuationSpacing.reset() }
+        if !Self.literalTypes.contains(textDocumentProxy.keyboardType ?? .default) {
+            capitalizeStandaloneI(before: textDocumentProxy.documentContextBeforeInput ?? "",
+                                   incoming: value, inNotes: false)
+        }
         let literal = Self.literalTypes.contains(textDocumentProxy.keyboardType ?? .default)
         let preferences = keyboard.preferences
         let edit = punctuationSpacing.edit(for: value, before: textDocumentProxy.documentContextBeforeInput,
