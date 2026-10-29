@@ -202,7 +202,7 @@ extension String {
 }
 
 enum KeyAction: Hashable, Sendable {
-    case text(String), shift, backspace, space, enter, language, page, globe, dismiss
+    case text(String), shift, backspace, space, enter, language, emoji, page, globe, dismiss
     /// Opens the first of the person's layers from the letter page.
     case layers
     /// Moves the cursor or deletes, from a navigation layer.
@@ -290,11 +290,10 @@ enum KeyboardLayout {
             }
         }
         if needsGlobe { controls.append(Key(action: .globe)) }
-        // With a single language there is nothing to switch to, unless a URL or
-        // email field put the keyboard in English and it needs a way back.
-        if preferences.language(after: state.language) != state.language {
-            controls.append(Key(action: .language, weight: 1.25))
-        }
+        // The emoji picker takes the position of the former UA / EN key.
+        // Other languages remain available with a long-press on that key and
+        // the explicit language control in the companion app.
+        controls.append(Key(action: .emoji, weight: 1.15))
         controls += [Key(action: .space, weight: 3.8),
                      Key(action: .enter, weight: preferences.validated.actionKeyWidth)]
         if state.page != .letters && !preferences.iphoneKeyPositions {
@@ -559,12 +558,12 @@ enum KeyScratchNoteFont: String, Codable, CaseIterable, Identifiable, Sendable {
 }
 
 struct KeyboardPreferences: Codable, Equatable, Sendable {
-    let schemaVersion = 6
+    let schemaVersion = 7
     var keyHeight: Double = 62
     var columnSpacing: Double = 2
     var rowSpacing: Double = 2
     var fillGaps: Bool = true
-    var defaultLanguage: KeyboardLanguage = .ukrainian
+    var defaultLanguage: KeyboardLanguage = .english
     var controlHeight: Double = 48
     var letterSize: Double = 24
     var actionKeyWidth: Double = 2.4
@@ -582,6 +581,7 @@ struct KeyboardPreferences: Codable, Equatable, Sendable {
     var digitAccess: DigitAccess = .flick
     var glideTyping: Bool = true
     var iphoneKeyPositions: Bool = true
+    var appleKeyAppearance: Bool = true
     var keyScratchMode: KeyScratchMode = .split
     var keyScratchNoteWidth: Double = 0.30
     var keyScratchNoteFontSize: Double = 11
@@ -592,7 +592,7 @@ struct KeyboardPreferences: Codable, Equatable, Sendable {
     var contextualSuggestions: Bool = true
 
     /// The languages the language key cycles through, in `allCases` order.
-    var languages: [KeyboardLanguage] = [.ukrainian, .english]
+    var languages: [KeyboardLanguage] = [.english]
     var englishLayout: EnglishLayout = .qwerty
     var rememberLanguage: Bool = true
     /// Bumped to make the keyboard forget remembered languages; see LanguageMemory.
@@ -618,7 +618,7 @@ struct KeyboardPreferences: Codable, Equatable, Sendable {
         case controlHeight, letterSize, actionKeyWidth, shiftPlacement, showPunctuation, showApostrophe, showHeader, autoSpacePunctuation
         case yiOnLongPress, autoCapitalize, doubleSpacePeriod, digitAccess, glideTyping
         case keyScratchMode, keyScratchNoteWidth, keyScratchNoteFontSize, keyScratchNoteFont
-        case iphoneKeyPositions
+        case iphoneKeyPositions, appleKeyAppearance
         case theme, accent, showLongPressHints
         case suggestionsEnabled, nextWordSuggestions, contextualSuggestions
         case languages, englishLayout, rememberLanguage, languageMemoryGeneration, invasionAnswer
@@ -667,7 +667,7 @@ struct KeyboardPreferences: Codable, Equatable, Sendable {
 
     mutating func apply(_ preset: KeyboardPreset) {
         let language = (defaultLanguage, languages, englishLayout, rememberLanguage, languageMemoryGeneration, invasionAnswer)
-        let appearance = (theme, accent, showLongPressHints)
+        let appearance = (theme, accent, showLongPressHints, appleKeyAppearance)
         let suggestions = (suggestionsEnabled, nextWordSuggestions, contextualSuggestions)
         let typing = (autoCapitalize, doubleSpacePeriod, digitAccess, glideTyping, iphoneKeyPositions)
         let custom = (customLayouts, layers, showLayerKey, keycaps, expansions, extrasEnabled)
@@ -676,7 +676,7 @@ struct KeyboardPreferences: Codable, Equatable, Sendable {
         (customLayouts, layers, showLayerKey, keycaps, expansions, extrasEnabled) = custom
         (keyScratchMode, keyScratchNoteWidth, keyScratchNoteFontSize, keyScratchNoteFont) = scratch
         (defaultLanguage, languages, englishLayout, rememberLanguage, languageMemoryGeneration, invasionAnswer) = language
-        (theme, accent, showLongPressHints) = appearance
+        (theme, accent, showLongPressHints, appleKeyAppearance) = appearance
         (suggestionsEnabled, nextWordSuggestions, contextualSuggestions) = suggestions
         (autoCapitalize, doubleSpacePeriod, digitAccess, glideTyping, iphoneKeyPositions) = typing
     }
@@ -706,6 +706,7 @@ extension KeyboardPreferences {
         digitAccess = (try? c.decodeIfPresent(DigitAccess.self, forKey: .digitAccess)) ?? digitAccess
         glideTyping = try c.decodeIfPresent(Bool.self, forKey: .glideTyping) ?? glideTyping
         iphoneKeyPositions = try c.decodeIfPresent(Bool.self, forKey: .iphoneKeyPositions) ?? iphoneKeyPositions
+        appleKeyAppearance = try c.decodeIfPresent(Bool.self, forKey: .appleKeyAppearance) ?? appleKeyAppearance
         keyScratchMode = (try? c.decodeIfPresent(KeyScratchMode.self, forKey: .keyScratchMode)) ?? keyScratchMode
         keyScratchNoteWidth = try c.decodeIfPresent(Double.self, forKey: .keyScratchNoteWidth) ?? keyScratchNoteWidth
         keyScratchNoteFontSize = try c.decodeIfPresent(Double.self, forKey: .keyScratchNoteFontSize) ?? keyScratchNoteFontSize
@@ -741,7 +742,15 @@ extension KeyboardPreferences {
         // Legacy Ortholinear configurations using untouched factory geometry migrate
         // to Key Scratch's more compact defaults. Deliberately customized sizes survive.
         if !c.contains(.schemaVersion), keyHeight == 48 { keyHeight = 72 }
-        // Retain upstream language defaults. The Lab offers one-tap English-only mode.
+        // Migrate only the untouched upstream UA+EN default. Explicitly
+        // chosen Ukrainian or other enabled-language combinations are preserved.
+        let previousSchema = (try? c.decodeIfPresent(Int.self, forKey: .schemaVersion)) ?? 0
+        if previousSchema < 7, defaultLanguage == .ukrainian,
+           languages == [.ukrainian, .english] {
+            defaultLanguage = .english
+            languages = [.english, .ukrainian]
+            languageMemoryGeneration += 1
+        }
         if keyHeight == 72 && controlHeight == 56 && rowSpacing == 3 && letterSize == 28 {
             keyHeight = 62
             controlHeight = 48
