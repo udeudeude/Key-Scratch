@@ -36,14 +36,14 @@ final class KeyboardView: UIControl {
     }
     var returnTitle = "return" { didSet { if oldValue != returnTitle { refresh() } } }
     var returnEnabled = true { didSet { if oldValue != returnEnabled { refresh() } } }
+    var editingScratchpad = false { didSet { if oldValue != editingScratchpad { refresh() } } }
     /// Hosts turn this on only for languages and fields that can decode a trace.
     var glideEnabled = false { didSet { if !glideEnabled { for id in sessions.keys { sessions[id]?.trace = nil } } } }
     var onAction: ((KeyAction) -> Void)?
     var onCursor: ((Int) -> Void)?
     var onCursorVertical: ((Int) -> Void)?
     var onDismiss: (() -> Void)?
-    /// Long-press the emoji key to cycle enabled languages without sacrificing
-    /// the now-familiar keyboard position of the emoji selector.
+    /// Long-press the Notes/App key to cycle enabled languages.
     var onLanguageHold: (() -> Void)?
     var onGlide: (([CGPoint]) -> Void)?
     var onGesture: ((KeyboardGesture) -> Void)?
@@ -77,7 +77,7 @@ final class KeyboardView: UIControl {
         var cursorSteps = 0
         var cursorRows = 0
         var cursorMode = false
-        var emojiHeld = false
+        var focusHeld = false
         var timer: Timer?
         var startCell: Int
         var flick: String?
@@ -182,7 +182,7 @@ final class KeyboardView: UIControl {
         case .space: return "space"
         case .enter: return returnTitle
         case .language: return nextLanguage.badge
-        case .emoji: return "☺︎"
+        case .noteFocus: return editingScratchpad ? "App" : "Notes"
         case .page: return displayState.page == .letters ? "123" : "ABC"
         case .globe: return ""
         case .dismiss: return "⌄"
@@ -204,7 +204,7 @@ final class KeyboardView: UIControl {
         case .space: return "Space"
         case .enter: return "Return"
         case .language: return "Switch to \(nextLanguage.title)"
-        case .emoji: return "Emoji. Hold for next language."
+        case .noteFocus: return editingScratchpad ? "Return typing to the app. Hold for next language." : "Type in scratchpad. Hold for next language."
         case .page: return displayState.page == .letters ? "Numbers" : "Letters"
         case .dismiss: return "Dismiss keyboard"
         case .layers: return KeyboardLayout.firstLayerPage(preferences).map { KeyboardLayout.pageName($0, preferences: preferences) } ?? "Layers"
@@ -469,8 +469,9 @@ final class KeyboardView: UIControl {
                      font: .systemFont(ofSize: 10, weight: .semibold), color: color)
         case .dismiss:
             drawSymbol("keyboard.chevron.compact.down", in: frame, size: 21, color: color)
-        case .emoji:
-            drawSymbol("face.smiling", in: frame, size: 23, color: color)
+        case .noteFocus:
+            // A text label makes the destination explicit and VoiceOver-friendly.
+            break
         case .globe: break // Native button keeps Apple's tap-and-hold behavior.
         default: return false
         }
@@ -523,7 +524,7 @@ final class KeyboardView: UIControl {
             sessions[id] = session
             if key.action == .backspace { emit(.backspace) }
             if key.action == .backspace || key.action == .space
-                || key.action == .emoji || !key.alternatives.isEmpty {
+                || key.action == .noteFocus || !key.alternatives.isEmpty {
                 let delay = key.action == .backspace ? DeleteRepeat.initialDelay
                     : (key.action == .space ? 0.32 : 0.42)
                 let timer = Timer(timeInterval: delay, repeats: false) { [weak self] _ in
@@ -543,9 +544,9 @@ final class KeyboardView: UIControl {
         } else if key.action == .space {
             sessions[id]?.cursorMode = true
             setNeedsDisplay()
-        } else if key.action == .emoji {
-            // Consume the upcoming touch-up so a hold never opens Emoji as well.
-            sessions[id]?.emojiHeld = true
+        } else if key.action == .noteFocus {
+            // A language hold never toggles editing focus on release.
+            sessions[id]?.focusHeld = true
             onLanguageHold?()
             setNeedsDisplay()
         } else if popup == nil {
@@ -708,7 +709,7 @@ final class KeyboardView: UIControl {
                 onGesture?(.flick)
             } else if session.cursorMode {
                 onGesture?(.spaceCursor)
-            } else if session.emojiHeld {
+            } else if session.focusHeld {
                 // Long press already switched language.
             } else if session.original != .backspace,
                       let index = KeyboardGeometry.hit(at: touch.location(in: self), cells: cells) {
