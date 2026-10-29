@@ -144,7 +144,7 @@ struct ContentView: View {
                 }
 
                 VStack(spacing: 0) {
-                    detailRow("01", title: "All the way to the edges.", subtitle: "No stagger or indents. Fewer keys in a row means wider letters.")
+                    detailRow("01", title: "Your keyboard geometry.", subtitle: "iPhone-style key positions or Ortholinear’s grid, with adjustable heights and split width.")
                     Divider().padding(.vertical, 17)
                     detailRow("02", title: "Make the space yours.", subtitle: "Size letters and controls separately. Choose which punctuation earns a key.")
                     Divider().padding(.vertical, 17)
@@ -155,8 +155,8 @@ struct ContentView: View {
                 Button("Test the installed system keyboard") { showSystemTest = true }
                     .font(.system(size: 13, weight: .medium)).accessibilityIdentifier("system-test")
                 HStack(spacing: 20) {
-                    Link("Privacy policy", destination: URL(string: "https://github.com/IgorVaryvoda/Ortholinear/blob/main/PRIVACY.md")!)
-                    Link("Support", destination: URL(string: "https://github.com/IgorVaryvoda/Ortholinear/blob/main/SUPPORT.md")!)
+                    Link("Privacy policy", destination: URL(string: "https://github.com/udeudeude/Key-Scratch/blob/feature/scratchpad-first-pass/PRIVACY.md")!)
+                    Link("Source and feedback", destination: URL(string: "https://github.com/udeudeude/Key-Scratch/issues")!)
                 }
                 .font(.system(size: 13, weight: .medium))
                 Text("KEY SCRATCH / EXPERIMENTAL")
@@ -543,10 +543,10 @@ struct SetupView: View {
                 Section {
                     Label("Open Settings → General → Keyboard", systemImage: "1.circle")
                     Label("Choose Keyboards → Add New Keyboard", systemImage: "2.circle")
-                    Label("Select Ortholinear", systemImage: "3.circle")
-                    Label("In any text field, use the globe to switch to Ortholinear", systemImage: "4.circle")
+                    Label("Select Key Scratch", systemImage: "3.circle")
+                    Label("In any text field, use the globe to switch to Key Scratch", systemImage: "4.circle")
                 } header: { Text("A one-time setup") } footer: {
-                    Text("Ortholinear does not request Full Access. Typing and geometry settings work without network access.")
+                    Text("For notes Copy/Paste and sharing the scratchpad with this app, select Key Scratch under Settings → General → Keyboard → Keyboards and enable Allow Full Access. No internet connection or account is needed.")
                 }
                 Section {
                     Button("Open Settings") {
@@ -702,16 +702,16 @@ private struct KeyScratchExperimentLab: View {
                 }
 
                 Section("Copy and paste") {
-                    Text("The keyboard must have iOS Allow Full Access enabled to use the clipboard. This is optional for typing and notes. Key Scratch does not send your text anywhere.")
+                    Text("Enable Allow Full Access for Key Scratch in iOS Settings to use the clipboard and share the note with this app. The keyboard still runs locally and doesn't transmit typed text.")
                         .font(.caption).foregroundStyle(.secondary)
                     Button {
                         if let url = URL(string: UIApplication.openSettingsURLString) {
                             UIApplication.shared.open(url)
                         }
                     } label: {
-                        Label("Open iPhone app settings", systemImage: "gear")
+                        Label("Open iOS Settings", systemImage: "gear")
                     }
-                    Text("For the keyboard permission, go to Settings > General > Keyboard > Keyboards > Key Scratch > Allow Full Access. Reopen the keyboard afterward.")
+                    Text("If Settings opens on this app's page, return to the main Settings list, then go to General → Keyboard → Keyboards → Key Scratch → Allow Full Access. Reopen the keyboard afterward.")
                         .font(.caption).foregroundStyle(.secondary)
                 }
 
