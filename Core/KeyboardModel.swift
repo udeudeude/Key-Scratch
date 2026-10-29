@@ -247,7 +247,7 @@ enum KeyboardLayout {
         var result: [[Key]]
         switch state.page {
         case .letters: result = letterKeys(state.language, preferences: preferences)
-        case .numbers: result = numberKeys(state.language)
+        case .numbers: result = numberKeys(state.language, iphone: preferences.iphoneKeyPositions)
         case .symbols:
             result = preferences.iphoneKeyPositions
                 ? textKeys(["[]{}#%^*+=", "_\\|~<>€£¥•", ".,?!'₴…"])
@@ -256,7 +256,7 @@ enum KeyboardLayout {
             // A layer deleted while it was open shows the numbers instead.
             if let layer = preferences.shownLayers.first(where: { $0.id == id }) {
                 result = layer.rows.map { row in row.map(\.layerKey) }
-            } else { result = numberKeys(state.language) }
+            } else { result = numberKeys(state.language, iphone: preferences.iphoneKeyPositions) }
         }
         let digits = "1234567890".map(String.init)
         if state.page == .letters && preferences.digitAccess == .flick {
@@ -330,8 +330,8 @@ enum KeyboardLayout {
         }
     }
 
-    private static func numberKeys(_ language: KeyboardLanguage) -> [[Key]] {
-        textKeys(["1234567890", "-/:;()$&@\"", (language == .ukrainian ? ".,?!ʼ" : ".,?!'") + "[]=+%"])
+    private static func numberKeys(_ language: KeyboardLanguage, iphone: Bool = false) -> [[Key]] {
+        textKeys(["1234567890", "-/:;()$&@\"", (language == .ukrainian ? ".,?!ʼ" : ".,?!'") + (iphone ? "+%" : "[]=+%")])
     }
 
     /// The pages the #+= / 123 key steps through: numbers, symbols, then each usable layer.
@@ -412,6 +412,19 @@ enum KeyboardLayout {
     static func letterAlternatives(_ character: Character, language: KeyboardLanguage,
                                    preferences: KeyboardPreferences) -> [String] {
         switch (language, character) {
+        // English uses the same iOS-style long-press diacritics as other languages.
+        case (.english, "a"): ["à", "á", "â", "ä", "æ", "ã", "å", "ā", "ą"]
+        case (.english, "e"): ["è", "é", "ê", "ë", "ē", "ė", "ę"]
+        case (.english, "i"): ["ì", "í", "î", "ï", "ī", "į"]
+        case (.english, "o"): ["ò", "ó", "ô", "ö", "œ", "ø", "ō", "õ"]
+        case (.english, "u"): ["ù", "ú", "û", "ü", "ū"]
+        case (.english, "c"): ["ç", "ć", "č"]
+        case (.english, "n"): ["ñ", "ń"]
+        case (.english, "s"): ["ß", "ś", "š"]
+        case (.english, "y"): ["ÿ", "ý"]
+        case (.english, "z"): ["ž", "ź", "ż"]
+        case (.english, "d"): ["ð"]
+        case (.english, "t"): ["þ"]
         // Only Ukrainian has ґ; Russian and Serbian г must not offer it.
         case (.ukrainian, "г"): ["ґ"]
         case (.ukrainian, "і"): preferences.yiOnLongPress ? ["ї"] : []
@@ -568,6 +581,7 @@ struct KeyboardPreferences: Codable, Equatable, Sendable {
     var doubleSpacePeriod: Bool = true
     var digitAccess: DigitAccess = .flick
     var glideTyping: Bool = true
+    var iphoneKeyPositions: Bool = true
     var keyScratchMode: KeyScratchMode = .split
     var keyScratchNoteWidth: Double = 0.30
     var keyScratchNoteFontSize: Double = 11
@@ -604,6 +618,7 @@ struct KeyboardPreferences: Codable, Equatable, Sendable {
         case controlHeight, letterSize, actionKeyWidth, shiftPlacement, showPunctuation, showApostrophe, showHeader, autoSpacePunctuation
         case yiOnLongPress, autoCapitalize, doubleSpacePeriod, digitAccess, glideTyping
         case keyScratchMode, keyScratchNoteWidth, keyScratchNoteFontSize, keyScratchNoteFont
+        case iphoneKeyPositions
         case theme, accent, showLongPressHints
         case suggestionsEnabled, nextWordSuggestions, contextualSuggestions
         case languages, englishLayout, rememberLanguage, languageMemoryGeneration, invasionAnswer
@@ -654,7 +669,7 @@ struct KeyboardPreferences: Codable, Equatable, Sendable {
         let language = (defaultLanguage, languages, englishLayout, rememberLanguage, languageMemoryGeneration, invasionAnswer)
         let appearance = (theme, accent, showLongPressHints)
         let suggestions = (suggestionsEnabled, nextWordSuggestions, contextualSuggestions)
-        let typing = (autoCapitalize, doubleSpacePeriod, digitAccess, glideTyping)
+        let typing = (autoCapitalize, doubleSpacePeriod, digitAccess, glideTyping, iphoneKeyPositions)
         let custom = (customLayouts, layers, showLayerKey, keycaps, expansions, extrasEnabled)
         let scratch = (keyScratchMode, keyScratchNoteWidth, keyScratchNoteFontSize, keyScratchNoteFont)
         self = preset.preferences
@@ -663,7 +678,7 @@ struct KeyboardPreferences: Codable, Equatable, Sendable {
         (defaultLanguage, languages, englishLayout, rememberLanguage, languageMemoryGeneration, invasionAnswer) = language
         (theme, accent, showLongPressHints) = appearance
         (suggestionsEnabled, nextWordSuggestions, contextualSuggestions) = suggestions
-        (autoCapitalize, doubleSpacePeriod, digitAccess, glideTyping) = typing
+        (autoCapitalize, doubleSpacePeriod, digitAccess, glideTyping, iphoneKeyPositions) = typing
     }
 }
 
@@ -690,6 +705,7 @@ extension KeyboardPreferences {
         doubleSpacePeriod = try c.decodeIfPresent(Bool.self, forKey: .doubleSpacePeriod) ?? doubleSpacePeriod
         digitAccess = (try? c.decodeIfPresent(DigitAccess.self, forKey: .digitAccess)) ?? digitAccess
         glideTyping = try c.decodeIfPresent(Bool.self, forKey: .glideTyping) ?? glideTyping
+        iphoneKeyPositions = try c.decodeIfPresent(Bool.self, forKey: .iphoneKeyPositions) ?? iphoneKeyPositions
         keyScratchMode = (try? c.decodeIfPresent(KeyScratchMode.self, forKey: .keyScratchMode)) ?? keyScratchMode
         keyScratchNoteWidth = try c.decodeIfPresent(Double.self, forKey: .keyScratchNoteWidth) ?? keyScratchNoteWidth
         keyScratchNoteFontSize = try c.decodeIfPresent(Double.self, forKey: .keyScratchNoteFontSize) ?? keyScratchNoteFontSize
@@ -784,13 +800,18 @@ enum KeyboardGeometry {
             : p.keyHeight + (p.numberRowHeight + p.rowSpacing) / 3
         var rowY = p.headerHeight
         return rows.enumerated().flatMap { row, keys in
-            let unit = width / keys.reduce(0) { $0 + $1.weight }
+            // Center the nine-key middle alphabet row, with half a key of inset.
+            let middleRow = rows.count == 5 ? 2 : 1
+            let middleInset: Double = p.iphoneKeyPositions && state.page == .letters
+                && state.language == .english && p.englishLayout == .qwerty
+                && row == middleRow ? width / 20 : 0
+            let unit = (width - 2 * middleInset) / keys.reduce(0) { $0 + $1.weight }
             let keyHeight = row == rows.count - 1 ? p.controlHeight : (rows.count == 5 && row == 0 ? p.numberRowHeight : letterHeight)
             let rowHeight = keyHeight + p.rowSpacing
             defer { rowY += rowHeight }
-            var x = 0.0
+            var x = middleInset
             return keys.enumerated().map { column, key in
-                let right = column == keys.count - 1 ? width : x + unit * key.weight
+                let right = column == keys.count - 1 ? width - middleInset : x + unit * key.weight
                 let frame = CGRect(x: x, y: rowY, width: right - x, height: rowHeight)
                 x = right
                 let leftGap = column == 0 ? 0 : p.columnSpacing / 2
