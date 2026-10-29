@@ -105,6 +105,9 @@ schemes:
     build:
       targets:
         Ortholinear: all
+    # Compare an optimized Release run with the App Store's optimized Ortholinear.
+    run:
+      config: Release
     test:
       targets: [OrtholinearUITests]
   OrtholinearSystemTests:
