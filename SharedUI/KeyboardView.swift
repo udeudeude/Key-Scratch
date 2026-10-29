@@ -42,6 +42,9 @@ final class KeyboardView: UIControl {
     var onCursor: ((Int) -> Void)?
     var onCursorVertical: ((Int) -> Void)?
     var onDismiss: (() -> Void)?
+    /// Long-press the emoji key to cycle enabled languages without sacrificing
+    /// the now-familiar keyboard position of the emoji selector.
+    var onLanguageHold: (() -> Void)?
     var onGlide: (([CGPoint]) -> Void)?
     var onGesture: ((KeyboardGesture) -> Void)?
     let suggestionBar = SuggestionBar()
@@ -74,6 +77,7 @@ final class KeyboardView: UIControl {
         var cursorSteps = 0
         var cursorRows = 0
         var cursorMode = false
+        var emojiHeld = false
         var timer: Timer?
         var startCell: Int
         var flick: String?
@@ -175,12 +179,10 @@ final class KeyboardView: UIControl {
             guard displayState.page == .letters else { return KeyboardLayout.pageTitle(nextPage, preferences: preferences) }
             return displayState.shift == .locked ? "⇪" : "⇧"
         case .backspace: return "⌫"
-        case .space:
-            let language = displayState.language
-            let layout = preferences.englishLayout
-            return language == .english && layout != .qwerty ? "\(language.title) · \(layout.title)" : language.title
+        case .space: return "space"
         case .enter: return returnTitle
         case .language: return nextLanguage.badge
+        case .emoji: return "☺︎"
         case .page: return displayState.page == .letters ? "123" : "ABC"
         case .globe: return ""
         case .dismiss: return "⌄"
@@ -202,6 +204,7 @@ final class KeyboardView: UIControl {
         case .space: return "Space"
         case .enter: return "Return"
         case .language: return "Switch to \(nextLanguage.title)"
+        case .emoji: return "Emoji. Hold for next language."
         case .page: return displayState.page == .letters ? "Numbers" : "Letters"
         case .dismiss: return "Dismiss keyboard"
         case .layers: return KeyboardLayout.firstLayerPage(preferences).map { KeyboardLayout.pageName($0, preferences: preferences) } ?? "Layers"
@@ -292,13 +295,20 @@ final class KeyboardView: UIControl {
 
     private var palette: KeyboardPalette {
         let increasedContrast = traitCollection.accessibilityContrast == .high
-        if let keycaps = preferences.shownKeycaps {
-            return KeyboardPalette(colors: .resolve(keycaps: keycaps, increasedContrast: increasedContrast),
-                                   font: keycaps.font, shape: keycaps.shape)
+        let dark = traitCollection.userInterfaceStyle == .dark
+        let keycaps = preferences.shownKeycaps
+        var style: KeyboardPalette
+        if let keycaps {
+            style = KeyboardPalette(colors: .resolve(keycaps: keycaps, increasedContrast: increasedContrast),
+                                    font: keycaps.font, shape: keycaps.shape)
+        } else {
+            style = KeyboardPalette(colors: .resolve(theme: preferences.theme, accent: preferences.accent,
+                                                     systemDark: dark, increasedContrast: increasedContrast))
         }
-        return KeyboardPalette(colors: .resolve(theme: preferences.theme, accent: preferences.accent,
-                                                systemDark: traitCollection.userInterfaceStyle == .dark,
-                                                increasedContrast: increasedContrast))
+        // Respect custom keycaps when the user explicitly chose them.
+        style.iosAppearance = preferences.appleKeyAppearance && keycaps == nil
+        style.darkAppearance = dark
+        return style
     }
 
     /// Position accent choices next to the held key instead of requiring a
@@ -336,9 +346,16 @@ final class KeyboardView: UIControl {
             let selectedShift = action == .shift && displayState.page == .letters && inputState.shift != .off
             let pressed = active.contains(index) || selectedShift
             let frame = cell.visualFrame.insetBy(dx: 0.25, dy: 0.25)
-            let radius = min(8, frame.width / 4)
-            let accentKey = action == .enter ? palette.colors.accentKey.map(UIColor.init(keyboardHex:)) : nil
+            let radius = min(palette.iosAppearance ? 5 : 8, frame.width / 4)
+            let accentKey = !palette.iosAppearance && action == .enter
+                ? palette.colors.accentKey.map(UIColor.init(keyboardHex:)) : nil
             let fill = accentKey ?? (isText ? palette.key : palette.control)
+            if palette.iosAppearance {
+                let drop = UIBezierPath(roundedRect: frame.offsetBy(dx: 0, dy: 1.4),
+                                        cornerRadius: radius)
+                UIColor.black.withAlphaComponent(palette.darkAppearance ? 0.38 : 0.17).setFill()
+                drop.fill()
+            }
             var path = UIBezierPath(roundedRect: frame, cornerRadius: radius)
             var face = frame
             if palette.shape == .sculpted, frame.height > 12 {
@@ -423,7 +440,7 @@ final class KeyboardView: UIControl {
         } else if preferences.showHeader {
             palette.accent.withAlphaComponent((dismissButton.isHighlighted ? 1 : feedbackOpacity(for: .dismiss)) * palette.highlightOpacity).setFill()
             UIBezierPath(roundedRect: dismissButton.frame.insetBy(dx: 2, dy: 2), cornerRadius: 8).fill()
-            let text = sessions.values.contains(where: \.cursorMode) ? "Slide to move cursor" : "\(inputState.language.badge)  ·  ORTHOLINEAR"
+            let text = sessions.values.contains(where: \.cursorMode) ? "Slide to move cursor" : "Key Scratch · \(inputState.language.badge)"
             drawText(text, in: CGRect(x: 10, y: 0, width: bounds.width - 64, height: 38),
                      font: .monospacedSystemFont(ofSize: 10, weight: .medium), color: palette.secondary, alignment: .left)
         }
@@ -452,6 +469,8 @@ final class KeyboardView: UIControl {
                      font: .systemFont(ofSize: 10, weight: .semibold), color: color)
         case .dismiss:
             drawSymbol("keyboard.chevron.compact.down", in: frame, size: 21, color: color)
+        case .emoji:
+            drawSymbol("face.smiling", in: frame, size: 23, color: color)
         case .globe: break // Native button keeps Apple's tap-and-hold behavior.
         default: return false
         }
@@ -503,7 +522,8 @@ final class KeyboardView: UIControl {
             }
             sessions[id] = session
             if key.action == .backspace { emit(.backspace) }
-            if key.action == .backspace || key.action == .space || !key.alternatives.isEmpty {
+            if key.action == .backspace || key.action == .space
+                || key.action == .emoji || !key.alternatives.isEmpty {
                 let delay = key.action == .backspace ? DeleteRepeat.initialDelay
                     : (key.action == .space ? 0.32 : 0.42)
                 let timer = Timer(timeInterval: delay, repeats: false) { [weak self] _ in
@@ -522,6 +542,11 @@ final class KeyboardView: UIControl {
             repeatDelete(id: id)
         } else if key.action == .space {
             sessions[id]?.cursorMode = true
+            setNeedsDisplay()
+        } else if key.action == .emoji {
+            // Consume the upcoming touch-up so a hold never opens Emoji as well.
+            sessions[id]?.emojiHeld = true
+            onLanguageHold?()
             setNeedsDisplay()
         } else if popup == nil {
             sessions[id]?.trace = nil
@@ -683,6 +708,8 @@ final class KeyboardView: UIControl {
                 onGesture?(.flick)
             } else if session.cursorMode {
                 onGesture?(.spaceCursor)
+            } else if session.emojiHeld {
+                // Long press already switched language.
             } else if session.original != .backspace,
                       let index = KeyboardGeometry.hit(at: touch.location(in: self), cells: cells) {
                 emit(cells[index].key.action)
