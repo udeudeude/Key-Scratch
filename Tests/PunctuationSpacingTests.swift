@@ -138,4 +138,16 @@ final class PunctuationSpacingTests: XCTestCase {
         XCTAssertEqual(spacing.edit(for: ";", before: "", enabled: true), .init(text: "; "), "Without such shortcuts, as before")
         XCTAssertEqual(spacing.edit(for: ";", before: nil, enabled: true, shortcutStarts: starts), .init(text: "; "), "Unknown text keeps the old behavior")
     }
+    func testTwoSpacesAfterSwipeBecomePeriodAndSpace() {
+        var spacing = PunctuationSpacing()
+        spacing.adoptSpace(before: "garden ")
+        let first = spacing.edit(for: " ", before: "garden ", enabled: true,
+                                 doubleSpacePeriod: true, at: 2)
+        XCTAssertEqual(first, .init(text: ""), "First Space accepts the swipe's provisional space")
+        let second = spacing.edit(for: " ", before: "garden ", enabled: true,
+                                  doubleSpacePeriod: true, at: 2.3)
+        XCTAssertEqual(second, .init(deleteBackward: true, text: ". "),
+                       "Second Space turns the existing separator into punctuation")
+    }
+
 }
