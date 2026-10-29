@@ -290,9 +290,13 @@ final class ScratchpadView: UIView, UITextViewDelegate, UIEditMenuInteractionDel
                 stop = true
             }
         }
-        if let found { editor.selectedRange = found }
-        updateCaret()
-        onTextChange?()
+        if let found {
+            editor.selectedRange = found
+            updateCaret()
+            onTextChange?()
+            editMenu.presentEditMenu(with: UIEditMenuConfiguration(
+                identifier: nil, sourcePoint: gesture.location(in: editor)))
+        }
     }
 
     @objc private func selectParagraphAtTap(_ gesture: UITapGestureRecognizer) {
@@ -306,6 +310,8 @@ final class ScratchpadView: UIView, UITextViewDelegate, UIEditMenuInteractionDel
         editor.selectedRange = text.paragraphRange(for: NSRange(location: offset, length: 0))
         updateCaret()
         onTextChange?()
+        editMenu.presentEditMenu(with: UIEditMenuConfiguration(
+            identifier: nil, sourcePoint: gesture.location(in: editor)))
     }
 
     /// Our own long-press menu is bound to this local note. Prevent UIKit's
