@@ -24,6 +24,27 @@ An experimental fork of Ortholinear for iPhone. The notes occupy the left 30% of
 
 The unmodified Ortholinear app is responsive on the same iPhone XS Max. That makes Key Scratch's added geometry, note UI, or suggestion routing the likely regression. Our current hypothesis is that suggestions and swipe decoding contend for work. The fork now runs glide decoding independently at high priority, warms its dictionary when the language changes, and avoids forced suggestion rebuilds on every note character. This is **not yet a measured fix**: compare original Ortholinear and the new Key Scratch directly on-device using the same phrases, and inspect the Xcode console for non-text glide-to-insertion timing.
 
+## Experiment lab (in the companion app)
+
+Open **Key Scratch > Key Scratch Experiment Lab**. Select one color-coded mode, change the sliders, then press **Apply and test**. The included TextEditor invokes the real installed third-party keyboard. Use the iOS globe key to switch to Key Scratch. Switch to another keyboard and back after applying changes so iOS creates/reloads the extension and reads the shared settings again. You can do this without recompiling.
+
+The four modes deliberately attack different hypotheses:
+
+| Color / name | Notes width | Swipe implementation | Live suggestions |
+| --- | --- | --- | --- |
+| Blue · Full width | 0% | Original shared worker | On |
+| Green · Split | Adjustable (default 30%) | Independent prioritized worker | On |
+| Amber · Quiet | Same width as Green | Independent prioritized worker | Off |
+| Purple · Narrow notes | 10 percentage points narrower than Green (minimum 16%) | Independent prioritized worker | On |
+
+The keyboard displays a **matching colored label**; after a successful glide, that label shows the locally measured glide-to-insertion time in milliseconds. It records no words. Use **Copy configuration** in the lab to report exact settings. Never compare modes using different language/dictionary layouts without noting that difference.
+
+Lab controls: notes width (18–42%), note font size (9–16 pt), system text / rounded / serif / monospaced fonts, letter-row height, control-row height, row spacing, and an English-only shortcut. The original Ortholinear languages remain in the project, even if English is the only one enabled.
+
+**Performance caveat:** The App Store's Ortholinear is a Release-optimized build, while Xcode normally Runs in unoptimized Debug. The device update script automatically backs up the generated Xcode scheme and changes *Run* to optimized Release so perceived lag can be compared fairly. Debug build settings are preserved for testing. If you regenerate with XcodeGen, the project.yml Run scheme also selects Release.
+
+Settings use Ortholinear's App Group file. If Xcode signing prevents App Group access, the app reports that sharing failed rather than pretending the keyboard received the new settings. In that case fix signing before relying on A/B comparison.
+
 ## Clipboard permission
 
 Apple's keyboard sandbox requires the optional **Allow Full Access** permission for system clipboard operations. Key Scratch requests eligibility for that permission, but local typing and notes continue to work without it.
