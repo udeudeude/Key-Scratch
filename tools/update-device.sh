@@ -39,6 +39,20 @@ fetch "SharedUI/SuggestionBar.swift"
 fetch "KeyboardExtension/Info.plist"
 fetch "App/Info.plist"
 
+# App Store Ortholinear is optimized. Compare it against an optimized Key Scratch,
+# not Swift's (much slower) default Debug configuration.
+SCHEME="Ortholinear.xcodeproj/xcshareddata/xcschemes/Ortholinear.xcscheme"
+if [ -f "$SCHEME" ]; then
+    BACKUP="$SCHEME.before-key-scratch-release"
+    if [ ! -f "$BACKUP" ]; then
+        cp "$SCHEME" "$BACKUP"
+    fi
+    /usr/bin/perl -0pi -e 's{(<LaunchAction\\b[^>]*\\bbuildConfiguration\\s*=\\s*")Debug(")}{${1}Release${2}}s' "$SCHEME"
+    echo "Selected optimized Release for Xcode Run (original scheme backed up)."
+else
+    echo "Could not find scheme. In Xcode: Product > Scheme > Edit Scheme > Run > Build Configuration: Release."
+fi
+
 echo ""
 echo "Updated. Keep your existing Xcode project and signing team."
 echo "In Xcode: Product > Clean Build Folder, then Run (Command-R)."
