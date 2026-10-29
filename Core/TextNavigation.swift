@@ -56,6 +56,26 @@ enum TextNavigation {
         return 0
     }
 
+    /// Third-party keyboard proxies expose characters, not the host app's visual
+    /// line rectangles. Move across explicit newlines when available; wrapped
+    /// lines cannot be mapped accurately without the host's text layout.
+    static func verticalOffset(rows: Int, before: String, after: String) -> Int? {
+        guard rows != 0 else { return nil }
+        let column = String(before.split(separator: "\n", omittingEmptySubsequences: false).last ?? "").utf16.count
+        if rows < 0 {
+            let currentLine = before.split(separator: "\n", omittingEmptySubsequences: false).last ?? ""
+            let prefix = before.dropLast(currentLine.count)
+            guard prefix.last == "\n" else { return nil }
+            let previousLine = prefix.dropLast().split(separator: "\n", omittingEmptySubsequences: false).last ?? ""
+            let width = String(previousLine).utf16.count
+            return -(column + 1 + width - min(column, width))
+        }
+        let remainder = after.prefix { $0 != "\n" }
+        guard remainder.count < after.count else { return nil }
+        let following = after.dropFirst(remainder.count + 1).prefix { $0 != "\n" }
+        return String(remainder).utf16.count + 1 + min(column, String(following).utf16.count)
+    }
+
     /// The edit for `command`, given the text either side of the cursor. Text the host doesn't
     /// share counts as absent, so commands stop where the known text ends.
     static func edit(for command: KeyCommand, before: String, after: String) -> TextEdit? {
