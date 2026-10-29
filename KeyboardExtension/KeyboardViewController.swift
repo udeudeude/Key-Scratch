@@ -39,6 +39,8 @@ final class KeyboardViewController: UIInputViewController {
         scratchpadWidth = scratchpad.widthAnchor.constraint(equalToConstant: 0)
         scratchpadWidth?.isActive = true
         modeLabel.font = .systemFont(ofSize: 9, weight: .semibold)
+        modeLabel.adjustsFontSizeToFitWidth = true
+        modeLabel.minimumScaleFactor = 0.68
         modeLabel.textAlignment = .center
         modeLabel.textColor = .white
         modeLabel.layer.cornerRadius = 3
@@ -97,8 +99,8 @@ final class KeyboardViewController: UIInputViewController {
                 before: proxy.documentContextBeforeInput ?? "",
                 after: proxy.documentContextAfterInput ?? ""
             ))
-            self?.updateAutoShift()
-            self?.suggestions.refresh()
+            self.updateAutoShift()
+            self.suggestions.refresh()
         }
         keyboard.onDismiss = { [weak self] in self?.suggestions.cancelGlide(); self?.dismissKeyboard() }
         adoptLanguageSettings(PreferenceStore.load())
@@ -148,7 +150,7 @@ final class KeyboardViewController: UIInputViewController {
         if abs((scratchpadWidth?.constant ?? 0) - width) > 0.5 {
             scratchpadWidth?.constant = width
         }
-        let badgeWidth: CGFloat = fraction == 0 ? 116 : min(width, 116)
+        let badgeWidth: CGFloat = 122
         modeLabel.frame = CGRect(x: 0, y: max(0, view.bounds.height - 16),
                                  width: badgeWidth, height: 15)
         view.bringSubviewToFront(modeLabel)
