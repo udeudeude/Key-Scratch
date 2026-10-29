@@ -430,6 +430,7 @@ struct GeometrySettings: View {
                 Toggle("Dot, comma and question mark", isOn: $preferences.showPunctuation)
                     .accessibilityIdentifier("show-punctuation")
                 Toggle("English apostrophe", isOn: $preferences.showApostrophe)
+                    .disabled(preferences.iphoneKeyPositions)
                     .accessibilityIdentifier("show-apostrophe")
                 Toggle("ї on long-press і", isOn: $preferences.yiOnLongPress)
                     .accessibilityIdentifier("yi-on-long-press")
