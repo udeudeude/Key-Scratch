@@ -113,10 +113,11 @@ final class SuggestionTests: XCTestCase {
         var preferences = try JSONDecoder().decode(KeyboardPreferences.self, from: Data("{}".utf8))
         XCTAssertTrue(preferences.suggestionsEnabled)
         let height = preferences.keyboardHeight
+        let suggestionHeight = preferences.suggestionHeight
         preferences.suggestionsEnabled = false
         preferences.nextWordSuggestions = false
         preferences.contextualSuggestions = false
-        XCTAssertEqual(height - preferences.keyboardHeight, 44)
+        XCTAssertEqual(height - preferences.keyboardHeight, suggestionHeight)
         preferences.apply(.balanced)
         XCTAssertFalse(preferences.suggestionsEnabled)
         XCTAssertFalse(preferences.nextWordSuggestions)
