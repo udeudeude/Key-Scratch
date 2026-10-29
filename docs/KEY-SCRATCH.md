@@ -28,16 +28,17 @@ The unmodified Ortholinear app is responsive on the same iPhone XS Max. That mak
 
 Open **Key Scratch > Key Scratch Experiment Lab**. Select one color-coded mode, change the sliders, then press **Apply and test**. The included TextEditor invokes the real installed third-party keyboard. Use the iOS globe key to switch to Key Scratch. Switch to another keyboard and back after applying changes so iOS creates/reloads the extension and reads the shared settings again. You can do this without recompiling.
 
-The four modes deliberately attack different hypotheses:
+The five modes deliberately attack different hypotheses:
 
 | Color / name | Notes width | Swipe implementation | Live suggestions |
 | --- | --- | --- | --- |
 | Blue · Full width | 0% | Original shared worker | On |
-| Green · Split | Adjustable (default 30%) | Independent prioritized worker | On |
+| Red · Shared split | Adjustable (default 30%) | Original shared worker | On |
+| Green · Split | Same width as Red | Independent prioritized worker | On |
 | Amber · Quiet | Same width as Green | Independent prioritized worker | Off |
 | Purple · Narrow notes | 10 percentage points narrower than Green (minimum 16%) | Independent prioritized worker | On |
 
-The keyboard displays a **matching colored label**; after a successful glide, that label shows the locally measured glide-to-insertion time in milliseconds. It records no words. Use **Copy configuration** in the lab to report exact settings. Never compare modes using different language/dictionary layouts without noting that difference.
+Compare Blue versus Red to isolate the notes panel; Red versus Green to isolate the glide worker; Green versus Amber to isolate live suggestions; and Green versus Purple to isolate keyboard width. Use the same words, language and geometry settings for each pair.\n\nThe keyboard displays a **matching colored label**; after a successful glide, that label shows the locally measured glide-to-insertion time in milliseconds. It records no words. Use **Copy configuration** in the lab to report exact settings. Never compare modes using different language/dictionary layouts without noting that difference.
 
 Lab controls: notes width (18–42%), note font size (9–16 pt), system text / rounded / serif / monospaced fonts, letter-row height, control-row height, row spacing, and an English-only shortcut. The original Ortholinear languages remain in the project, even if English is the only one enabled.
 
