@@ -3,6 +3,7 @@ import UIKit
 final class KeyboardViewController: UIInputViewController {
     private let keyboard = KeyboardView()
     private let scratchpad = ScratchpadView()
+    private let modeLabel = UILabel()
     private let scratchpadDocumentID = UUID()
     private var scratchpadWidth: NSLayoutConstraint?
     private var heightConstraint: NSLayoutConstraint?
@@ -35,8 +36,16 @@ final class KeyboardViewController: UIInputViewController {
         view.addSubview(keyboard)
         scratchpad.translatesAutoresizingMaskIntoConstraints = false
         view.addSubview(scratchpad)
-        scratchpadWidth = scratchpad.widthAnchor.constraint(equalTo: view.widthAnchor, multiplier: 0.30)
+        scratchpadWidth = scratchpad.widthAnchor.constraint(equalToConstant: 0)
         scratchpadWidth?.isActive = true
+        modeLabel.font = .systemFont(ofSize: 9, weight: .semibold)
+        modeLabel.textAlignment = .center
+        modeLabel.textColor = .white
+        modeLabel.layer.cornerRadius = 3
+        modeLabel.layer.masksToBounds = true
+        modeLabel.isUserInteractionEnabled = false
+        modeLabel.accessibilityIdentifier = "key-scratch-mode"
+        view.addSubview(modeLabel)
         scratchpad.onInsert = { [weak self] text in
             self?.textDocumentProxy.insertText(text)
             self?.suggestions.refresh(force: true)
@@ -109,7 +118,15 @@ final class KeyboardViewController: UIInputViewController {
         let preferences = PreferenceStore.load()
         adoptLanguageSettings(preferences)
         scratchpad.canUseClipboard = hasFullAccess
+        if preferences.keyScratchMode == .reference { scratchpad.deactivate() }
+        scratchpad.isHidden = preferences.keyScratchMode == .reference
+        scratchpad.configure(mode: preferences.keyScratchMode,
+                             font: preferences.keyScratchNoteFont,
+                             size: preferences.keyScratchNoteFontSize)
+        modeLabel.text = preferences.keyScratchMode.title.uppercased()
+        modeLabel.backgroundColor = UIColor(keyboardHex: preferences.keyScratchMode.colorHex)
         keyboard.preferences = preferences
+        view.setNeedsLayout()
         heightConstraint?.constant = preferences.keyboardHeight
         lastKeyboardType = nil
         suggestions.beginSession()
@@ -125,6 +142,16 @@ final class KeyboardViewController: UIInputViewController {
     override func viewDidLayoutSubviews() {
         super.viewDidLayoutSubviews()
         if keyboard.needsGlobe != needsInputModeSwitchKey { keyboard.needsGlobe = needsInputModeSwitchKey }
+        let fraction = keyboard.preferences.keyScratchMode.noteFraction(
+            userWidth: keyboard.preferences.keyScratchNoteWidth)
+        let width = (view.bounds.width * CGFloat(fraction)).rounded(.toNearestOrAwayFromZero)
+        if abs((scratchpadWidth?.constant ?? 0) - width) > 0.5 {
+            scratchpadWidth?.constant = width
+        }
+        let badgeWidth: CGFloat = fraction == 0 ? 116 : min(width, 116)
+        modeLabel.frame = CGRect(x: 0, y: max(0, view.bounds.height - 16),
+                                 width: badgeWidth, height: 15)
+        view.bringSubviewToFront(modeLabel)
     }
 
     override func textDidChange(_ textInput: (any UITextInput)?) { if !applyingSuggestion { suggestions.cancelGlide(); synchronize() } }
