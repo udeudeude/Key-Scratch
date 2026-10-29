@@ -348,6 +348,8 @@ final class SuggestionCoordinator {
     var apply: ((SuggestionEdit, SuggestionSnapshot) -> Void)?
     /// Inserts a glided word with the host's spacing and Shift state; returns the text inserted.
     var insertWord: ((String) -> String?)?
+    /// Reports elapsed time, never the typed word, for local A/B testing.
+    var onGlideLatency: ((Double) -> Void)?
     var switchLanguage: ((KeyboardLanguage) -> Void)?
     var supplementary = SupplementaryWords()
 
@@ -531,8 +533,9 @@ final class SuggestionCoordinator {
             guard !Task.isCancelled, let self, self.glideContext?() == current,
                   let best = words?.first,
                   let inserted = self.insertWord?(best.word) else { return }
-            #if DEBUG
             let elapsedMS = (ProcessInfo.processInfo.systemUptime - started) * 1000
+            self.onGlideLatency?(elapsedMS)
+            #if DEBUG
             print("KeyScratch glide-to-text latency: \(Int(elapsedMS.rounded())) ms")
             #endif
             // Alternatives need a snapshot to replace safely; without host context, only the word goes in.
