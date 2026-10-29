@@ -420,6 +420,8 @@ struct GeometrySettings: View {
                     }.pickerStyle(.segmented)
                 }
                 Toggle("Show header strip", isOn: $preferences.showHeader)
+                Toggle("iPhone key positions", isOn: $preferences.iphoneKeyPositions)
+                    .accessibilityIdentifier("iphone-key-positions")
                     .accessibilityIdentifier("show-header")
             } header: { Label("Layout · Controls", systemImage: "rectangle.bottomthird.inset.filled") } footer: {
                 Text("Hide the header to leave more room for letters.")
@@ -673,6 +675,11 @@ private struct KeyScratchExperimentLab: View {
                         .foregroundStyle(.secondary)
                 }
 
+                Section("Keyboard layout") {
+                    Toggle("iPhone key positions", isOn: $draft.iphoneKeyPositions)
+                    Text("Shift / #+= remains on the left of the third row, Delete stays on its right, and Return always stays at bottom right. Turn this off to compare the original Ortholinear positions.")
+                        .font(.caption).foregroundStyle(.secondary)
+                }
                 Section("Keyboard dimensions") {
                     adjustment("Letter row", value: $draft.keyHeight, bounds: 36...88)
                     adjustment("Control row", value: $draft.controlHeight, bounds: 36...72)
@@ -708,6 +715,7 @@ private struct KeyScratchExperimentLab: View {
                             "Letter row: \(Int(setup.keyHeight)) pt",
                             "Control row: \(Int(setup.controlHeight)) pt",
                             "Row spacing: \(Int(setup.rowSpacing)) pt",
+                            "iPhone key positions: \(setup.iphoneKeyPositions ? "on" : "off")",
                             "Live suggestions: \(setup.keyScratchMode.hasLiveSuggestions ? "yes" : "no")",
                             "Glide worker: \(setup.keyScratchMode.usesDedicatedGlide ? "dedicated" : "original")"
                         ].joined(separator: "\n")
