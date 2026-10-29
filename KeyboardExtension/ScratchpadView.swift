@@ -72,6 +72,7 @@ final class ScratchpadView: UIView, UITextViewDelegate, UIEditMenuInteractionDel
     /// Applies the current experiment's typography and color identification.
     func configure(mode: KeyScratchMode, font: KeyScratchNoteFont, size: Double) {
         modeColor = UIColor(keyboardHex: mode.colorHex)
+        caret.backgroundColor = modeColor
         layer.borderColor = modeColor.withAlphaComponent(isEditingNote ? 1.0 : 0.6).cgColor
         layer.borderWidth = isEditingNote ? 1 : 0.5
         let size = CGFloat(size)
@@ -214,7 +215,7 @@ final class ScratchpadView: UIView, UITextViewDelegate, UIEditMenuInteractionDel
         caret.isHidden = true
         caret.isUserInteractionEnabled = false
         editor.addSubview(caret)
-        editor.textContainerInset = UIEdgeInsets(top: 2, left: 2, bottom: 2, right: 2)
+        editor.textContainerInset = UIEdgeInsets(top: 2, left: 2, bottom: 19, right: 2)
         editor.text = ScratchpadStore.migrate(legacy: UserDefaults.standard.string(forKey: storeKey))
         editor.accessibilityLabel = "Scratchpad note. Tap to type with Key Scratch."
         // Recognize multi-taps before moving the caret. Without this failure
