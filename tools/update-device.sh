@@ -3,7 +3,12 @@
 # Intended for ZIP checkouts of feature/scratchpad-first-pass.
 set -eu
 
-cd "$(dirname "$0")/.."
+SCRIPT_DIR=$(CDPATH= cd "$(dirname "$0")" && pwd)
+if [ -d "$SCRIPT_DIR/KeyboardExtension" ]; then
+    cd "$SCRIPT_DIR"
+else
+    cd "$SCRIPT_DIR/.."
+fi
 if [ ! -d KeyboardExtension ] || [ ! -d SharedUI ] || [ ! -d App ]; then
     echo "Run from a Key Scratch project checkout with KeyboardExtension, SharedUI and App folders." >&2
     exit 1
