@@ -390,8 +390,8 @@ struct GeometrySettings: View {
                     HStack(spacing: 12) {
                         Image(systemName: "paintpalette.fill").font(.title3)
                         VStack(alignment: .leading, spacing: 4) {
-                            Text("Theme and colors").font(.body.weight(.medium))
-                            Text("\(preferences.theme.title) · \(preferences.accent.title)").font(.caption).foregroundStyle(.secondary)
+                            Text("Appearance").font(.body.weight(.medium))
+                            Text(preferences.appleKeyAppearance ? "iPhone-style · automatic light/dark" : "\(preferences.theme.title) · \(preferences.accent.title)").font(.caption).foregroundStyle(.secondary)
                         }
                         Spacer()
                         Image(systemName: "chevron.right").font(.caption.weight(.semibold)).foregroundStyle(.secondary)
@@ -728,7 +728,7 @@ private struct KeyScratchExperimentLab: View {
 
                 Section("Keyboard layout") {
                     Toggle("iPhone key positions", isOn: $draft.iphoneKeyPositions)
-                    Text("Shift / #+= remains on the left of the third row, Delete stays on its right, and Return always stays at bottom right. Turn this off to compare the original Ortholinear positions.")
+                    Text("Keeps Shift / #+= at lower left, Delete at lower right, and Return in its familiar position. Turn off only to compare the original grid arrangement.")
                         .font(.caption).foregroundStyle(.secondary)
                 }
                 Section("Keyboard dimensions") {
