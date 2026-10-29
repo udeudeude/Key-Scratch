@@ -3,6 +3,7 @@ import UIKit
 final class KeyboardViewController: UIInputViewController {
     private let keyboard = KeyboardView()
     private let scratchpad = ScratchpadView()
+    private let scratchpadDocumentID = UUID()
     private var scratchpadWidth: NSLayoutConstraint?
     private var heightConstraint: NSLayoutConstraint?
     private var inputState = InputState()
@@ -36,7 +37,20 @@ final class KeyboardViewController: UIInputViewController {
         view.addSubview(scratchpad)
         scratchpadWidth = scratchpad.widthAnchor.constraint(equalTo: view.widthAnchor, multiplier: 0.30)
         scratchpadWidth?.isActive = true
-        scratchpad.onInsert = { [weak self] text in self?.textDocumentProxy.insertText(text) }
+        scratchpad.onInsert = { [weak self] text in
+            self?.textDocumentProxy.insertText(text)
+            self?.suggestions.refresh(force: true)
+        }
+        scratchpad.onEditingChange = { [weak self] _ in
+            self?.suggestions.cancelGlide()
+            self?.updateAutoShift()
+            if let self { self.keyboard.inputState = self.inputState }
+            self?.suggestions.refresh(force: true)
+        }
+        scratchpad.onTextChange = { [weak self] in
+            self?.suggestions.refresh(force: true)
+        }
+        scratchpad.canUseClipboard = hasFullAccess
         NSLayoutConstraint.activate([
             scratchpad.leadingAnchor.constraint(equalTo: view.leadingAnchor),
             scratchpad.topAnchor.constraint(equalTo: view.topAnchor),
@@ -53,18 +67,19 @@ final class KeyboardViewController: UIInputViewController {
         keyboard.globeButton.addTarget(self, action: #selector(handleInputModeList(from:with:)), for: .allTouchEvents)
         suggestions.snapshot = { [weak self] in self?.suggestionSnapshot() }
         suggestions.apply = { [weak self] edit, snapshot in self?.applySuggestion(edit, snapshot: snapshot) }
-        suggestions.insertWord = { [weak self] in
-            guard let self else { return nil }
-            if self.scratchpad.isEditingNote { self.scratchpad.type($0 + " "); return $0 }
-            return self.insertGlided($0)
-        }
+        suggestions.insertWord = { [weak self] in self?.insertGlided($0) }
         suggestions.glideContext = { [weak self] in self?.glideContext() }
         suggestions.switchLanguage = { [weak self] in self?.switchLanguage(to: $0) }
         keyboard.onAction = { [weak self] in self?.handle($0) }
         keyboard.onCursor = { [weak self] in
-            self?.suggestions.cancelGlide()
-            self?.punctuationSpacing.reset()
-            guard let proxy = self?.textDocumentProxy else { return }
+            guard let self else { return }
+            self.suggestions.cancelGlide()
+            if self.scratchpad.isEditingNote {
+                self.scratchpad.moveCaret(steps: $0)
+                return
+            }
+            self.punctuationSpacing.reset()
+            let proxy = self.textDocumentProxy
             proxy.adjustTextPosition(byCharacterOffset: TextNavigation.offset(
                 steps: $0,
                 before: proxy.documentContextBeforeInput ?? "",
@@ -90,6 +105,7 @@ final class KeyboardViewController: UIInputViewController {
         punctuationSpacing.reset()
         let preferences = PreferenceStore.load()
         adoptLanguageSettings(preferences)
+        scratchpad.canUseClipboard = hasFullAccess
         keyboard.preferences = preferences
         heightConstraint?.constant = preferences.keyboardHeight
         lastKeyboardType = nil
@@ -122,7 +138,9 @@ final class KeyboardViewController: UIInputViewController {
     }
 
     private func suggestionSnapshot() -> SuggestionSnapshot? {
-        if scratchpad.isEditingNote { return nil }
+        if scratchpad.isEditingNote {
+            return scratchpad.snapshot(document: scratchpadDocumentID, language: inputState.language)
+        }
         guard isViewLoaded, view.window != nil, lastKeyboardType != nil else { return nil }
         let allowed = Self.suggestionTypes
         guard allowed.contains(textDocumentProxy.keyboardType ?? .default),
@@ -145,7 +163,10 @@ final class KeyboardViewController: UIInputViewController {
     }
 
     private func glideContext() -> GlideContext? {
-        if scratchpad.isEditingNote { return nil }
+        if scratchpad.isEditingNote {
+            return GlideContext(language: inputState.language, before: scratchpad.beforeCaret,
+                                selection: scratchpad.selectedNoteText, document: scratchpadDocumentID)
+        }
         guard isViewLoaded, view.window != nil, lastKeyboardType != nil else { return nil }
         let allowed = Self.suggestionTypes
         guard allowed.contains(textDocumentProxy.keyboardType ?? .default),
@@ -156,6 +177,11 @@ final class KeyboardViewController: UIInputViewController {
     }
 
     private func applySuggestion(_ edit: SuggestionEdit, snapshot: SuggestionSnapshot) {
+        if scratchpad.isEditingNote {
+            _ = scratchpad.apply(edit, offered: snapshot, document: scratchpadDocumentID,
+                                 language: inputState.language)
+            return
+        }
         guard suggestionSnapshot() == snapshot else { return }
         applyingSuggestion = true
         defer { applyingSuggestion = false }
@@ -187,6 +213,14 @@ final class KeyboardViewController: UIInputViewController {
         case .off: break
         }
         expander.forget()
+        // A glide is directed to whichever destination is currently active.
+        if scratchpad.isEditingNote {
+            let needsSpace = scratchpad.beforeCaret.last.map { !$0.isWhitespace && !"([{«„“'\"".contains($0) } ?? false
+            scratchpad.type((needsSpace ? " " : "") + text)
+            updateAutoShift()
+            keyboard.inputState = inputState
+            return text
+        }
         // Glides are whole words: separate them from the word or mark before.
         let needsSpace = textDocumentProxy.documentContextBeforeInput?.last.map { !$0.isWhitespace && !"([{«„“'\"".contains($0) } ?? false
         punctuationSpacing.reset()
@@ -207,6 +241,7 @@ final class KeyboardViewController: UIInputViewController {
     }
 
     private var autocapitalization: AutoCapitalization {
+        if scratchpad.isEditingNote { return keyboard.preferences.autoCapitalize ? .sentences : .none }
         guard keyboard.preferences.autoCapitalize,
               !Self.literalTypes.contains(textDocumentProxy.keyboardType ?? .default) else { return .none }
         switch textDocumentProxy.autocapitalizationType ?? .sentences {
@@ -220,7 +255,8 @@ final class KeyboardViewController: UIInputViewController {
     /// Turns Shift on for one letter where the field's own capitalization asks for it.
     private func updateAutoShift() {
         guard inputState.page == .letters, inputState.shift != .locked else { return }
-        let before = textDocumentProxy.documentContextBeforeInput
+        let before: String? = scratchpad.isEditingNote
+            ? scratchpad.beforeCaret : textDocumentProxy.documentContextBeforeInput
         guard manualShiftContext != (before ?? "") else { return }
         manualShiftContext = nil
         // A host that hides its context must not get a capital on every letter.
@@ -323,10 +359,39 @@ final class KeyboardViewController: UIInputViewController {
     private func handle(_ action: KeyAction) {
         if scratchpad.isEditingNote {
             switch action {
-            case .text(let value): scratchpad.type(inputState.consume(value)); keyboard.inputState = inputState; return
-            case .space: scratchpad.type(" "); return
-            case .enter: scratchpad.type("\n"); return
-            case .backspace: scratchpad.deleteBackward(); return
+            case .text(let value):
+                scratchpad.type(inputState.consume(value))
+                updateAutoShift()
+                keyboard.inputState = inputState
+                return
+            case .space:
+                scratchpad.type(" ")
+                updateAutoShift()
+                keyboard.inputState = inputState
+                return
+            case .enter:
+                scratchpad.type("\n")
+                updateAutoShift()
+                keyboard.inputState = inputState
+                return
+            case .backspace:
+                scratchpad.deleteBackward()
+                updateAutoShift()
+                keyboard.inputState = inputState
+                return
+            case .command(let command):
+                switch TextNavigation.edit(for: command, before: scratchpad.beforeCaret,
+                                           after: scratchpad.afterCaret) {
+                case .move(let offset): scratchpad.moveCaret(steps: offset)
+                case .deleteBackward(let count):
+                    for _ in 0..<count { scratchpad.deleteBackward() }
+                case nil: break
+                }
+                return
+            case .pair(let value, let back):
+                scratchpad.type(value)
+                scratchpad.moveCaret(steps: -String(value.suffix(back)).count)
+                return
             default: break
             }
         }
