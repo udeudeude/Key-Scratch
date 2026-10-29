@@ -285,6 +285,37 @@ private actor SuggestionWorker {
     func unload() { engines.removeAll() }
 }
 
+/// Independent, user-initiated glide decoding. Autocorrection work can never
+/// block a completed swipe in the other worker's queue.
+private actor FastGlideWorker {
+    private var cachedLanguage: KeyboardLanguage?
+    private var cachedEngine: SuggestionEngine?
+
+    func prepare(_ language: KeyboardLanguage) {
+        guard language.dictionaryCode != nil, cachedLanguage != language else { return }
+        cachedEngine = try? SuggestionResources.engine(language: language)
+        cachedLanguage = cachedEngine == nil ? nil : language
+    }
+
+    func glide(_ points: [CGPoint], language: KeyboardLanguage, learned: [String],
+               context: [String], preferences: KeyboardPreferences, width: Double) throws -> [WordSuggestion] {
+        try Task.checkCancellation()
+        prepare(language)
+        guard let engine = cachedEngine, cachedLanguage == language else {
+            throw CocoaError(.fileNoSuchFile)
+        }
+        let geometry = SuggestionGeometry(language: language, preferences: preferences, width: width)
+        try Task.checkCancellation()
+        return engine.glide(points, language: language, learned: learned, geometry: geometry,
+                            context: preferences.contextualSuggestions ? context : [])
+    }
+
+    func release() {
+        cachedEngine = nil
+        cachedLanguage = nil
+    }
+}
+
 /// Where a glide will type. A decoded word goes in only if all of this is unchanged.
 struct GlideContext: Equatable {
     var language: KeyboardLanguage
@@ -296,6 +327,7 @@ struct GlideContext: Equatable {
 @MainActor
 final class SuggestionCoordinator {
     private let worker = SuggestionWorker()
+    private let fastGlideWorker = FastGlideWorker()
     private weak var keyboard: KeyboardView?
     private var task: Task<Void, Never>?
     private var glideTask: Task<Void, Never>?
@@ -352,7 +384,14 @@ final class SuggestionCoordinator {
     }
 
     /// A new keyboard appearance may show a tip again, up to its limit.
-    func beginSession() { cancelGlide(); tipChosen = false; sessionTip = nil }
+    func beginSession() {
+        cancelGlide()
+        tipChosen = false
+        sessionTip = nil
+        if let language = keyboard?.inputState.language, language.dictionaryCode != nil {
+            Task(priority: .utility) { [fastGlideWorker] in await fastGlideWorker.prepare(language) }
+        }
+    }
 
     /// Any input, or the keyboard leaving, makes a glide still being decoded land in the wrong place.
     func cancelGlide() { glideTask?.cancel(); glideTask = nil }
@@ -369,6 +408,7 @@ final class SuggestionCoordinator {
         suspend()
         glideOffer = nil
         Task { await worker.unload() }
+        Task { await fastGlideWorker.release() }
     }
 
     private func punctuation(for language: KeyboardLanguage) -> [String] {
@@ -459,12 +499,17 @@ final class SuggestionCoordinator {
         let preferences = keyboard.preferences, width = keyboard.bounds.width
         suspend()
         glideOffer = nil
-        glideTask = Task { [weak self, worker] in
-            guard let words = try? await worker.glide(points, language: current.language, learned: learned,
+        let started = ProcessInfo.processInfo.systemUptime
+        glideTask = Task(priority: .userInitiated) { [weak self, fastGlideWorker] in
+            guard let words = try? await fastGlideWorker.glide(points, language: current.language, learned: learned,
                                                       context: SuggestionText.context(current.before),
                                                       preferences: preferences, width: width),
                   !Task.isCancelled, let self, self.glideContext?() == current, let best = words.first,
                   let inserted = self.insertWord?(best.word) else { return }
+            #if DEBUG
+            let elapsedMS = (ProcessInfo.processInfo.systemUptime - started) * 1000
+            print("KeyScratch glide-to-text latency: (Int(elapsedMS.rounded())) ms")
+            #endif
             // Alternatives need a snapshot to replace safely; without host context, only the word goes in.
             guard let after = self.snapshot?() else { self.refresh(force: true); return }
             let alternatives = words.dropFirst().map {
