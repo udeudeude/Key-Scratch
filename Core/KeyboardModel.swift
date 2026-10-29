@@ -466,13 +466,75 @@ enum KeyboardLayout {
     }
 }
 
+/// Configurations for controlled Key Scratch experiments. Colors are identifiers,
+/// not a new keyboard theme. The mode is persisted with ordinary keyboard settings.
+enum KeyScratchMode: String, Codable, CaseIterable, Identifiable, Sendable {
+    case reference, split, quiet, narrow
+    var id: String { rawValue }
+    var colorName: String {
+        switch self {
+        case .reference: "Blue"
+        case .split: "Green"
+        case .quiet: "Amber"
+        case .narrow: "Purple"
+        }
+    }
+    var shortName: String {
+        switch self {
+        case .reference: "Full width"
+        case .split: "Split"
+        case .quiet: "Quiet"
+        case .narrow: "Narrow notes"
+        }
+    }
+    var title: String { colorName + " · " + shortName }
+    var purpose: String {
+        switch self {
+        case .reference: "No notes panel; the original shared glide worker. Measures baseline latency."
+        case .split: "Notes on the left; swipe processing has its own priority worker."
+        case .quiet: "Same split as Green but pauses live word suggestions to test contention."
+        case .narrow: "Smaller notes panel than Green, leaving more room for swipe gestures."
+        }
+    }
+    var colorHex: UInt32 {
+        switch self {
+        case .reference: 0x2869BA
+        case .split: 0x23765A
+        case .quiet: 0xB57917
+        case .narrow: 0x8056AD
+        }
+    }
+    func noteFraction(userWidth: Double) -> Double {
+        switch self {
+        case .reference: 0
+        case .split, .quiet: userWidth
+        case .narrow: max(0.16, userWidth - 0.10)
+        }
+    }
+    var usesDedicatedGlide: Bool { self != .reference }
+    var hasLiveSuggestions: Bool { self != .quiet }
+}
+
+enum KeyScratchNoteFont: String, Codable, CaseIterable, Identifiable, Sendable {
+    case text, rounded, serif, monospaced
+    var id: String { rawValue }
+    var title: String {
+        switch self {
+        case .text: "SF Text"
+        case .rounded: "Rounded"
+        case .serif: "Serif"
+        case .monospaced: "Monospaced"
+        }
+    }
+}
+
 struct KeyboardPreferences: Codable, Equatable, Sendable {
-    let schemaVersion = 5
+    let schemaVersion = 6
     var keyHeight: Double = 62
     var columnSpacing: Double = 2
     var rowSpacing: Double = 2
     var fillGaps: Bool = true
-    var defaultLanguage: KeyboardLanguage = .ukrainian
+    var defaultLanguage: KeyboardLanguage = .english
     var controlHeight: Double = 48
     var letterSize: Double = 24
     var actionKeyWidth: Double = 2.4
@@ -489,13 +551,17 @@ struct KeyboardPreferences: Codable, Equatable, Sendable {
     var doubleSpacePeriod: Bool = true
     var digitAccess: DigitAccess = .flick
     var glideTyping: Bool = true
+    var keyScratchMode: KeyScratchMode = .split
+    var keyScratchNoteWidth: Double = 0.30
+    var keyScratchNoteFontSize: Double = 11
+    var keyScratchNoteFont: KeyScratchNoteFont = .text
 
     var suggestionsEnabled: Bool = true
     var nextWordSuggestions: Bool = true
     var contextualSuggestions: Bool = true
 
     /// The languages the language key cycles through, in `allCases` order.
-    var languages: [KeyboardLanguage] = [.ukrainian, .english]
+    var languages: [KeyboardLanguage] = [.english]
     var englishLayout: EnglishLayout = .qwerty
     var rememberLanguage: Bool = true
     /// Bumped to make the keyboard forget remembered languages; see LanguageMemory.
@@ -520,6 +586,7 @@ struct KeyboardPreferences: Codable, Equatable, Sendable {
         case schemaVersion, keyHeight, columnSpacing, rowSpacing, fillGaps, defaultLanguage
         case controlHeight, letterSize, actionKeyWidth, shiftPlacement, showPunctuation, showApostrophe, showHeader, autoSpacePunctuation
         case yiOnLongPress, autoCapitalize, doubleSpacePeriod, digitAccess, glideTyping
+        case keyScratchMode, keyScratchNoteWidth, keyScratchNoteFontSize, keyScratchNoteFont
         case theme, accent, showLongPressHints
         case suggestionsEnabled, nextWordSuggestions, contextualSuggestions
         case languages, englishLayout, rememberLanguage, languageMemoryGeneration, invasionAnswer
@@ -533,7 +600,9 @@ struct KeyboardPreferences: Codable, Equatable, Sendable {
         result.letterSize = letterSize.isFinite ? min(36, max(18, letterSize)) : 24
         result.actionKeyWidth = actionKeyWidth.isFinite ? min(3.5, max(1.25, actionKeyWidth)) : 2.4
         result.columnSpacing = columnSpacing.isFinite ? min(8, max(0, columnSpacing)) : 2
-        result.rowSpacing = rowSpacing.isFinite ? min(12, max(0, rowSpacing)) : 3
+        result.rowSpacing = rowSpacing.isFinite ? min(12, max(0, rowSpacing)) : 2
+        result.keyScratchNoteWidth = keyScratchNoteWidth.isFinite ? min(0.42, max(0.18, keyScratchNoteWidth)) : 0.30
+        result.keyScratchNoteFontSize = keyScratchNoteFontSize.isFinite ? min(16, max(9, keyScratchNoteFontSize)) : 11
         let enabled = KeyboardLanguage.allCases.filter { languages.contains($0) && ($0 != .russian || invasionAnswer == .opposes) }
         result.languages = enabled.isEmpty ? Self().languages : enabled
         if !result.languages.contains(defaultLanguage) { result.defaultLanguage = result.languages[0] }
@@ -570,8 +639,10 @@ struct KeyboardPreferences: Codable, Equatable, Sendable {
         let suggestions = (suggestionsEnabled, nextWordSuggestions, contextualSuggestions)
         let typing = (autoCapitalize, doubleSpacePeriod, digitAccess, glideTyping)
         let custom = (customLayouts, layers, showLayerKey, keycaps, expansions, extrasEnabled)
+        let scratch = (keyScratchMode, keyScratchNoteWidth, keyScratchNoteFontSize, keyScratchNoteFont)
         self = preset.preferences
         (customLayouts, layers, showLayerKey, keycaps, expansions, extrasEnabled) = custom
+        (keyScratchMode, keyScratchNoteWidth, keyScratchNoteFontSize, keyScratchNoteFont) = scratch
         (defaultLanguage, languages, englishLayout, rememberLanguage, languageMemoryGeneration, invasionAnswer) = language
         (theme, accent, showLongPressHints) = appearance
         (suggestionsEnabled, nextWordSuggestions, contextualSuggestions) = suggestions
@@ -602,6 +673,10 @@ extension KeyboardPreferences {
         doubleSpacePeriod = try c.decodeIfPresent(Bool.self, forKey: .doubleSpacePeriod) ?? doubleSpacePeriod
         digitAccess = (try? c.decodeIfPresent(DigitAccess.self, forKey: .digitAccess)) ?? digitAccess
         glideTyping = try c.decodeIfPresent(Bool.self, forKey: .glideTyping) ?? glideTyping
+        keyScratchMode = (try? c.decodeIfPresent(KeyScratchMode.self, forKey: .keyScratchMode)) ?? keyScratchMode
+        keyScratchNoteWidth = try c.decodeIfPresent(Double.self, forKey: .keyScratchNoteWidth) ?? keyScratchNoteWidth
+        keyScratchNoteFontSize = try c.decodeIfPresent(Double.self, forKey: .keyScratchNoteFontSize) ?? keyScratchNoteFontSize
+        keyScratchNoteFont = (try? c.decodeIfPresent(KeyScratchNoteFont.self, forKey: .keyScratchNoteFont)) ?? keyScratchNoteFont
         theme = try c.decodeIfPresent(KeyboardTheme.self, forKey: .theme) ?? theme
         accent = try c.decodeIfPresent(KeyboardAccent.self, forKey: .accent) ?? accent
         showLongPressHints = try c.decodeIfPresent(Bool.self, forKey: .showLongPressHints) ?? showLongPressHints
@@ -633,6 +708,7 @@ extension KeyboardPreferences {
         // Legacy Ortholinear configurations using untouched factory geometry migrate
         // to Key Scratch's more compact defaults. Deliberately customized sizes survive.
         if !c.contains(.schemaVersion), keyHeight == 48 { keyHeight = 72 }
+        // Older installs keep language preferences; new installs start with English.
         if keyHeight == 72 && controlHeight == 56 && rowSpacing == 3 && letterSize == 28 {
             keyHeight = 62
             controlHeight = 48
