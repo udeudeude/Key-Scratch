@@ -47,7 +47,7 @@ if [ -f "$SCHEME" ]; then
     if [ ! -f "$BACKUP" ]; then
         cp "$SCHEME" "$BACKUP"
     fi
-    /usr/bin/perl -0pi -e 's{(<LaunchAction\\b[^>]*\\bbuildConfiguration\\s*=\\s*")Debug(")}{${1}Release${2}}s' "$SCHEME"
+    /usr/bin/perl -0pi -e 's{(<LaunchAction[[:space:]]+buildConfiguration[[:space:]]*=[[:space:]]*")Debug(")}{${1}Release${2}}s' "$SCHEME"
     echo "Selected optimized Release for Xcode Run (original scheme backed up)."
 else
     echo "Could not find scheme. In Xcode: Product > Scheme > Edit Scheme > Run > Build Configuration: Release."
