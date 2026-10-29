@@ -1,82 +1,62 @@
-# Key Scratch: local notes and Ortholinear keyboard
+# Key Scratch: iPhone keyboard with a local scratchpad
 
-An experimental fork of Ortholinear for iPhone. The notes occupy the left 30% of the keyboard while the existing keys and offline swipe recognizer remain on the right.
+A fork of Ortholinear that adds a note panel beside its offline swipe keyboard. Development branch: `feature/scratchpad-first-pass`; draft PR #1. Keep main/upstream Ortholinear intact while the fork is tested on-device.
 
-## Interaction: second iPhone test build
+## Working design from the first real iPhone XS Max experiment
 
-- **Tap anywhere in the notes panel to begin typing into it.** No separate Edit button. Tap **App** to resume typing into the app above the keyboard. The control says **Notes** when the app is active.
-- **Swipe typing, individual keys, word suggestions, Backspace, cursor gestures and text replacements** route to the active destination. Swipe decoding has a high-priority worker independent of ordinary suggestion jobs.
-- Tap within the note to position the insertion point. Press **Paste** to insert clipboard text at that point.
-- **Copy** copies selected text or the entire note when nothing is selected.
-- **Insert** inserts selected note text or the entire note into the app above.
-- **Hold Clear** requires a long press and permanently erases the note (no undo yet).
-- The note persists in the keyboard extension's local UserDefaults, not in the containing app. There is no cross-device synchronization.
+Five color-coded modes remain available in the companion app's **Key Scratch Lab**. Recorded single-swipe badge times were approximately Blue 12 ms, Red 10–15 ms, Green 12 ms, Amber 10 ms, Purple 15 ms. The user reported no noticeable lag in any mode; disabling suggestions did not help, and Purple's notes were too narrow. **Green, about 30% note width, with live suggestions, is the preferred starting configuration.**
 
-## Compact layout and typography
+Mode comparisons: Blue ↔ Red tests the added panel; Red ↔ Green tests the independent glide worker; Green ↔ Amber tests live prediction; Green ↔ Purple tests panel width. Treat the milliseconds as individual local timing samples, not statistical benchmarks.
 
-- Key Scratch's ordinary letter rows are now **62 pt** instead of 72 pt; the control row is **48 pt** instead of 56 pt, and the suggestion strip is **36 pt** instead of 44 pt. Row spacing is also reduced. In its standard configuration the combined keyboard is approximately **278 pt** tall instead of **328 pt** (about **15% shorter**).
-- Existing geometry that matches untouched Ortholinear factory defaults migrates to these shorter values. Deliberately customized sizes are retained. The **Big letters** preset still offers the original 72 pt rows.
-- The notes now use **11 pt San Francisco system text (medium weight)** rather than 10 pt monospaced text. Smaller insets preserve room for more characters in the narrow panel.
-- The notes control bar is 42 pt instead of 48 pt.
-- You can adjust row and key heights later through the companion app's keyboard geometry settings. If you choose larger rows, the suggestion strip returns to 44 pt.
+## Note editing
 
-## Lag investigation
+- Tap text in the narrow notes area to direct Ortholinear typing and swipe recognition to that area. Keyboard suggestions and text replacements also apply to notes.
+- Tap twice to select a word, or three times to select a paragraph. Gesture handling gives higher tap counts priority, but requires another physical-device test. Long-press a word for a floating edit menu; **Select Paragraph** there provides a more reliable fallback.
+- Long-press the note for **Copy, Cut, Paste, Select All, Select Paragraph, Insert in App**, or a guarded **Clear…** submenu. These are actions on the scratchpad, not the app above the keyboard. Copy/Cut/Paste require Allow Full Access.
+- Changing focus to a host app is automatic when iOS informs the extension about a text-field or selection change. An unchanged-caret tap into the already-selected host field may not generate a notification. A small upper-right arrow in the notes area is the reliable fallback.
+- Notes are stored locally. Older extension-only notes are migrated to the local App Group on the first launch of the updated keyboard. The extension also keeps a local fallback copy.
 
-The unmodified Ortholinear app is responsive on the same iPhone XS Max. That makes Key Scratch's added geometry, note UI, or suggestion routing the likely regression. Our current hypothesis is that suggestions and swipe decoding contend for work. The fork now runs glide decoding independently at high priority, warms its dictionary when the language changes, and avoids forced suggestion rebuilds on every note character. This is **not yet a measured fix**: compare original Ortholinear and the new Key Scratch directly on-device using the same phrases, and inspect the Xcode console for non-text glide-to-insertion timing.
+### Full-size note editor
 
-## Experiment lab (in the companion app)
+Open the **Key Scratch** companion app and choose **Scratchpad**. This presents the same note in an ordinary iOS text editor, with native selection, Paste, Copy All, **Share / export**, and a confirmed Clear action. Edits are saved locally and are loaded into the split keyboard when it next appears. If the shared note hasn't yet been migrated, the companion editor protects the existing note by asking you to open the upgraded keyboard once before editing.
 
-Open **Key Scratch > Key Scratch Experiment Lab**. Select one color-coded mode, change the sliders, then press **Apply and test**. The included TextEditor invokes the real installed third-party keyboard. Use the iOS globe key to switch to Key Scratch. Switch to another keyboard and back after applying changes so iOS creates/reloads the extension and reads the shared settings again. You can do this without recompiling.
+This is local device sharing, not cloud syncing. Export important notes periodically until persistence has been thoroughly verified.
 
-The five modes deliberately attack different hypotheses:
+## Allow Full Access
 
-| Color / name | Notes width | Swipe implementation | Live suggestions |
-| --- | --- | --- | --- |
-| Blue · Full width | 0% | Original shared worker | On |
-| Red · Shared split | Adjustable (default 30%) | Original shared worker | On |
-| Green · Split | Same width as Red | Independent prioritized worker | On |
-| Amber · Quiet | Same width as Green | Independent prioritized worker | Off |
-| Purple · Narrow notes | 10 percentage points narrower than Green (minimum 16%) | Independent prioritized worker | On |
+The keyboard extension has `RequestsOpenAccess: true`, but iOS requires the user to authorize it:
 
-Compare Blue versus Red to isolate the notes panel; Red versus Green to isolate the glide worker; Green versus Amber to isolate live suggestions; and Green versus Purple to isolate keyboard width. Use the same words, language and geometry settings for each pair.
+**iPhone Settings → General → Keyboard → Keyboards → Key Scratch → Allow Full Access → On.** Then switch away from Key Scratch and back. The containing app can't change this switch.
 
-The keyboard displays a **matching colored label**; after a successful glide, that label shows the locally measured glide-to-insertion time in milliseconds. It records no words. Use **Copy configuration** in the lab to report exact settings. Never compare modes using different language/dictionary layouts without noting that difference.
+Full Access is used for keyboard **UIPasteboard** operations and writing the shared local App Group note. It permits broader capabilities at the iOS sandbox level, but this fork doesn't upload typed words, notes or clipboard contents; no networking code is used for the keyboard's typing features. See [PRIVACY.md](../PRIVACY.md).
 
-Lab controls: notes width (18–42%), note font size (9–16 pt), system text / rounded / serif / monospaced fonts, letter-row height, control-row height, row spacing, and an English-only shortcut. The original Ortholinear languages remain in the project, even if English is the only one enabled.
+## Native iOS behavior improvements awaiting physical device verification
 
-**Performance caveat:** The App Store's Ortholinear is a Release-optimized build, while Xcode normally Runs in unoptimized Debug. The device update script automatically backs up the generated Xcode scheme and changes *Run* to optimized Release so perceived lag can be compared fairly. Debug build settings are preserved for testing. If you regenerate with XcodeGen, the project.yml Run scheme also selects Release.
+- Swiping inserts a temporary trailing separator, preventing manually typed letters from joining the word. Punctuation can replace that separator.
+- Standalone English lowercase "i" becomes "I" at a word boundary, while "inside" remains lowercase.
+- English long-press accents are available; the popup now appears near the held key. Holding and releasing unchanged types the original letter; horizontal drag chooses accents.
+- First Delete immediately following a glide removes the entire most recently swiped word if the caret still matches; later Deletes use normal character deletion.
+- Press-and-hold Space activates cursor movement, including up/down through the scratchpad's rendered soft-wrapped lines. For text fields in other apps, Apple provides only a text proxy, not their visual line layout: this implementation handles explicit newlines but cannot precisely match all visual line wraps.
+- An enabled-by-default "iPhone key positions" option puts Shift / #+= at the lower-left of the third row, Delete at its right, and Return in the lower-right control position on every page. Ortholinear's original geometry remains available in the Lab.
+- The scratchpad now applies punctuation spacing and quick-double-space period rules too.
 
-Settings use Ortholinear's App Group file. If Xcode signing prevents App Group access, the app reports that sharing failed rather than pretending the keyboard received the new settings. In that case fix signing before relying on A/B comparison.
+## Updating the existing signed Xcode checkout
 
-## Clipboard permission
+In Terminal, inside the extracted project folder that already builds on the iPhone:
 
-Apple's keyboard sandbox requires the optional **Allow Full Access** permission for system clipboard operations. Key Scratch requests eligibility for that permission, but local typing and notes continue to work without it.
+```sh
+curl -fL https://raw.githubusercontent.com/udeudeude/Key-Scratch/feature/scratchpad-first-pass/tools/update-device.sh -o update-key-scratch.sh
+sh update-key-scratch.sh
+```
 
-On iPhone: **Settings > General > Keyboard > Keyboards > Key Scratch (possibly Ortholinear on earlier builds) > Allow Full Access**. Enable it if you need Copy/Paste. No network requests or uploads are implemented in this fork. When access is off, the clipboard buttons display an explanation instead of failing silently.
+The script replaces existing source and plist files, preserving the local Xcode project and signing settings. It backs up and updates the Run scheme to optimized **Release**, since comparing an unoptimized Xcode Debug build to App Store Ortholinear can exaggerate perceived latency.
 
-## Updating your already-installed development copy
+Reopen `Ortholinear.xcodeproj`, select **Product → Clean Build Folder**, then **Command-R** to build/install on the plugged-in iPhone. Do not run XcodeGen again just to update these files: project regeneration may reset signing.
 
-The existing Xcode project includes every Swift file changed by this pass. **Do not regenerate the Xcode project** simply to refresh these files: that may reset your Personal Team signing selection.
+Then enable Full Access in iOS Settings, open the keyboard once to migrate old notes, and open the companion app's full-size Scratchpad. Try Green before adjusting dimensions.
 
-In Terminal, inside your extracted Key Scratch project folder, run these two commands:
+## Outstanding verification
 
-    curl -fL https://raw.githubusercontent.com/udeudeude/Key-Scratch/feature/scratchpad-first-pass/tools/update-device.sh -o update-key-scratch.sh
-    sh update-key-scratch.sh
+The source is committed but these refinements are not yet fully device-tested. Verify compile and Swift core tests in GitHub Actions, then test long-press accents, three-tap paragraph selection, long-press menu Copy/Paste, full-size note persistence, capitalization, swipe spacing/undo, shifted key positions, and Space trackpad. Keep original notes backed up, as this is an experimental build. Secure text fields and apps that reject third-party keyboards remain outside the keyboard extension's control.
 
-The script updates only the changed source files and Info.plists, preserving your local Xcode signing choices. Then in Xcode choose **Product > Clean Build Folder**, and press **Command-R** to reinstall on the connected phone.
-
-For a fresh checkout, install XcodeGen, generate the project, select a signing team for the app and keyboard extension, and run.
-
-## Limits and test criteria
-
-- The previous version was built and installed successfully on an iPhone XS Max, but had slow glide insertion and unintuitive note editing. This revision needs a new on-device test.
-- Decode performance improvement is a hypothesis until measured. Xcode's Debug console now prints glide-to-text latency in milliseconds without logging the typed words.
-- iOS may show a clipboard paste permission prompt.
-- The notes intentionally use a selectable, non-editable UITextView with custom keyboard insertion to avoid summoning a second keyboard. Native text-selection gestures and cursor positions need device validation.
-- Width is fixed at 30% and text at 10 points. Multi-note support, synchronization, comprehensive undo, and adjustable geometry remain future work.
-- Secure text fields and certain host apps do not permit third-party keyboards.
-- Avoid storing irreplaceable text until persistence and stability have been verified.
-
-## Privacy
-
-See PRIVACY.md for the fork's local-storage and optional clipboard-access policy. Neither note contents nor typed host-app text are transmitted.
+See [the detailed acceptance tests](IOS_KEYBOARD_BEHAVIOR.md).
