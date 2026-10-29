@@ -163,6 +163,11 @@ final class KeyboardViewController: UIInputViewController {
         punctuationSpacing.reset()
         noteSpacing.reset()
         pendingGlide = nil
+        // An extension instance can survive switching back to the containing app.
+        // Always reload the shared note before any new editing, never overwrite
+        // companion-app changes with the extension's stale text.
+        scratchpad.deactivate()
+        scratchpad.reloadSharedNote()
         let preferences = PreferenceStore.load()
         adoptLanguageSettings(preferences)
         scratchpad.canUseClipboard = hasFullAccess
