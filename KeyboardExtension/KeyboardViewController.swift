@@ -3,6 +3,7 @@ import UIKit
 final class KeyboardViewController: UIInputViewController {
     private let keyboard = KeyboardView()
     private let scratchpad = ScratchpadView()
+    private let emojiPicker = KeyScratchEmojiPicker()
     private let modeLabel = UILabel()
     private let scratchpadDocumentID = UUID()
     private var scratchpadWidth: NSLayoutConstraint?
@@ -41,6 +42,30 @@ final class KeyboardViewController: UIInputViewController {
         view.addSubview(keyboard)
         scratchpad.translatesAutoresizingMaskIntoConstraints = false
         view.addSubview(scratchpad)
+        emojiPicker.translatesAutoresizingMaskIntoConstraints = false
+        emojiPicker.isHidden = true
+        view.addSubview(emojiPicker)
+        emojiPicker.onEmoji = { [weak self] emoji in
+            guard let self else { return }
+            self.pendingGlide = nil
+            self.expander.forget()
+            self.punctuationSpacing.reset()
+            self.noteSpacing.reset()
+            if self.scratchpad.isEditingNote {
+                self.scratchpad.type(emoji)
+            } else {
+                self.textDocumentProxy.insertText(emoji)
+            }
+            self.updateAutoShift()
+            self.keyboard.inputState = self.inputState
+            self.suggestions.refresh()
+        }
+        emojiPicker.onClose = { [weak self] in self?.emojiPicker.isHidden = true }
+        emojiPicker.onLanguage = { [weak self] in
+            guard let self else { return }
+            self.switchLanguage(to: self.keyboard.preferences.language(after: self.inputState.language))
+            self.emojiPicker.currentLanguage = self.inputState.language.badge
+        }
         scratchpadWidth = scratchpad.widthAnchor.constraint(equalToConstant: 0)
         scratchpadWidth?.isActive = true
         modeLabel.font = .systemFont(ofSize: 9, weight: .semibold)
@@ -79,7 +104,11 @@ final class KeyboardViewController: UIInputViewController {
             keyboard.leadingAnchor.constraint(equalTo: scratchpad.trailingAnchor),
             keyboard.trailingAnchor.constraint(equalTo: view.trailingAnchor),
             keyboard.topAnchor.constraint(equalTo: view.topAnchor),
-            keyboard.bottomAnchor.constraint(equalTo: view.bottomAnchor)
+            keyboard.bottomAnchor.constraint(equalTo: view.bottomAnchor),
+            emojiPicker.leadingAnchor.constraint(equalTo: keyboard.leadingAnchor),
+            emojiPicker.trailingAnchor.constraint(equalTo: keyboard.trailingAnchor),
+            emojiPicker.topAnchor.constraint(equalTo: keyboard.topAnchor),
+            emojiPicker.bottomAnchor.constraint(equalTo: keyboard.bottomAnchor)
         ])
         let height = view.heightAnchor.constraint(equalToConstant: keyboard.preferences.keyboardHeight)
         height.priority = .init(999)
@@ -98,6 +127,12 @@ final class KeyboardViewController: UIInputViewController {
         suggestions.glideContext = { [weak self] in self?.glideContext() }
         suggestions.switchLanguage = { [weak self] in self?.switchLanguage(to: $0) }
         keyboard.onAction = { [weak self] in self?.handle($0) }
+        keyboard.onLanguageHold = { [weak self] in
+            guard let self else { return }
+            let languages = self.keyboard.preferences.validated.languages
+            guard languages.count > 1 else { return }
+            self.switchLanguage(to: self.keyboard.preferences.language(after: self.inputState.language))
+        }
         keyboard.onCursor = { [weak self] in
             guard let self else { return }
             self.suggestions.cancelGlide()
@@ -171,6 +206,8 @@ final class KeyboardViewController: UIInputViewController {
         let preferences = PreferenceStore.load()
         adoptLanguageSettings(preferences)
         scratchpad.canUseClipboard = hasFullAccess
+        emojiPicker.isHidden = true
+        emojiPicker.currentLanguage = inputState.language.badge
         if preferences.keyScratchMode == .reference { scratchpad.deactivate() }
         scratchpad.isHidden = preferences.keyScratchMode == .reference
         scratchpad.configure(mode: preferences.keyScratchMode,
@@ -630,6 +667,9 @@ final class KeyboardViewController: UIInputViewController {
                 autoShifted = false
                 manualShiftContext = textDocumentProxy.documentContextBeforeInput ?? ""
             } else { inputState.page = KeyboardLayout.page(after: inputState.page, preferences: keyboard.preferences) }
+        case .emoji:
+            emojiPicker.currentLanguage = inputState.language.badge
+            emojiPicker.isHidden = false
         case .language:
             inputState.language = keyboard.preferences.language(after: inputState.language)
             inputState.page = .letters
@@ -726,4 +766,125 @@ private enum LanguageMemoryStore {
 /// handed to MainActor without concurrent access to its UIKit-isolated entries.
 private struct KeyScratchLexiconTransfer: @unchecked Sendable {
     let value: UILexicon
+}
+
+
+/// Compact emoji selector in the same right-hand area as the letter keyboard.
+/// Public UIKit cannot choose Apple's Emoji keyboard directly. The globe
+/// control below the extension still switches to user-enabled system keyboards.
+@MainActor
+private final class KeyScratchEmojiPicker: UIView {
+    var onEmoji: ((String) -> Void)?
+    var onClose: (() -> Void)?
+    var onLanguage: (() -> Void)?
+    var currentLanguage: String = "EN" {
+        didSet { languageButton.setTitle(currentLanguage + " ▾", for: .normal) }
+    }
+
+    private let closeButton = UIButton(type: .system)
+    private let languageButton = UIButton(type: .system)
+    private let groups = UISegmentedControl(items: ["🕘", "😀", "🐾", "🍎", "🚀", "❤️"])
+    private let scroll = UIScrollView()
+    private let stack = UIStackView()
+
+    private static let families: [[String]] = [
+        [],
+        ["😀","😃","😄","😁","😆","😅","😂","🤣","🥲","☺️","😊","😇","🙂","🙃","😉","😍","🥰","😘","😗","😙","😚","😋","😛","😝","😜","🤪","🤨","🧐","🤓","😎","🥸","🤩","🥳","😏","😒","😞","😔","😟","😕","🙁","☹️","😣","😖","😫","😩","🥺","😢","😭","😤","😠","😡","🤬","🤯","😳","🥵","🥶","😱","😨","😰","😥","😓","🤗","🤔","🫣","🤭","🫢","🤫","🤥","😶","😐","😑","🙄","😬","🫠","😴","🤤","😷","🤒","🤕","🤢","🤮","🤧","👍","👎","👏","🙌","👋","🤝","🙏","💪","✌️","🤞","👌","🤌"],
+        ["🐶","🐱","🐭","🐹","🐰","🦊","🐻","🐼","🐨","🐯","🦁","🐮","🐷","🐸","🐵","🙈","🙉","🙊","🐒","🐔","🐧","🐦","🐤","🦆","🦅","🦉","🦇","🐺","🐗","🐴","🦄","🐝","🪱","🐛","🦋","🐌","🐞","🐜","🪲","🐢","🐍","🦎","🦖","🦕","🐙","🦑","🦀","🐬","🐳","🐠","🐟","🦈","🐊","🦭","🐘","🦒","🦓","🦘","🦦","🌵","🌲","🌳","🌴","🌱","🌿","☘️","🍀","🍁","🍂","🍃","🌷","🌹","🌻","🌼","🌸","💐","🍄","🌞","🌝","🌛","⭐️","🌟","✨","⚡️","🔥","🌈","☀️","🌦","☁️","❄️","☃️"],
+        ["🍏","🍎","🍐","🍊","🍋","🍌","🍉","🍇","🍓","🫐","🍈","🍒","🍑","🥭","🍍","🥥","🥝","🍅","🍆","🥑","🥦","🥬","🥒","🌶","🫑","🌽","🥕","🫒","🧄","🧅","🥔","🍠","🥐","🥯","🍞","🥖","🥨","🧀","🥚","🍳","🥞","🧇","🥓","🥩","🍗","🍖","🌭","🍔","🍟","🍕","🥪","🌮","🌯","🫔","🥗","🥘","🍝","🍜","🍲","🍛","🍣","🍱","🥟","🍤","🍙","🍚","🍘","🍡","🍦","🍧","🍨","🍩","🍪","🎂","🍰","🧁","🍫","🍬","🍭","🍯","☕️","🍵","🥤","🧃","🧊"],
+        ["🚗","🚕","🚙","🚌","🚎","🏎","🚓","🚑","🚒","🚐","🚚","🚛","🚜","🏍","🛵","🚲","🛴","🚁","✈️","🛫","🛬","🚀","🛸","🛶","⛵️","🚤","🛳","⛴","🚢","⚓️","🚉","🚂","🚆","🚇","🚈","🚄","🚅","🏠","🏡","🏢","🏛","⛪️","🕌","🛕","🏰","🏯","🌋","🗻","🏕","🏖","🏜","🏝","🗺","🌍","🌎","🌏","🌐","🧭","⏰","⌚️","📱","💻","⌨️","🖥","🖨","🕹","🎮","📷","📸","📻","🎙","🎧","🎹","🎸","🎺","🎻","🎨","📚","📖","📝","✏️","💡","🔍"],
+        ["❤️","🧡","💛","💚","💙","💜","🖤","🤍","🤎","💔","❤️‍🔥","❤️‍🩹","💕","💞","💓","💗","💖","💘","💝","💟","☮️","✝️","☪️","🕉️","☸️","✡️","🔯","🕎","☯️","⚛️","♾️","🆗","🆒","🆕","🆓","❗️","❕","❓","❔","‼️","⁉️","✅","☑️","✔️","❌","⭕️","🚫","🔴","🟠","🟡","🟢","🔵","🟣","⚫️","⚪️","🟤","🔺","🔻","⬛️","⬜️","◾️","◽️","🔶","🔷","🔸","🔹","🔔","🔕","🎵","🎶","💬","🗯","💭","🗨","♻️","⚜️","🔱","〽️","💯"]
+    ]
+
+    override init(frame: CGRect) {
+        super.init(frame: frame)
+        backgroundColor = .secondarySystemBackground
+        closeButton.setTitle("ABC", for: .normal)
+        closeButton.titleLabel?.font = .systemFont(ofSize: 15, weight: .semibold)
+        closeButton.addTarget(self, action: #selector(close), for: .touchUpInside)
+        addSubview(closeButton)
+
+        languageButton.titleLabel?.font = .systemFont(ofSize: 12, weight: .semibold)
+        languageButton.setTitle(currentLanguage + " ▾", for: .normal)
+        languageButton.addTarget(self, action: #selector(changeLanguage), for: .touchUpInside)
+        addSubview(languageButton)
+
+        groups.selectedSegmentIndex = 1
+        groups.addTarget(self, action: #selector(categoryChanged), for: .valueChanged)
+        addSubview(groups)
+
+        scroll.alwaysBounceVertical = true
+        scroll.keyboardDismissMode = .none
+        addSubview(scroll)
+        stack.axis = .vertical
+        stack.spacing = 4
+        stack.translatesAutoresizingMaskIntoConstraints = false
+        scroll.addSubview(stack)
+        NSLayoutConstraint.activate([
+            stack.topAnchor.constraint(equalTo: scroll.contentLayoutGuide.topAnchor, constant: 4),
+            stack.bottomAnchor.constraint(equalTo: scroll.contentLayoutGuide.bottomAnchor, constant: -4),
+            stack.leadingAnchor.constraint(equalTo: scroll.contentLayoutGuide.leadingAnchor, constant: 4),
+            stack.trailingAnchor.constraint(equalTo: scroll.contentLayoutGuide.trailingAnchor, constant: -4),
+            stack.widthAnchor.constraint(equalTo: scroll.frameLayoutGuide.widthAnchor, constant: -8)
+        ])
+        reloadGrid()
+    }
+
+    required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
+
+    override func layoutSubviews() {
+        super.layoutSubviews()
+        let top: CGFloat = 32
+        closeButton.frame = CGRect(x: 4, y: 0, width: 56, height: top)
+        languageButton.frame = CGRect(x: bounds.width - 66, y: 0, width: 62, height: top)
+        groups.frame = CGRect(x: 3, y: top, width: max(0, bounds.width - 6), height: 33)
+        scroll.frame = CGRect(x: 0, y: top + 36, width: bounds.width,
+                              height: max(0, bounds.height - top - 36))
+    }
+
+    @objc private func close() { onClose?() }
+    @objc private func changeLanguage() { onLanguage?() }
+    @objc private func categoryChanged() { reloadGrid() }
+
+    private func reloadGrid() {
+        for row in stack.arrangedSubviews {
+            stack.removeArrangedSubview(row)
+            row.removeFromSuperview()
+        }
+        let recent = UserDefaults.standard.stringArray(forKey: "KeyScratch.recentEmojis") ?? []
+        let selected = groups.selectedSegmentIndex
+        let emojis = selected == 0 ? (recent.isEmpty ? Array(Self.families[1].prefix(30)) : recent)
+                                   : Self.families[max(1, min(selected, 5))]
+        for start in stride(from: 0, to: emojis.count, by: 6) {
+            let row = UIStackView()
+            row.axis = .horizontal
+            row.distribution = .fillEqually
+            row.spacing = 2
+            for i in 0..<6 {
+                let button = UIButton(type: .system)
+                if start + i < emojis.count {
+                    let emoji = emojis[start + i]
+                    button.setTitle(emoji, for: .normal)
+                    button.titleLabel?.font = .systemFont(ofSize: 29)
+                    button.accessibilityLabel = emoji
+                    button.addAction(UIAction { [weak self] _ in self?.picked(emoji) }, for: .touchUpInside)
+                } else {
+                    button.isEnabled = false
+                }
+                row.addArrangedSubview(button)
+            }
+            stack.addArrangedSubview(row)
+            row.heightAnchor.constraint(equalToConstant: 39).isActive = true
+        }
+        scroll.setContentOffset(.zero, animated: false)
+    }
+
+    private func picked(_ emoji: String) {
+        var recent = UserDefaults.standard.stringArray(forKey: "KeyScratch.recentEmojis") ?? []
+        recent.removeAll { $0 == emoji }
+        recent.insert(emoji, at: 0)
+        UserDefaults.standard.set(Array(recent.prefix(36)), forKey: "KeyScratch.recentEmojis")
+        onEmoji?(emoji)
+        if groups.selectedSegmentIndex == 0 { reloadGrid() }
+    }
 }
