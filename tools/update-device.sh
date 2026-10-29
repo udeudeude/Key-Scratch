@@ -32,6 +32,7 @@ fetch() {
 }
 
 fetch "Core/KeyboardModel.swift"
+fetch "SharedUI/PreferenceStore.swift"
 fetch "Core/PunctuationSpacing.swift"
 fetch "Core/Suggestions.swift"
 fetch "Core/TextNavigation.swift"
@@ -60,6 +61,7 @@ fi
 echo ""
 echo "Updated. Keep your existing Xcode project and signing team."
 echo "In Xcode: Product > Clean Build Folder, then Run (Command-R)."
-echo "Open Key Scratch on iPhone: Experiment Lab > choose a color > Apply and test."
-echo "Use the globe key to select Key Scratch again after a settings change."
-echo "Clipboard is optional: Settings > General > Keyboard > Keyboards > Key Scratch > Allow Full Access."
+echo "Open Key Scratch on iPhone: Scratchpad for full-size notes, or Experiment Lab to test modes."
+echo "Open the updated keyboard once before using the companion Scratchpad, to migrate old notes."
+echo "For Copy/Paste and shared notes: iPhone Settings > General > Keyboard > Keyboards > Key Scratch > Allow Full Access."
+echo "Reopen the keyboard after changing permissions or experiment settings."
