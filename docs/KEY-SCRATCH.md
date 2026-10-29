@@ -38,7 +38,9 @@ The five modes deliberately attack different hypotheses:
 | Amber · Quiet | Same width as Green | Independent prioritized worker | Off |
 | Purple · Narrow notes | 10 percentage points narrower than Green (minimum 16%) | Independent prioritized worker | On |
 
-Compare Blue versus Red to isolate the notes panel; Red versus Green to isolate the glide worker; Green versus Amber to isolate live suggestions; and Green versus Purple to isolate keyboard width. Use the same words, language and geometry settings for each pair.\n\nThe keyboard displays a **matching colored label**; after a successful glide, that label shows the locally measured glide-to-insertion time in milliseconds. It records no words. Use **Copy configuration** in the lab to report exact settings. Never compare modes using different language/dictionary layouts without noting that difference.
+Compare Blue versus Red to isolate the notes panel; Red versus Green to isolate the glide worker; Green versus Amber to isolate live suggestions; and Green versus Purple to isolate keyboard width. Use the same words, language and geometry settings for each pair.
+
+The keyboard displays a **matching colored label**; after a successful glide, that label shows the locally measured glide-to-insertion time in milliseconds. It records no words. Use **Copy configuration** in the lab to report exact settings. Never compare modes using different language/dictionary layouts without noting that difference.
 
 Lab controls: notes width (18–42%), note font size (9–16 pt), system text / rounded / serif / monospaced fonts, letter-row height, control-row height, row spacing, and an English-only shortcut. The original Ortholinear languages remain in the project, even if English is the only one enabled.
 
