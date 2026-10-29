@@ -510,7 +510,7 @@ final class SuggestionCoordinator {
                   let inserted = self.insertWord?(best.word) else { return }
             #if DEBUG
             let elapsedMS = (ProcessInfo.processInfo.systemUptime - started) * 1000
-            print("KeyScratch glide-to-text latency: (Int(elapsedMS.rounded())) ms")
+            print("KeyScratch glide-to-text latency: \(Int(elapsedMS.rounded())) ms")
             #endif
             // Alternatives need a snapshot to replace safely; without host context, only the word goes in.
             guard let after = self.snapshot?() else { self.refresh(force: true); return }
