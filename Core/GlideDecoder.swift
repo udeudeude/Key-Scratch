@@ -53,21 +53,21 @@ struct GlideDecoder: Sendable {
 
     init(lexicon: SuggestionLexicon, geometry: SuggestionGeometry) {
         self.lexicon = lexicon
-        var uniqueRows = Set<CGFloat>()
+        var uniqueRows = Set<Double>()
         for center in geometry.centers.values {
-            let halfRow = (center.y * 2).rounded() / 2
+            let halfRow = (Double(center.y) * 2).rounded() / 2
             uniqueRows.insert(halfRow)
         }
         let ys = uniqueRows.sorted()
-        var smallestPitch: CGFloat?
+        var smallestPitch: Double?
         for index in 1..<ys.count {
             let separation = ys[index] - ys[index - 1]
             if separation > 1 {
                 smallestPitch = min(smallestPitch ?? separation, separation)
             }
         }
-        let pitch = smallestPitch ?? geometry.unit
-        scale = SIMD2(1 / max(geometry.unit, 1), 1 / max(pitch, 1))
+        let pitch: Double = smallestPitch ?? geometry.unit
+        scale = SIMD2<Double>(1.0 / max(geometry.unit, 1.0), 1.0 / max(pitch, 1.0))
         var keyIndex: [Unicode.Scalar: Int] = [:], keys: [SIMD2<Double>] = []
         for (letter, center) in geometry.centers.sorted(by: { $0.key < $1.key }) {
             guard letter.unicodeScalars.count == 1, let scalar = letter.unicodeScalars.first else { continue }
