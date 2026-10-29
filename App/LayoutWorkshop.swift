@@ -261,8 +261,8 @@ struct LayoutWorkshop: View {
         } catch let error as LayoutFile.ReadError {
             notice = switch error {
             case .tooLarge: "That file is too large to be a layout."
-            case .notALayout: "That file isn’t an Ortholinear layout."
-            case .newerVersion: "That layout was made by a newer version of Ortholinear. Update the app to open it."
+            case .notALayout: "That file isn't a supported Key Scratch layout."
+            case .newerVersion: "That layout needs a newer version of Key Scratch."
             case .unknownLanguage: "That layout is for a language this version doesn’t have."
             case .malformed: "That layout file is damaged."
             }
