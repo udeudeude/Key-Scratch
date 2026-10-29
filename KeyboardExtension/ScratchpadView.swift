@@ -4,8 +4,9 @@ import UIKit
 /// The Ortholinear keys edit this text view directly via its selected range.
 /// It intentionally never becomes first responder: that would summon a second keyboard.
 @MainActor
-final class ScratchpadView: UIView {
+final class ScratchpadView: UIView, UITextViewDelegate {
     private let editor = UITextView()
+    private let caret = UIView()
     private let modeButton = UIButton(type: .system)
     private let message = UILabel()
     private let storeKey = "key-scratch.local-note.v1"
@@ -52,6 +53,7 @@ final class ScratchpadView: UIView {
         layer.borderColor = UIColor.systemBlue.cgColor
         layer.borderWidth = 1
         onEditingChange?(true)
+        updateCaret()
     }
 
     func deactivate() {
@@ -61,6 +63,7 @@ final class ScratchpadView: UIView {
         layer.borderColor = UIColor.separator.cgColor
         layer.borderWidth = 0.5
         onEditingChange?(false)
+        updateCaret()
     }
 
     /// Replaces the selected UTF-16 range, keeping the selection/caret in the note.
@@ -73,6 +76,7 @@ final class ScratchpadView: UIView {
         editor.text = value
         editor.selectedRange = NSRange(location: range.location + (replacement as NSString).length, length: 0)
         editor.scrollRangeToVisible(editor.selectedRange)
+        updateCaret()
         save()
         onTextChange?()
     }
@@ -108,6 +112,7 @@ final class ScratchpadView: UIView {
               let next = editor.position(from: start, offset: steps),
               let range = editor.textRange(from: next, to: next) else { return }
         editor.selectedTextRange = range
+        updateCaret()
         onTextChange?()
     }
 
@@ -174,6 +179,11 @@ final class ScratchpadView: UIView {
         editor.isEditable = false
         editor.isSelectable = true
         editor.isScrollEnabled = true
+        editor.delegate = self
+        caret.backgroundColor = .systemBlue
+        caret.isHidden = true
+        caret.isUserInteractionEnabled = false
+        editor.addSubview(caret)
         editor.textContainerInset = UIEdgeInsets(top: 4, left: 2, bottom: 4, right: 2)
         editor.text = UserDefaults.standard.string(forKey: storeKey) ?? ""
         editor.accessibilityLabel = "Scratchpad note. Tap to type with Key Scratch."
@@ -209,7 +219,31 @@ final class ScratchpadView: UIView {
         if let position = editor.closestPosition(to: location) {
             editor.selectedTextRange = editor.textRange(from: position, to: position)
         }
+        updateCaret()
         onTextChange?()
+    }
+
+    func textViewDidChangeSelection(_ textView: UITextView) {
+        updateCaret()
+    }
+
+    func scrollViewDidScroll(_ scrollView: UIScrollView) {
+        updateCaret()
+    }
+
+    private func updateCaret() {
+        guard isEditingNote, let selection = editor.selectedTextRange,
+              selection.isEmpty else {
+            caret.isHidden = true
+            return
+        }
+        let rect = editor.caretRect(for: selection.start)
+        guard rect.isFinite, rect.height > 0 else {
+            caret.isHidden = true
+            return
+        }
+        caret.frame = CGRect(x: rect.minX, y: rect.minY, width: 1.5, height: max(rect.height, 12))
+        caret.isHidden = false
     }
 
     @objc private func toggleDestination() {
