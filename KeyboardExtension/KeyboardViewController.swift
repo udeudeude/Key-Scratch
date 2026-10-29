@@ -9,6 +9,10 @@ final class KeyboardViewController: UIInputViewController {
     private var heightConstraint: NSLayoutConstraint?
     private var inputState = InputState()
     private var punctuationSpacing = PunctuationSpacing()
+    private var noteSpacing = PunctuationSpacing()
+    /// Only the most recent uninterrupted glide can be undone as a whole.
+    /// Keep the exact inserted suffix so an outside edit never deletes other text.
+    private var pendingGlide: (inserted: String, inNotes: Bool)?
     private var expander = TextExpander()
     private var lastKeyboardType: UIKeyboardType?
     private var reportedLanguage: KeyboardLanguage?
@@ -53,6 +57,8 @@ final class KeyboardViewController: UIInputViewController {
             self?.suggestions.refresh(force: true)
         }
         scratchpad.onEditingChange = { [weak self] _ in
+            self?.pendingGlide = nil
+            self?.noteSpacing.reset()
             self?.expander.forget()
             self?.suggestions.cancelGlide()
             self?.updateAutoShift()
@@ -123,6 +129,8 @@ final class KeyboardViewController: UIInputViewController {
     override func viewWillAppear(_ animated: Bool) {
         super.viewWillAppear(animated)
         punctuationSpacing.reset()
+        noteSpacing.reset()
+        pendingGlide = nil
         let preferences = PreferenceStore.load()
         adoptLanguageSettings(preferences)
         scratchpad.canUseClipboard = hasFullAccess
@@ -168,6 +176,7 @@ final class KeyboardViewController: UIInputViewController {
         guard !applyingSuggestion else { return }
         // Tapping a different caret in the host app restores normal typing.
         if scratchpad.isEditingNote { scratchpad.deactivate() }
+        pendingGlide = nil
         suggestions.cancelGlide()
         updateAutoShift()
         keyboard.inputState = inputState
@@ -218,6 +227,7 @@ final class KeyboardViewController: UIInputViewController {
     }
 
     private func applySuggestion(_ edit: SuggestionEdit, snapshot: SuggestionSnapshot) {
+        pendingGlide = nil
         if scratchpad.isEditingNote {
             _ = scratchpad.apply(edit, offered: snapshot, document: scratchpadDocumentID,
                                  language: inputState.language)
