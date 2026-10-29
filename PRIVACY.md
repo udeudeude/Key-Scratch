@@ -1,5 +1,7 @@
 # Privacy policy
 
+> Key Scratch is a modified fork of Ortholinear. The following additional rules describe the fork's local scratchpad and optional clipboard access.
+
 Effective October 6, 2026.
 
 Ortholinear is an on-device Ukrainian and English keyboard for iPhone and iPad, with optional layouts for other European languages, maintained by Igor Varyvoda.
@@ -24,9 +26,13 @@ Layout and setup files are created only when you choose to share one, and go whe
 
 Ortholinear Pro is a one-time in-app purchase handled by Apple. When you buy or restore it, the app talks to the App Store through Apple's StoreKit; Apple processes the payment under its own privacy policy. The developer does not receive your name, Apple Account or payment details. The app keeps only whether Pro is unlocked, on your device.
 
-## No tracking or Full Access
+## Key Scratch notes and clipboard access
 
-The app and keyboard include no analytics, advertising, accounts, or tracking SDKs. The keyboard does not request Full Access and makes no network requests. The app's only network use is the App Store for purchases, as described above.
+Key Scratch stores the scratchpad's contents locally in the keyboard extension's own sandbox. These notes are not transmitted to any server and are not a log of text you type into other apps. Deleting the app may delete these notes. There is currently no synchronization or backup.
+
+Key Scratch requests eligibility for Apple's optional **Allow Full Access** permission solely to support clipboard copying and pasting. Without that permission the keyboard and local notes still work, but clipboard operations are unavailable. With permission enabled, the keyboard can read and write the system clipboard when you press the Copy or Paste buttons. Key Scratch does not upload clipboard contents or keystrokes and contains no network code for such transmission.
+
+The app and keyboard include no added analytics, advertising, accounts, or tracking SDKs. The underlying Ortholinear app retains its original optional in-app purchase and Apple StoreKit behavior.
 
 ## External links and support
 
