@@ -90,9 +90,14 @@ struct SuggestionEdit: Equatable, Sendable {
                                offered: SuggestionSnapshot, current: SuggestionSnapshot) -> Self? {
         guard offered == current, current.selection.isEmpty, !inserted.isEmpty,
               SuggestionText.isWord(suggestion.word) else { return nil }
-        let left = String(current.before.suffix(inserted.count))
+        // A glide may add a provisional trailing space. Replace the preceding
+        // word without losing that space, so choosing an alternative still works.
+        let provisionalSpace = current.before.last == " " ? " " : ""
+        let beforeWord = provisionalSpace.isEmpty ? current.before : String(current.before.dropLast())
+        let left = String(beforeWord.suffix(inserted.count))
         guard left.unicodeScalars.elementsEqual(inserted.unicodeScalars) else { return nil }
-        return .init(left: left, right: "", replaceSelection: false, text: suggestion.word)
+        return .init(left: left + provisionalSpace, right: "", replaceSelection: false,
+                     text: suggestion.word + provisionalSpace)
     }
 }
 
