@@ -675,6 +675,20 @@ private struct KeyScratchExperimentLab: View {
                         .foregroundStyle(.secondary)
                 }
 
+                Section("Copy and paste") {
+                    Text("The keyboard must have iOS Allow Full Access enabled to use the clipboard. This is optional for typing and notes. Key Scratch does not send your text anywhere.")
+                        .font(.caption).foregroundStyle(.secondary)
+                    Button {
+                        if let url = URL(string: UIApplication.openSettingsURLString) {
+                            UIApplication.shared.open(url)
+                        }
+                    } label: {
+                        Label("Open iPhone app settings", systemImage: "gear")
+                    }
+                    Text("For the keyboard permission, go to Settings > General > Keyboard > Keyboards > Key Scratch > Allow Full Access. Reopen the keyboard afterward.")
+                        .font(.caption).foregroundStyle(.secondary)
+                }
+
                 Section("Keyboard layout") {
                     Toggle("iPhone key positions", isOn: $draft.iphoneKeyPositions)
                     Text("Shift / #+= remains on the left of the third row, Delete stays on its right, and Return always stays at bottom right. Turn this off to compare the original Ortholinear positions.")
