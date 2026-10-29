@@ -164,11 +164,11 @@ enum DigitAccess: String, Codable, CaseIterable, Sendable {
 enum ShiftMode: Sendable { case off, once, locked }
 enum ShiftPlacement: String, Codable, CaseIterable, Sendable {
     case beforeLastRow, controlRow
-    var title: String { self == .beforeLastRow ? "Before Я / Z" : "Control row" }
+    var title: String { self == .beforeLastRow ? "Third row (left)" : "Control row" }
 }
 
 struct InputState: Sendable {
-    var language: KeyboardLanguage = .ukrainian
+    var language: KeyboardLanguage = .english
     var page: KeyboardPage = .letters
     var shift: ShiftMode = .off
     private var lastShiftTap: TimeInterval?
@@ -786,7 +786,7 @@ enum KeyboardPreset: String, CaseIterable, Identifiable {
     }
     var detail: String {
         switch self {
-        case .bigLetters: "72 pt letters · wide Return and Delete · Shift before Я / Z"
+        case .bigLetters: "72 pt letters · large Return and Delete"
         case .balanced: "60 pt letters · a little more space for your text"
         case .original: "The original 48 pt grid, with punctuation and header"
         }
