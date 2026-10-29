@@ -4,10 +4,11 @@ import UIKit
 /// The Ortholinear keys edit this text view directly via its selected range.
 /// It intentionally never becomes first responder: that would summon a second keyboard.
 @MainActor
-final class ScratchpadView: UIView, UITextViewDelegate {
+final class ScratchpadView: UIView, UITextViewDelegate, UIEditMenuInteractionDelegate {
     private let editor = UITextView()
     private let caret = UIView()
-    private let modeButton = UIButton(type: .system)
+    private lazy var editMenu = UIEditMenuInteraction(delegate: self)
+    private let returnToApp = UIButton(type: .system)
     private let message = UILabel()
     private let storeKey = "key-scratch.local-note.v1"
     private var modeColor: UIColor = .systemGreen
@@ -50,7 +51,7 @@ final class ScratchpadView: UIView, UITextViewDelegate {
     func activate() {
         guard !isEditingNote else { return }
         isEditingNote = true
-        modeButton.setTitle("App", for: .normal)
+        returnToApp.isHidden = false
         layer.borderColor = modeColor.cgColor
         layer.borderWidth = 1
         onEditingChange?(true)
@@ -60,7 +61,7 @@ final class ScratchpadView: UIView, UITextViewDelegate {
     func deactivate() {
         guard isEditingNote else { return }
         isEditingNote = false
-        modeButton.setTitle("Notes", for: .normal)
+        returnToApp.isHidden = true
         layer.borderColor = modeColor.withAlphaComponent(0.6).cgColor
         layer.borderWidth = 0.5
         onEditingChange?(false)
@@ -180,43 +181,23 @@ final class ScratchpadView: UIView, UITextViewDelegate {
         layer.borderColor = UIColor.separator.cgColor
         layer.borderWidth = 0.5
 
-        let toolbar = UIStackView()
-        toolbar.axis = .vertical
-        toolbar.spacing = 1
-
-        let top = UIStackView()
-        top.axis = .horizontal
-        top.distribution = .fillEqually
-        let bottom = UIStackView()
-        bottom.axis = .horizontal
-        bottom.distribution = .fillEqually
-        toolbar.addArrangedSubview(top)
-        toolbar.addArrangedSubview(bottom)
-
-        modeButton.setTitle("Notes", for: .normal)
-        modeButton.titleLabel?.font = .systemFont(ofSize: 10, weight: .semibold)
-        modeButton.addTarget(self, action: #selector(toggleDestination), for: .touchUpInside)
-        top.addArrangedSubview(modeButton)
-
-        func add(_ title: String, action: Selector, to row: UIStackView) {
-            let button = UIButton(type: .system)
-            button.setTitle(title, for: .normal)
-            button.titleLabel?.font = .systemFont(ofSize: 9, weight: .semibold)
-            button.addTarget(self, action: action, for: .touchUpInside)
-            row.addArrangedSubview(button)
-        }
-
-        add("Insert", action: #selector(insertNote), to: top)
-        add("Paste", action: #selector(pasteClipboard), to: bottom)
-        add("Copy", action: #selector(copyNote), to: bottom)
-
-        let erase = UIButton(type: .system)
-        erase.setTitle("Clear", for: .normal)
-        erase.accessibilityLabel = "Clear note"
-        erase.accessibilityHint = "Press and hold to erase the entire note."
-        erase.titleLabel?.font = .systemFont(ofSize: 9)
-        erase.addGestureRecognizer(UILongPressGestureRecognizer(target: self, action: #selector(clearNoteOnHold(_:))))
-        bottom.addArrangedSubview(erase)
+        // Most of the panel is now text, not a toolbar. An unobtrusive
+        // icon remains as an optional fallback if a host tap emits no focus event.
+        returnToApp.setImage(UIImage(systemName: "arrow.up.forward.square"), for: .normal)
+        returnToApp.tintColor = .secondaryLabel
+        returnToApp.backgroundColor = .tertiarySystemBackground
+        returnToApp.layer.cornerRadius = 5
+        returnToApp.accessibilityLabel = "Return to app typing"
+        returnToApp.addTarget(self, action: #selector(returnToAppTapped), for: .touchUpInside)
+        returnToApp.isHidden = true
+        returnToApp.translatesAutoresizingMaskIntoConstraints = false
+        addSubview(returnToApp)
+        NSLayoutConstraint.activate([
+            returnToApp.topAnchor.constraint(equalTo: topAnchor, constant: 2),
+            returnToApp.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -2),
+            returnToApp.widthAnchor.constraint(equalToConstant: 24),
+            returnToApp.heightAnchor.constraint(equalToConstant: 24)
+        ])
 
         // San Francisco's text cut is optically tuned for tiny point sizes,
         // with less wasted width than the previous monospaced face.
@@ -255,13 +236,18 @@ final class ScratchpadView: UIView, UITextViewDelegate {
         editor.addGestureRecognizer(paragraphTap)
         editor.addGestureRecognizer(wordTap)
         editor.addGestureRecognizer(tap)
+        editor.addInteraction(editMenu)
+        let longPress = UILongPressGestureRecognizer(target: self, action: #selector(noteLongPressed(_:)))
+        longPress.minimumPressDuration = 0.45
+        longPress.cancelsTouchesInView = true
+        editor.addGestureRecognizer(longPress)
 
         message.font = .systemFont(ofSize: 9)
         message.textColor = .secondaryLabel
         message.numberOfLines = 3
         message.isHidden = true
 
-        let stack = UIStackView(arrangedSubviews: [toolbar, message, editor])
+        let stack = UIStackView(arrangedSubviews: [message, editor])
         stack.axis = .vertical
         stack.spacing = 2
         stack.translatesAutoresizingMaskIntoConstraints = false
@@ -270,9 +256,9 @@ final class ScratchpadView: UIView, UITextViewDelegate {
             stack.leadingAnchor.constraint(equalTo: leadingAnchor),
             stack.trailingAnchor.constraint(equalTo: trailingAnchor),
             stack.topAnchor.constraint(equalTo: topAnchor),
-            stack.bottomAnchor.constraint(equalTo: bottomAnchor),
-            toolbar.heightAnchor.constraint(equalToConstant: 42)
+            stack.bottomAnchor.constraint(equalTo: bottomAnchor)
         ])
+        bringSubviewToFront(returnToApp)
     }
 
     required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
@@ -344,9 +330,7 @@ final class ScratchpadView: UIView, UITextViewDelegate {
         caret.isHidden = false
     }
 
-    @objc private func toggleDestination() {
-        if isEditingNote { deactivate() } else { activate() }
-    }
+    @objc private func returnToAppTapped() { deactivate() }
 
     private func inform(_ text: String) {
         message.text = text
