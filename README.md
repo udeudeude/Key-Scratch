@@ -1,4 +1,4 @@
-> **Key Scratch fork:** Experimental local notes panel alongside Ortholinear. See [Key Scratch build and testing instructions](docs/KEY-SCRATCH.md). Work in progress on `feature/scratchpad-first-pass`.
+> **Key Scratch fork, experimental:** A split iPhone keyboard with local notes. The containing app now includes a full-size shared scratchpad editor, color-coded experiment modes, and improved iOS-style typing gestures. **Enable Allow Full Access** in iPhone Settings for note Copy/Paste and local app/keyboard note sharing. No text is uploaded by the keyboard. See [Key Scratch device setup and acceptance tests](docs/KEY-SCRATCH.md). Work in progress on `feature/scratchpad-first-pass`; do not merge into main without another iPhone test.
 
 # Ortholinear
 
@@ -20,7 +20,7 @@ For an iPhone or iPad:
 2. If necessary, replace the bundle identifiers and `ORTHOLINEAR_APP_GROUP` with identifiers registered to your team. Both targets must have the same App Group entitlement. The app bundle ID must prefix the extension bundle ID.
 3. Build and run the app on the device.
 4. In iOS Settings, open **General → Keyboard → Keyboards → Add New Keyboard → Ortholinear**.
-5. In a text field, use the globe to choose Ortholinear. Full Access is not requested.
+5. In a text field, use the globe to choose **Key Scratch** in this fork, or Ortholinear in the upstream app. For Key Scratch's clipboard and shared notes, enable **Settings → General → Keyboard → Keyboards → Key Scratch → Allow Full Access**. Upstream Ortholinear does not request it.
 
 Set geometry in the containing app, then dismiss and reopen the system keyboard to load the changes. Use **Test the installed system keyboard** in the app to check the actual extension in text and email fields.
 
