@@ -214,7 +214,7 @@ final class ScratchpadView: UIView, UITextViewDelegate, UIEditMenuInteractionDel
         caret.isUserInteractionEnabled = false
         editor.addSubview(caret)
         editor.textContainerInset = UIEdgeInsets(top: 2, left: 2, bottom: 2, right: 2)
-        editor.text = UserDefaults.standard.string(forKey: storeKey) ?? ""
+        editor.text = ScratchpadStore.migrate(legacy: UserDefaults.standard.string(forKey: storeKey))
         editor.accessibilityLabel = "Scratchpad note. Tap to type with Key Scratch."
         // Recognize multi-taps before moving the caret. Without this failure
         // hierarchy, the single-tap cursor handler can undo the selection
@@ -463,7 +463,21 @@ final class ScratchpadView: UIView, UITextViewDelegate, UIEditMenuInteractionDel
         inform("Note cleared")
     }
 
+    /// Refresh after the containing app edits the shared note.
+    /// Do not silently overwrite an active selection or in-progress note edit.
+    func reloadSharedNote() {
+        guard !isEditingNote, let shared = ScratchpadStore.load(),
+              shared != editor.text else { return }
+        editor.text = shared
+        editor.selectedRange = NSRange(location: (shared as NSString).length, length: 0)
+        updateCaret()
+        onTextChange?()
+    }
+
     private func save() {
+        // Maintain the previous extension-local copy as an offline fallback.
+        // The shared App Group copy is the canonical source once available.
         UserDefaults.standard.set(editor.text, forKey: storeKey)
+        _ = ScratchpadStore.save(editor.text)
     }
 }
