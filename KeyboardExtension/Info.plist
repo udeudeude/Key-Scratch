@@ -5,7 +5,7 @@
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
 	<key>CFBundleDisplayName</key>
-	<string>Ortholinear</string>
+	<string>Key Scratch</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>
@@ -31,7 +31,7 @@
 			<key>PrimaryLanguage</key>
 			<string>uk-UA</string>
 			<key>RequestsOpenAccess</key>
-			<false/>
+			<true/>
 		</dict>
 		<key>NSExtensionPointIdentifier</key>
 		<string>com.apple.keyboard-service</string>
