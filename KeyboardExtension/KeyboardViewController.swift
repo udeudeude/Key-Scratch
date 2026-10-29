@@ -42,6 +42,7 @@ final class KeyboardViewController: UIInputViewController {
             self?.suggestions.refresh(force: true)
         }
         scratchpad.onEditingChange = { [weak self] _ in
+            self?.expander.forget()
             self?.suggestions.cancelGlide()
             self?.updateAutoShift()
             if let self { self.keyboard.inputState = self.inputState }
@@ -360,26 +361,39 @@ final class KeyboardViewController: UIInputViewController {
         if scratchpad.isEditingNote {
             switch action {
             case .text(let value):
-                scratchpad.type(inputState.consume(value))
+                let typed = inputState.consume(value)
+                expandNote(before: typed)
+                scratchpad.type(typed)
+                expander.triggerTyped(as: typed)
                 updateAutoShift()
                 keyboard.inputState = inputState
                 return
             case .space:
+                expandNote(before: " ")
                 scratchpad.type(" ")
+                expander.triggerTyped(as: " ")
                 updateAutoShift()
                 keyboard.inputState = inputState
                 return
             case .enter:
+                expandNote(before: "\n")
                 scratchpad.type("\n")
+                expander.triggerTyped(as: "\n")
                 updateAutoShift()
                 keyboard.inputState = inputState
                 return
             case .backspace:
-                scratchpad.deleteBackward()
+                if let edit = expander.revert(before: scratchpad.beforeCaret,
+                                              selected: scratchpad.selectedNoteText) {
+                    scratchpad.replaceBeforeCaret(characters: edit.deleteCount, with: edit.insert)
+                } else {
+                    scratchpad.deleteBackward()
+                }
                 updateAutoShift()
                 keyboard.inputState = inputState
                 return
             case .command(let command):
+                expander.forget()
                 switch TextNavigation.edit(for: command, before: scratchpad.beforeCaret,
                                            after: scratchpad.afterCaret) {
                 case .move(let offset): scratchpad.moveCaret(steps: offset)
@@ -389,6 +403,7 @@ final class KeyboardViewController: UIInputViewController {
                 }
                 return
             case .pair(let value, let back):
+                expander.forget()
                 scratchpad.type(value)
                 scratchpad.moveCaret(steps: -String(value.suffix(back)).count)
                 return
@@ -453,10 +468,28 @@ final class KeyboardViewController: UIInputViewController {
 
     private var hasSelection: Bool { !(textDocumentProxy.selectedText ?? "").isEmpty }
 
+    private var availableExpansions: [TextExpansion] {
+        var result = keyboard.preferences.shownExpansions
+        let custom = Set(result.map { $0.abbreviation.lowercased() })
+        for (shortcut, expansion) in suggestions.supplementary.shortcuts
+            where !custom.contains(shortcut.lowercased()) {
+            result.append(TextExpansion(shortcut, expansion))
+        }
+        return result
+    }
+
+    /// Uses the same custom and iOS text replacements within the local scratchpad.
+    private func expandNote(before trigger: String) {
+        guard let edit = expander.expand(before: scratchpad.beforeCaret, trigger: trigger,
+                                         expansions: availableExpansions,
+                                         selected: scratchpad.selectedNoteText) else { return }
+        scratchpad.replaceBeforeCaret(characters: edit.deleteCount, with: edit.insert)
+    }
+
     /// Swaps a just-finished shortcut for its expansion, before `trigger` is typed after it.
     private func expand(before trigger: String) {
         guard let edit = expander.expand(before: textDocumentProxy.documentContextBeforeInput ?? "", trigger: trigger,
-                                         expansions: keyboard.preferences.shownExpansions,
+                                         expansions: availableExpansions,
                                          selected: textDocumentProxy.selectedText ?? "") else { return }
         for _ in 0..<edit.deleteCount { textDocumentProxy.deleteBackward() }
         textDocumentProxy.insertText(edit.insert)
