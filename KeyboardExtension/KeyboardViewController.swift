@@ -100,6 +100,7 @@ final class KeyboardViewController: UIInputViewController {
         keyboard.onCursor = { [weak self] in
             guard let self else { return }
             self.suggestions.cancelGlide()
+            self.pendingGlide = nil
             if self.scratchpad.isEditingNote {
                 self.scratchpad.moveCaret(steps: $0)
                 return
@@ -111,6 +112,28 @@ final class KeyboardViewController: UIInputViewController {
                 before: proxy.documentContextBeforeInput ?? "",
                 after: proxy.documentContextAfterInput ?? ""
             ))
+            self.updateAutoShift()
+            self.suggestions.refresh()
+        }
+        keyboard.onCursorVertical = { [weak self] rows in
+            guard let self, rows != 0 else { return }
+            self.pendingGlide = nil
+            self.suggestions.cancelGlide()
+            if self.scratchpad.isEditingNote {
+                self.scratchpad.moveCaretVertically(rows: rows)
+                return
+            }
+            // UITextDocumentProxy doesn't expose visual soft-wrapped lines.
+            // Use hard-line boundaries; avoid guessing and moving into other text.
+            let proxy = self.textDocumentProxy
+            let before = proxy.documentContextBeforeInput ?? ""
+            let after = proxy.documentContextAfterInput ?? ""
+            for _ in 0..<abs(rows) {
+                guard let offset = TextNavigation.verticalOffset(
+                    rows: rows < 0 ? -1 : 1, before: proxy.documentContextBeforeInput ?? before,
+                    after: proxy.documentContextAfterInput ?? after) else { break }
+                proxy.adjustTextPosition(byCharacterOffset: offset)
+            }
             self.updateAutoShift()
             self.suggestions.refresh()
         }
@@ -171,7 +194,17 @@ final class KeyboardViewController: UIInputViewController {
         view.bringSubviewToFront(modeLabel)
     }
 
-    override func textDidChange(_ textInput: (any UITextInput)?) { if !applyingSuggestion { suggestions.cancelGlide(); synchronize() } }
+    override func textWillChange(_ textInput: (any UITextInput)?) {
+        super.textWillChange(textInput)
+        // A new host text input becoming active should take focus from notes.
+        if scratchpad.isEditingNote { scratchpad.deactivate() }
+    }
+    override func textDidChange(_ textInput: (any UITextInput)?) {
+        guard !applyingSuggestion else { return }
+        if scratchpad.isEditingNote { scratchpad.deactivate() }
+        suggestions.cancelGlide()
+        synchronize()
+    }
     override func selectionDidChange(_ textInput: (any UITextInput)?) {
         guard !applyingSuggestion else { return }
         // Tapping a different caret in the host app restores normal typing.
