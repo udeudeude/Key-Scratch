@@ -202,7 +202,7 @@ extension String {
 }
 
 enum KeyAction: Hashable, Sendable {
-    case text(String), shift, backspace, space, enter, language, emoji, page, globe, dismiss
+    case text(String), shift, backspace, space, enter, language, noteFocus, page, globe, dismiss
     /// Opens the first of the person's layers from the letter page.
     case layers
     /// Moves the cursor or deletes, from a navigation layer.
@@ -290,10 +290,9 @@ enum KeyboardLayout {
             }
         }
         if needsGlobe { controls.append(Key(action: .globe)) }
-        // The emoji picker takes the position of the former UA / EN key.
-        // Other languages remain available with a long-press on that key and
-        // the explicit language control in the companion app.
-        controls.append(Key(action: .emoji, weight: 1.15))
+        // One tap toggles the writing destination between host app and notes.
+        // Long-press cycles enabled languages; the globe switches iOS keyboards.
+        controls.append(Key(action: .noteFocus, weight: 1.4))
         controls += [Key(action: .space, weight: 3.8),
                      Key(action: .enter, weight: preferences.validated.actionKeyWidth)]
         if state.page != .letters && !preferences.iphoneKeyPositions {
