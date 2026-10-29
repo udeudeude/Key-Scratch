@@ -31,6 +31,7 @@ fetch() {
     mv "$temp" "$target"
 }
 
+fetch "Core/KeyboardModel.swift"
 fetch "KeyboardExtension/ScratchpadView.swift"
 fetch "KeyboardExtension/KeyboardViewController.swift"
 fetch "SharedUI/SuggestionBar.swift"
