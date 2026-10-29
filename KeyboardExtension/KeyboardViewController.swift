@@ -209,7 +209,12 @@ final class KeyboardViewController: UIInputViewController {
         guard !applyingSuggestion else { return }
         // Tapping a different caret in the host app restores normal typing.
         if scratchpad.isEditingNote { scratchpad.deactivate() }
-        pendingGlide = nil
+        // Hosts may announce a caret change after textDocumentProxy.insertText.
+        // Keep the word-level Delete option until the actual suffix changes.
+        if let pendingGlide, !pendingGlide.inNotes,
+           textDocumentProxy.documentContextBeforeInput?.hasSuffix(pendingGlide.inserted) != true {
+            self.pendingGlide = nil
+        }
         suggestions.cancelGlide()
         updateAutoShift()
         keyboard.inputState = inputState
