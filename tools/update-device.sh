@@ -32,6 +32,9 @@ fetch() {
 }
 
 fetch "Core/KeyboardModel.swift"
+fetch "Core/Suggestions.swift"
+fetch "Core/TextNavigation.swift"
+fetch "SharedUI/KeyboardView.swift"
 fetch "App/ContentView.swift"
 fetch "KeyboardExtension/ScratchpadView.swift"
 fetch "KeyboardExtension/KeyboardViewController.swift"
