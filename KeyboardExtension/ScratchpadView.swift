@@ -238,7 +238,7 @@ final class ScratchpadView: UIView, UITextViewDelegate {
             return
         }
         let rect = editor.caretRect(for: selection.start)
-        guard rect.isFinite, rect.height > 0 else {
+        guard rect.minX.isFinite, rect.minY.isFinite, rect.height.isFinite, rect.height > 0 else {
             caret.isHidden = true
             return
         }
