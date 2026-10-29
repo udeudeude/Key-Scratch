@@ -66,21 +66,23 @@ final class SuggestionBar: UIView {
 
     override func layoutSubviews() {
         super.layoutSubviews()
+        let rowHeight = bounds.height
+        let buttonHeight = max(26, rowHeight - 6)
         let content = max(0, bounds.width - 44)
         let words = compact ? content * 0.64 : content
         let width = words / (compact ? 2 : 3)
         for (index, button) in buttons.enumerated() {
-            button.frame = CGRect(x: CGFloat(index) * width + 2, y: 3, width: max(0, width - 4), height: 38)
+            button.frame = CGRect(x: CGFloat(index) * width + 2, y: 3, width: max(0, width - 4), height: buttonHeight)
         }
         let marks = compact ? min(Self.compactMarks, punctuationButtons.count) : punctuationButtons.count
         let markOrigin = compact ? words : 0
         let markWidth = marks == 0 ? 0 : (content - markOrigin) / CGFloat(marks)
         for (index, button) in punctuationButtons.enumerated() {
-            button.frame = CGRect(x: markOrigin + CGFloat(index) * markWidth + 2, y: 3, width: max(0, markWidth - 4), height: 38)
+            button.frame = CGRect(x: markOrigin + CGFloat(index) * markWidth + 2, y: 3, width: max(0, markWidth - 4), height: buttonHeight)
         }
-        hint.frame = CGRect(x: 0, y: 0, width: content, height: 44)
-        tipButton.frame = CGRect(x: 8, y: 0, width: max(0, content - 16), height: 44)
-        more.frame = CGRect(x: bounds.width - 44, y: 0, width: 44, height: 44)
+        hint.frame = CGRect(x: 0, y: 0, width: content, height: rowHeight)
+        tipButton.frame = CGRect(x: 8, y: 0, width: max(0, content - 16), height: rowHeight)
+        more.frame = CGRect(x: bounds.width - 44, y: 0, width: 44, height: rowHeight)
     }
 
     func style(_ palette: KeyboardPalette) {
