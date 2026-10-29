@@ -658,6 +658,21 @@ private struct KeyScratchExperimentLab: View {
                     }
                 }
 
+                Section("Language") {
+                    if draft.languages == [.english] && draft.defaultLanguage == .english {
+                        Label("English only", systemImage: "checkmark.circle.fill")
+                            .foregroundStyle(.secondary)
+                    } else {
+                        Button("Use English only for now") {
+                            draft.languages = [.english]
+                            draft.defaultLanguage = .english
+                        }
+                    }
+                    Text("Ortholinear's other languages are still included and can be re-enabled under Keyboard Settings.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+
                 Section("Keyboard dimensions") {
                     adjustment("Letter row", value: $draft.keyHeight, bounds: 36...88)
                     adjustment("Control row", value: $draft.controlHeight, bounds: 36...72)
@@ -684,6 +699,24 @@ private struct KeyScratchExperimentLab: View {
                     }
                     .buttonStyle(.borderedProminent)
                     .accessibilityIdentifier("apply-key-scratch-experiment")
+                    Button {
+                        let setup = draft.validated
+                        let report = [
+                            "Key Scratch experiment: \(setup.keyScratchMode.title)",
+                            "Notes: \(Int(setup.keyScratchMode.noteFraction(userWidth: setup.keyScratchNoteWidth) * 100))% width",
+                            "Font: \(setup.keyScratchNoteFont.title), \(Int(setup.keyScratchNoteFontSize)) pt",
+                            "Letter row: \(Int(setup.keyHeight)) pt",
+                            "Control row: \(Int(setup.controlHeight)) pt",
+                            "Row spacing: \(Int(setup.rowSpacing)) pt",
+                            "Live suggestions: \(setup.keyScratchMode.hasLiveSuggestions ? "yes" : "no")",
+                            "Glide worker: \(setup.keyScratchMode.usesDedicatedGlide ? "dedicated" : "original")"
+                        ].joined(separator: "\n")
+                        UIPasteboard.general.string = report
+                        status = "Configuration copied. Paste it into our conversation when reporting a result."
+                    } label: {
+                        Label("Copy configuration", systemImage: "doc.on.doc")
+                    }
+                    .accessibilityIdentifier("copy-experiment-configuration")
                     Text(status).font(.caption).foregroundStyle(.secondary)
                     TextEditor(text: $testText)
                         .focused($testing)
