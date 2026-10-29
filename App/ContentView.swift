@@ -1,9 +1,7 @@
 import SwiftUI
 
-private let accent = Color(red: 0.12, green: 0.43, blue: 0.38)
-private let paper = Color(uiColor: UIColor { $0.userInterfaceStyle == .dark
-    ? UIColor(red: 0.08, green: 0.10, blue: 0.10, alpha: 1)
-    : UIColor(red: 0.96, green: 0.95, blue: 0.92, alpha: 1) })
+private let accent = Color(uiColor: .systemBlue)
+private let paper = Color(uiColor: .systemGroupedBackground)
 
 private func keyScratchColor(_ mode: KeyScratchMode) -> Color {
     let hex = mode.colorHex
@@ -27,8 +25,8 @@ struct ContentView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 26) {
                 HStack(spacing: 10) {
-                    GridMark().frame(width: 30, height: 30)
-                    Text("key scratch").font(.system(size: 23, weight: .semibold, design: .rounded))
+                    KeyScratchMark().frame(width: 32, height: 32)
+                    Text("Key Scratch").font(.system(size: 23, weight: .bold))
                     Spacer()
                     Text(languageBadge).font(.system(size: 10, weight: .semibold, design: .monospaced))
                         .padding(.horizontal, 10).padding(.vertical, 7)
@@ -108,7 +106,7 @@ struct ContentView: View {
 
                 VStack(alignment: .leading, spacing: 12) {
                     HStack {
-                        Text("ORTHOLINEAR PREVIEW").font(.system(size: 10, weight: .semibold, design: .monospaced)).tracking(2)
+                        Text("KEYBOARD PREVIEW").font(.system(size: 10, weight: .semibold, design: .monospaced)).tracking(2)
                         Spacer()
                         Button("Clear") { NotificationCenter.default.post(name: .clearKeyboardPreview, object: nil) }
                             .font(.system(size: 12, weight: .medium)).accessibilityIdentifier("clear-preview")
@@ -144,11 +142,11 @@ struct ContentView: View {
                 }
 
                 VStack(spacing: 0) {
-                    detailRow("01", title: "Your keyboard geometry.", subtitle: "iPhone-style key positions or Ortholinear’s grid, with adjustable heights and split width.")
+                    detailRow("01", title: "Familiar keyboard geometry.", subtitle: "iPhone-like key positions with adjustable height and note width.")
                     Divider().padding(.vertical, 17)
-                    detailRow("02", title: "Make the space yours.", subtitle: "Size letters and controls separately. Choose which punctuation earns a key.")
+                    detailRow("02", title: "Your note, always visible.", subtitle: "Keep a reference in sight while composing text in another app.")
                     Divider().padding(.vertical, 17)
-                    detailRow("03", title: "Your words stay yours.", subtitle: "Offline by default. Full Access is optional for clipboard use.")
+                    detailRow("03", title: "Notes remain on-device.", subtitle: "Full Access enables the clipboard and the companion app's shared note.")
                 }
                 .padding(20).background(.primary.opacity(0.035), in: RoundedRectangle(cornerRadius: 14))
 
@@ -209,7 +207,7 @@ private struct GestureChecklist: View {
 
     private var items: [(KeyboardGesture, String)] {
         var items: [(KeyboardGesture, String)] = [
-            (.alternative, preferences.validated.defaultLanguage == .ukrainian ? "Hold г, then release, for ґ" : "Hold a key with a small letter for more"),
+            (.alternative, "Hold a letter, then slide to choose an accent"),
             (.symbolSlide, "Hold 123, slide to a symbol, release"),
             (.spaceCursor, "Slide on Space to move the cursor")
         ]
@@ -237,15 +235,28 @@ private struct GestureChecklist: View {
     }
 }
 
-private struct GridMark: View {
+private struct KeyScratchMark: View {
     var body: some View {
-        Grid(horizontalSpacing: 2, verticalSpacing: 2) {
-            ForEach(0..<3) { row in
-                GridRow { ForEach(0..<3) { column in
-                    RoundedRectangle(cornerRadius: 1).fill(row == 2 && column == 2 ? accent.opacity(0.35) : accent)
-                } }
+        ZStack {
+            RoundedRectangle(cornerRadius: 8).fill(accent)
+            HStack(spacing: 3) {
+                RoundedRectangle(cornerRadius: 2)
+                    .fill(.white.opacity(0.95))
+                    .frame(width: 9, height: 20)
+                VStack(spacing: 3) {
+                    ForEach(0..<3) { _ in
+                        HStack(spacing: 3) {
+                            ForEach(0..<2) { _ in
+                                RoundedRectangle(cornerRadius: 1.2)
+                                    .fill(.white.opacity(0.95))
+                                    .frame(width: 6.5, height: 5)
+                            }
+                        }
+                    }
+                }
             }
         }
+        .accessibilityLabel("Key Scratch")
     }
 }
 
@@ -372,7 +383,7 @@ struct GeometrySettings: View {
                 }.accessibilityIdentifier("layout-workshop")
             }
             if let proRows = ProHooks.settingsRows {
-                Section("Ortholinear Pro") { proRows($preferences) }
+                Section("Additional features") { proRows($preferences) }
             }
             Section("Appearance") {
                 Button { showAppearance = true } label: {
@@ -592,7 +603,7 @@ struct SystemKeyboardTest: View {
                         }
                     }
                 }
-                Section("Use the globe to choose Ortholinear") {
+                Section("Use the globe to choose Key Scratch") {
                     TextEditor(text: $text).frame(minHeight: 150).accessibilityIdentifier("system-editor")
                 }
                 Section("Email input") {
@@ -612,7 +623,7 @@ struct SystemKeyboardTest: View {
 }
 
 
-/// Controlled experiments, saved through the same App Group store Ortholinear uses.
+/// Controlled experiments, saved through Key Scratch's shared preferences.
 /// The inline text editor invokes the *installed* keyboard extension, not a mockup.
 private struct KeyScratchExperimentLab: View {
     @Binding var preferences: KeyboardPreferences
@@ -696,7 +707,7 @@ private struct KeyScratchExperimentLab: View {
                             draft.defaultLanguage = .english
                         }
                     }
-                    Text("Ortholinear's other languages are still included and can be re-enabled under Keyboard Settings.")
+                    Text("Additional languages remain available under Keyboard Settings. Hold the Notes/App key to cycle enabled languages.")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
