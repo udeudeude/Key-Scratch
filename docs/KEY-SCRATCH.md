@@ -1,40 +1,46 @@
-# Key Scratch: experimental keyboard
+# Key Scratch: local notes and Ortholinear keyboard
 
-This fork retains Ortholinear's offline glide engine and adds a local scratchpad occupying 30% of the keyboard width. It is an **unverified prototype**, not a release.
+An experimental fork of Ortholinear for iPhone. The notes occupy the left 30% of the keyboard while the existing keys and offline swipe recognizer remain on the right.
 
-## Current behavior
+## Interaction: second iPhone test build
 
-- The scratchpad is visible to the left of the Ortholinear keys.
-- Tap **Edit** to route individual key presses, Space, Return and Delete into the scratchpad. Tap **Done** to resume typing in the host app.
-- Tap within the note to move the insertion point. Select text using the text view's normal selection gestures where available.
-- **Paste** appends clipboard text outside edit mode or inserts at the caret in edit mode.
-- **Copy** copies selected note text or the entire note.
-- **Insert** inserts the entire note into the host text field.
-- **Hold Clear** requires a long press to erase the local note (currently no undo).
-- Notes are stored in the keyboard extension's UserDefaults. Deleting the app can delete the note. They do **not** sync with other devices or the companion app.
+- **Tap anywhere in the notes panel to begin typing into it.** No separate Edit button. Tap **App** to resume typing into the app above the keyboard. The control says **Notes** when the app is active.
+- **Swipe typing, individual keys, word suggestions, Backspace, cursor gestures and text replacements** route to the active destination. Swipe decoding has a high-priority worker independent of ordinary suggestion jobs.
+- Tap within the note to position the insertion point. Press **Paste** to insert clipboard text at that point.
+- **Copy** copies selected text or the entire note when nothing is selected.
+- **Insert** inserts selected note text or the entire note into the app above.
+- **Hold Clear** requires a long press and permanently erases the note (no undo yet).
+- The note persists in the keyboard extension's local UserDefaults, not in the containing app. There is no cross-device synchronization.
 
-## Known gaps
+## Clipboard permission
 
-- Glide/swipe typing and word suggestions **inside the scratchpad** are not yet integrated. Glide in the host app is inherited from Ortholinear, but must be tested at 70% keyboard width.
-- iOS text replacements are handled by Ortholinear for host-app typing, not yet within the note.
-- The scratchpad uses a non-editable UITextView with custom insertion, so that the keyboard does not recursively invoke another system keyboard. Selection and caret placement need device validation.
-- The note area is fixed at 30%, font at 10 points. No collapse, adjustable width, multi-note support, sync, or reliable undo.
-- Some system text fields (passwords and certain secure contexts) refuse third-party keyboards.
-- The prototype has not been compiled or tested on an iPhone.
+Apple's keyboard sandbox requires the optional **Allow Full Access** permission for system clipboard operations. Key Scratch requests eligibility for that permission, but local typing and notes continue to work without it.
 
-## Build and test on a Mac
+On iPhone: **Settings > General > Keyboard > Keyboards > Key Scratch (possibly Ortholinear on earlier builds) > Allow Full Access**. Enable it if you need Copy/Paste. No network requests or uploads are implemented in this fork. When access is off, the clipboard buttons display an explanation instead of failing silently.
 
-1. Install Xcode from the App Store, launch it once, and install command-line tools if prompted.
-2. Clone this repository, then check out the `feature/scratchpad-first-pass` branch.
-3. Install XcodeGen (`brew install xcodegen`), then run `xcodegen generate` from the repository root. The checked-in `.xcodeproj` predates the new file and identifiers, so **regeneration is required**.
-4. Open `Ortholinear.xcodeproj` and select the `Ortholinear` scheme.
-5. Under Signing & Capabilities, choose your Apple Personal Team for **both** app and keyboard extension. Change bundle identifiers and app-group entitlement if your team cannot register the proposed values. They must agree across both targets.
-6. Run on a simulator first. Then connect the iPhone and run the app.
-7. On the iPhone, open Settings > General > Keyboard > Keyboards > Add New Keyboard > Key Scratch. Switch with the globe key in an ordinary text field.
-8. Test the Edit/Done switch, note persistence after leaving and returning to the app, selected-text replacement, delete at Unicode character boundaries, clipboard actions, and host-app glide accuracy.
+## Updating your already-installed development copy
 
-The GitHub Actions workflow `.github/workflows/ios-build.yml` compiles the simulator target without signing. A simulator artifact is **not** installable directly on a physical iPhone.
+The existing Xcode project includes every Swift file changed by this pass. **Do not regenerate the Xcode project** simply to refresh these files: that may reset your Personal Team signing selection.
 
-## Design principles
+In Terminal, inside your extracted Key Scratch project folder, run these two commands:
 
-Do not request Full Access unless a future feature truly needs it. Do not record text typed into host apps. Keep all note data local by default. Maintain upstream Ortholinear licensing and attribution.
+    curl -fL https://raw.githubusercontent.com/udeudeude/Key-Scratch/feature/scratchpad-first-pass/tools/update-device.sh -o update-key-scratch.sh
+    sh update-key-scratch.sh
+
+The script updates only the changed source files and Info.plists, preserving your local Xcode signing choices. Then in Xcode choose **Product > Clean Build Folder**, and press **Command-R** to reinstall on the connected phone.
+
+For a fresh checkout, install XcodeGen, generate the project, select a signing team for the app and keyboard extension, and run.
+
+## Limits and test criteria
+
+- The previous version was built and installed successfully on an iPhone XS Max, but had slow glide insertion and unintuitive note editing. This revision needs a new on-device test.
+- Decode performance improvement is a hypothesis until measured. Xcode's Debug console now prints glide-to-text latency in milliseconds without logging the typed words.
+- iOS may show a clipboard paste permission prompt.
+- The notes intentionally use a selectable, non-editable UITextView with custom keyboard insertion to avoid summoning a second keyboard. Native text-selection gestures and cursor positions need device validation.
+- Width is fixed at 30% and text at 10 points. Multi-note support, synchronization, comprehensive undo, and adjustable geometry remain future work.
+- Secure text fields and certain host apps do not permit third-party keyboards.
+- Avoid storing irreplaceable text until persistence and stability have been verified.
+
+## Privacy
+
+See PRIVACY.md for the fork's local-storage and optional clipboard-access policy. Neither note contents nor typed host-app text are transmitted.
