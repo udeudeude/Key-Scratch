@@ -145,8 +145,16 @@ final class KeyboardViewController: UIInputViewController {
         suggestions.refresh()
         // The completion arrives on an XPC queue, not the main thread.
         requestSupplementaryLexicon { @Sendable [weak self] lexicon in
-            let words = SupplementaryWords(entries: lexicon.entries.map { ($0.userInput, $0.documentText) })
-            Task { @MainActor in self?.suggestions.supplementary = words }
+            // Apple isolates UILexicon entries on the main actor. Transfer the
+            // immutable result to MainActor before extracting those properties.
+            let transfer = KeyScratchLexiconTransfer(value: lexicon)
+            Task { @MainActor in
+                let words = SupplementaryWords(entries: transfer.value.entries.map {
+                    ($0.userInput, $0.documentText)
+                })
+                self?.suggestions.supplementary = words
+                self?.suggestions.refresh(force: true)
+            }
         }
     }
 
@@ -707,4 +715,10 @@ private enum LanguageMemoryStore {
         guard let data = try? JSONEncoder().encode(memory) else { return }
         UserDefaults.standard.set(data, forKey: key)
     }
+}
+
+/// This UILexicon result is owned by the one-shot completion callback and is
+/// handed to MainActor without concurrent access to its UIKit-isolated entries.
+private struct KeyScratchLexiconTransfer: @unchecked Sendable {
+    let value: UILexicon
 }
