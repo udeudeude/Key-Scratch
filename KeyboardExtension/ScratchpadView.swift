@@ -1,7 +1,7 @@
 import UIKit
 
 /// A local, selectable note inside the keyboard extension.
-/// The Ortholinear keys edit this text view directly via its selected range.
+/// Key Scratch's keys edit this text view directly via its selected range.
 /// It intentionally never becomes first responder: that would summon a second keyboard.
 @MainActor
 // UIKit presents edit menus on the main thread, but this delegate's protocol
@@ -168,7 +168,7 @@ final class ScratchpadView: UIView, UITextViewDelegate, UIEditMenuInteractionDel
         onTextChange?()
     }
 
-    /// Safely applies an Ortholinear suggestion against the exact note it was offered for.
+    /// Safely applies a Key Scratch suggestion against the exact note it was offered for.
     func apply(_ edit: SuggestionEdit, offered: SuggestionSnapshot, document: UUID,
                language: KeyboardLanguage) -> Bool {
         guard isEditingNote, snapshot(document: document, language: language) == offered else { return false }
