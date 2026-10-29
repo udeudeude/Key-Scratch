@@ -80,7 +80,7 @@ final class TextNavigationTests: XCTestCase {
         preferences.iphoneKeyPositions = true
         var input = InputState()
         input.language = .english
-        for page: KeyboardPage in [.letters, .numbers, .symbols] {
+        for page in [KeyboardPage.letters, .numbers, .symbols] {
             input.page = page
             let rows = KeyboardLayout.rows(state: input, needsGlobe: true, preferences: preferences)
             XCTAssertEqual(rows[2].first?.action, .shift)
