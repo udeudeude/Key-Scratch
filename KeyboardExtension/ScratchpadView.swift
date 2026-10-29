@@ -330,6 +330,84 @@ final class ScratchpadView: UIView, UITextViewDelegate, UIEditMenuInteractionDel
         caret.isHidden = false
     }
 
+    /// Hold a finger on a word to select it and display iOS's floating edit menu.
+    /// Holding empty space instead offers Paste and Select All.
+    @objc private func noteLongPressed(_ gesture: UILongPressGestureRecognizer) {
+        guard gesture.state == .began else { return }
+        activate()
+        let point = gesture.location(in: editor)
+        let text = editor.text ?? ""
+        let cursor = editor.closestPosition(to: point)
+        if let cursor, !text.isEmpty {
+            let utf16Position = editor.offset(from: editor.beginningOfDocument, to: cursor)
+            var word: NSRange?
+            text.enumerateSubstrings(in: text.startIndex..<text.endIndex, options: .byWords) {
+                _, range, _, stop in
+                let candidate = NSRange(range, in: text)
+                if NSLocationInRange(min(utf16Position, (text as NSString).length - 1), candidate) {
+                    word = candidate
+                    stop = true
+                }
+            }
+            if let word { editor.selectedRange = word }
+            else if editor.selectedRange.length == 0 {
+                editor.selectedTextRange = editor.textRange(from: cursor, to: cursor)
+            }
+        } else if let cursor, editor.selectedRange.length == 0 {
+            editor.selectedTextRange = editor.textRange(from: cursor, to: cursor)
+        }
+        updateCaret()
+        onTextChange?()
+        editMenu.presentEditMenu(with: UIEditMenuConfiguration(identifier: nil, sourcePoint: point))
+    }
+
+    /// Only these actions should appear for the local scratchpad. We do not
+    /// borrow UIKit's host-app menu: it edits a different text destination.
+    func editMenuInteraction(_ interaction: UIEditMenuInteraction,
+                             menuFor configuration: UIEditMenuConfiguration,
+                             suggestedActions: [UIMenuElement]) -> UIMenu? {
+        var actions: [UIMenuElement] = []
+        let selected = selectedNoteText
+        let hasText = !(editor.text ?? "").isEmpty
+        if hasText {
+            actions.append(UIAction(title: "Copy", image: UIImage(systemName: "doc.on.doc"),
+                                    attributes: canUseClipboard ? [] : [.disabled]) { [weak self] _ in
+                self?.copyNote()
+            })
+            if !selected.isEmpty {
+                actions.append(UIAction(title: "Cut", image: UIImage(systemName: "scissors"),
+                                        attributes: canUseClipboard ? [] : [.disabled]) { [weak self] _ in
+                    guard let self else { return }
+                    self.copyNote()
+                    self.type("")
+                })
+            }
+        }
+        actions.append(UIAction(title: "Paste", image: UIImage(systemName: "doc.on.clipboard"),
+                                attributes: canUseClipboard ? [] : [.disabled]) { [weak self] _ in
+            self?.pasteClipboard()
+        })
+        if hasText && (editor.selectedRange.length != (editor.text as NSString).length) {
+            actions.append(UIAction(title: "Select All") { [weak self] _ in
+                guard let self else { return }
+                self.editor.selectedRange = NSRange(location: 0,
+                                                    length: (self.editor.text as NSString).length)
+                self.updateCaret()
+                self.onTextChange?()
+            })
+        }
+        if hasText {
+            actions.append(UIAction(title: "Insert in App", image: UIImage(systemName: "arrow.up.forward.square")) { [weak self] _ in
+                self?.insertNote()
+            })
+        }
+        if !canUseClipboard {
+            actions.append(UIAction(title: "Clipboard needs Full Access",
+                                    attributes: [.disabled]) { _ in })
+        }
+        return UIMenu(children: actions)
+    }
+
     @objc private func returnToAppTapped() { deactivate() }
 
     private func inform(_ text: String) {
