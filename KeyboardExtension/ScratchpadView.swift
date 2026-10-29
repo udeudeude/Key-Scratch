@@ -77,6 +77,19 @@ final class ScratchpadView: UIView {
         onTextChange?()
     }
 
+    /// Used by TextExpander to replace the shortcut immediately before the caret.
+    func replaceBeforeCaret(characters: Int, with replacement: String) {
+        guard isEditingNote, characters >= 0 else { return }
+        let selection = safeSelection()
+        guard selection.length == 0, beforeCaret.count >= characters else { return }
+        let previous = String(beforeCaret.suffix(characters))
+        let utf16Length = (previous as NSString).length
+        guard selection.location >= utf16Length else { return }
+        editor.selectedRange = NSRange(location: selection.location - utf16Length,
+                                       length: utf16Length)
+        type(replacement)
+    }
+
     func deleteBackward() {
         guard isEditingNote else { return }
         let selection = safeSelection()
