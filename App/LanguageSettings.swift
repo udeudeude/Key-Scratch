@@ -6,7 +6,7 @@ struct LanguageSettings: View {
     var body: some View {
         Form {
             Section {
-                ForEach(KeyboardLanguage.allCases.filter { $0 != .russian }, id: \.self) { language in
+                ForEach([KeyboardLanguage.english] + KeyboardLanguage.allCases.filter { $0 != .english }, id: \.self) { language in
                     Toggle(isOn: enabled(language)) {
                         VStack(alignment: .leading, spacing: 3) {
                             Text(language.title)
@@ -17,7 +17,7 @@ struct LanguageSettings: View {
                     .accessibilityIdentifier("language-\(language.rawValue)")
                 }
             } header: { Text("Languages") } footer: {
-                Text("The language key cycles through the languages you turn on. Hold a letter for its accented forms. English and Ukrainian have bundled word suggestions and glide typing; the other layouts use the spell checker built into iOS, on your device.")
+                Text("Hold the Notes/App key to switch among enabled languages. The globe key switches iOS keyboards, including Apple's Emoji keyboard. English and Ukrainian include bundled glide dictionaries; other language layouts use on-device iOS spelling.")
             }
             Section {
                 Picker("English layout", selection: $preferences.englishLayout) {
@@ -30,35 +30,6 @@ struct LanguageSettings: View {
                     .listRowInsets(EdgeInsets(top: 8, leading: 8, bottom: 8, trailing: 8))
             } footer: {
                 Text("Colemak, Colemak-DH, Dvorak and Workman rearrange the English letters. Colemak-DH uses the ortholinear bottom row. Suggestions follow the layout you choose." + (preferences.customLayouts[.english] == nil ? "" : " Your English layout from the Layout Workshop is in use instead."))
-            }
-            Section {
-                switch preferences.invasionAnswer {
-                case .unanswered:
-                    Text("Do you support Russia’s invasion of Ukraine?")
-                    HStack(spacing: 12) {
-                        Button("Yes") { preferences.invasionAnswer = .supports }
-                            .accessibilityIdentifier("invasion-supports")
-                        Button("No") { preferences.invasionAnswer = .opposes }
-                            .accessibilityIdentifier("invasion-opposes")
-                    }
-                    // Separate bordered buttons, or the whole row becomes one tap target.
-                    .buttonStyle(.bordered)
-                case .opposes:
-                    Toggle(isOn: enabled(.russian)) {
-                        VStack(alignment: .leading, spacing: 3) {
-                            Text(KeyboardLanguage.russian.title)
-                            Text(detail(.russian)).font(.caption).foregroundStyle(.secondary)
-                        }
-                    }
-                    .disabled(languages == [.russian])
-                    .accessibilityIdentifier("language-russian")
-                case .supports:
-                    Text("Russian isn’t available.").foregroundStyle(.secondary)
-                }
-            } header: { Text("Русский") } footer: {
-                if preferences.invasionAnswer == .unanswered {
-                    Text("Answer to see the Russian layout.")
-                }
             }
             Section {
                 Picker("Starting language", selection: $preferences.defaultLanguage) {
@@ -87,7 +58,7 @@ struct LanguageSettings: View {
             var chosen = languages.filter { $0 != language }
             if isOn { chosen.append(language) }
             guard !chosen.isEmpty else { return }
-            preferences.languages = KeyboardLanguage.allCases.filter(chosen.contains)
+            preferences.languages = chosen
             preferences.defaultLanguage = preferences.validated.defaultLanguage
         }
     }
