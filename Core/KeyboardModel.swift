@@ -290,9 +290,16 @@ enum KeyboardLayout {
             }
         }
         if needsGlobe { controls.append(Key(action: .globe)) }
-        // One tap toggles the writing destination between host app and notes.
-        // Long-press cycles enabled languages; the globe switches iOS keyboards.
-        controls.append(Key(action: .noteFocus, weight: 1.4))
+        // The Blue full-width reference has no notes, so it cannot offer a
+        // Notes/App toggle. Otherwise that one-tap destination control is always
+        // in the same spot, with language cycling on a long press.
+        if preferences.keyScratchMode == .reference {
+            if preferences.language(after: state.language) != state.language {
+                controls.append(Key(action: .language, weight: 1.2))
+            }
+        } else {
+            controls.append(Key(action: .noteFocus, weight: 1.4))
+        }
         controls += [Key(action: .space, weight: 3.8),
                      Key(action: .enter, weight: preferences.validated.actionKeyWidth)]
         if state.page != .letters && !preferences.iphoneKeyPositions {
