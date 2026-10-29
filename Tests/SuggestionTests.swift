@@ -177,7 +177,10 @@ final class SuggestionTests: XCTestCase {
 
     func testDocumentedWrongLayoutExampleRecovers() throws {
         let ukrainian = try SuggestionResources.engine(language: .ukrainian)
-        let preferences = KeyboardPreferences()
+        // The documented physical-key typo assumes the original matrix
+        // arrangement, not Key Scratch's new iPhone-positioned English row.
+        var preferences = KeyboardPreferences()
+        preferences.iphoneKeyPositions = false
         for width in [375.0, 393.0, 430.0, 820.0] {
             let en = SuggestionGeometry(language: .english, preferences: preferences, width: width)
             let uk = SuggestionGeometry(language: .ukrainian, preferences: preferences, width: width)
