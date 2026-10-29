@@ -307,6 +307,13 @@ final class ScratchpadView: UIView, UITextViewDelegate, UIEditMenuInteractionDel
         onTextChange?()
     }
 
+    /// Our own long-press menu is bound to this local note. Prevent UIKit's
+    /// generic, read-only UITextView menu from competing with it.
+    func textView(_ textView: UITextView, editMenuForTextIn range: NSRange,
+                  suggestedActions: [UIMenuElement]) -> UIMenu? {
+        UIMenu(children: [])
+    }
+
     func textViewDidChangeSelection(_ textView: UITextView) {
         updateCaret()
     }
