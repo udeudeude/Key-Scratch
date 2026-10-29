@@ -53,7 +53,14 @@ struct PunctuationSpacing {
         let removeSpace = ownsSpace && (marks.contains(value) || Self.closers.contains(value) || value == "\n" || numericContinuation)
         reset()
         // A deliberate space after punctuation accepts the automatic space once.
-        if ownsSpace && value == " " { return Edit(text: "") }
+        if ownsSpace && value == " " {
+            // The implicit space after a glide counts as the first Space.
+            // One explicit Space accepts it; a second quick tap becomes ". ".
+            if doubleSpacePeriod, let context, context.last == " " {
+                spaceAfterWord = (String(context.suffix(32)), time)
+            }
+            return Edit(text: "")
+        }
         let before = removeSpace ? context.map { String($0.dropLast()) } : context
         let startsWord = shortcutStarts.contains(value) && (before.map { TextExpander.isShortcutBoundary($0.last) } ?? false)
         let output = value + (marks.contains(value) && !startsWord ? " " : "")
