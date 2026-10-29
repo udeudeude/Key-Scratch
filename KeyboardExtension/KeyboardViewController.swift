@@ -128,6 +128,8 @@ final class KeyboardViewController: UIInputViewController {
     override func textDidChange(_ textInput: (any UITextInput)?) { if !applyingSuggestion { suggestions.cancelGlide(); synchronize() } }
     override func selectionDidChange(_ textInput: (any UITextInput)?) {
         guard !applyingSuggestion else { return }
+        // Tapping a different caret in the host app restores normal typing.
+        if scratchpad.isEditingNote { scratchpad.deactivate() }
         suggestions.cancelGlide()
         updateAutoShift()
         keyboard.inputState = inputState
