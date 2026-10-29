@@ -450,7 +450,10 @@ final class SuggestionCoordinator {
         keyboard.suggestionBar.punctuation = punctuation(for: current?.language ?? keyboard.inputState.language)
         keyboard.glideEnabled = preferences.glideTyping && keyboard.inputState.page == .letters
             && glideContext?()?.language.dictionaryCode != nil
-        guard preferences.suggestionsEnabled, keyboard.inputState.page == .letters, let current else { cancel(); return }
+        // Quiet mode keeps the same key geometry but skips live prediction work.
+        // Glide decoding remains available via its separate worker.
+        guard preferences.suggestionsEnabled, preferences.keyScratchMode.hasLiveSuggestions,
+              keyboard.inputState.page == .letters, let current else { cancel(); return }
         if let offer = glideOffer {
             if offer.snapshot == current {
                 guard force || requested != current else { return }
@@ -511,11 +514,22 @@ final class SuggestionCoordinator {
         suspend()
         glideOffer = nil
         let started = ProcessInfo.processInfo.systemUptime
-        glideTask = Task(priority: .userInitiated) { [weak self, fastGlideWorker] in
-            guard let words = try? await fastGlideWorker.glide(points, language: current.language, learned: learned,
-                                                      context: SuggestionText.context(current.before),
-                                                      preferences: preferences, width: width),
-                  !Task.isCancelled, let self, self.glideContext?() == current, let best = words.first,
+        glideTask = Task(priority: .userInitiated) { [weak self, worker, fastGlideWorker] in
+            let context = SuggestionText.context(current.before)
+            let words: [WordSuggestion]?
+            if preferences.keyScratchMode.usesDedicatedGlide {
+                words = try? await fastGlideWorker.glide(points, language: current.language,
+                                                         learned: learned, context: context,
+                                                         preferences: preferences, width: width)
+            } else {
+                // Blue reference mode intentionally preserves Ortholinear's
+                // original serialized dictionary/suggestion worker.
+                words = try? await worker.glide(points, language: current.language,
+                                                learned: learned, context: context,
+                                                preferences: preferences, width: width)
+            }
+            guard !Task.isCancelled, let self, self.glideContext?() == current,
+                  let best = words?.first,
                   let inserted = self.insertWord?(best.word) else { return }
             #if DEBUG
             let elapsedMS = (ProcessInfo.processInfo.systemUptime - started) * 1000
@@ -523,7 +537,7 @@ final class SuggestionCoordinator {
             #endif
             // Alternatives need a snapshot to replace safely; without host context, only the word goes in.
             guard let after = self.snapshot?() else { self.refresh(force: true); return }
-            let alternatives = words.dropFirst().map {
+            let alternatives = (words ?? []).dropFirst().map {
                 WordSuggestion(word: SuggestionText.cased($0.word, like: inserted, language: current.language), kind: .correction)
             }
             if !alternatives.isEmpty { self.glideOffer = (after, inserted, Array(alternatives.prefix(3))) }
