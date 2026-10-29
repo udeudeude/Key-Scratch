@@ -37,12 +37,17 @@ fetch "Core/PunctuationSpacing.swift"
 fetch "Core/Suggestions.swift"
 fetch "Core/TextNavigation.swift"
 fetch "SharedUI/KeyboardView.swift"
+fetch "SharedUI/KeyboardPalette.swift"
+fetch "App/AppearanceSettings.swift"
 fetch "App/ContentView.swift"
 fetch "KeyboardExtension/ScratchpadView.swift"
 fetch "KeyboardExtension/KeyboardViewController.swift"
 fetch "SharedUI/SuggestionBar.swift"
 fetch "KeyboardExtension/Info.plist"
 fetch "App/Info.plist"
+# The app icon is a binary PNG. Download it atomically rather than treating it
+# as Swift source; keep signed local project intact.
+fetch "Resources/Assets.xcassets/AppIcon.appiconset/AppIcon.png"
 
 # App Store Ortholinear is optimized. Compare it against an optimized Key Scratch,
 # not Swift's (much slower) default Debug configuration.
