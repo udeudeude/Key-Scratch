@@ -840,7 +840,20 @@ enum KeyboardGeometry {
                 let rightGap = column == keys.count - 1 ? 0 : p.columnSpacing / 2
                 let visual = CGRect(x: frame.minX + leftGap, y: frame.minY + p.rowSpacing / 2,
                                     width: frame.width - leftGap - rightGap, height: keyHeight)
-                return KeyCell(key: key, hitFrame: p.fillGaps ? frame : visual, visualFrame: visual)
+                // The stagger is visual. Edge touches must still reach a
+                // key, just as they do on the built-in iPhone keyboard.
+                // Otherwise the first/last middle-row key cannot be tapped
+                // near the sides in a narrow split keyboard.
+                let hit: CGRect
+                if p.fillGaps {
+                    let left = column == 0 ? 0 : frame.minX
+                    let rightEdge = column == keys.count - 1 ? width : frame.maxX
+                    hit = CGRect(x: left, y: frame.minY, width: rightEdge - left,
+                                 height: frame.height)
+                } else {
+                    hit = visual
+                }
+                return KeyCell(key: key, hitFrame: hit, visualFrame: visual)
             }
         }
     }
