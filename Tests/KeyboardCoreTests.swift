@@ -148,7 +148,7 @@ final class KeyboardCoreTests: XCTestCase {
         let p = KeyboardPreferences(keyHeight: -100, columnSpacing: 999, rowSpacing: .infinity).validated
         XCTAssertEqual(p.keyHeight, 36)
         XCTAssertEqual(p.columnSpacing, 8)
-        XCTAssertEqual(p.rowSpacing, 3)
+        XCTAssertEqual(p.rowSpacing, 8)
         let data = try JSONEncoder().encode(p)
         XCTAssertEqual(try JSONDecoder().decode(KeyboardPreferences.self, from: data), p)
     }
@@ -456,8 +456,8 @@ final class KeyboardCoreTests: XCTestCase {
         XCTAssertTrue(KeyboardLayout.rows(state: numbers, needsGlobe: false).joined().allSatisfy { $0.flick == nil })
 
         var row = KeyboardPreferences(); row.digitAccess = .numberRow
-        XCTAssertEqual(row.numberRowHeight, 43)
-        XCTAssertEqual(row.keyboardHeight, KeyboardPreferences().keyboardHeight + 43 + 3)
+        XCTAssertEqual(row.numberRowHeight, 37)
+        XCTAssertEqual(row.keyboardHeight, KeyboardPreferences().keyboardHeight + 37 + 8)
         let rows = KeyboardLayout.rows(state: InputState(), needsGlobe: true, preferences: row)
         XCTAssertEqual(rows.count, 5)
         XCTAssertEqual(rows[0].map(\.action), "1234567890".map { .text(String($0)) })
