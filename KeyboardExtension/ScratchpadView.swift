@@ -18,7 +18,6 @@ final class ScratchpadView: UIView, UITextViewDelegate, UIEditMenuInteractionDel
     private let returnToApp = UIButton(type: .system)
     private let message = UILabel()
     private let storeKey = "key-scratch.local-note.v1"
-    private var modeColor: UIColor = .systemGreen
     private(set) var isEditingNote = false
 
     var onInsert: ((String) -> Void)?
@@ -60,8 +59,7 @@ final class ScratchpadView: UIView, UITextViewDelegate, UIEditMenuInteractionDel
         reloadSharedNote()
         isEditingNote = true
         returnToApp.isHidden = false
-        layer.borderColor = modeColor.cgColor
-        layer.borderWidth = 1
+        updateBorderAppearance()
         onEditingChange?(true)
         updateCaret()
     }
@@ -70,18 +68,23 @@ final class ScratchpadView: UIView, UITextViewDelegate, UIEditMenuInteractionDel
         guard isEditingNote else { return }
         isEditingNote = false
         returnToApp.isHidden = true
-        layer.borderColor = modeColor.withAlphaComponent(0.6).cgColor
-        layer.borderWidth = 0.5
+        updateBorderAppearance()
         onEditingChange?(false)
         updateCaret()
     }
 
-    /// Applies the current experiment's typography and color identification.
-    func configure(mode: KeyScratchMode, font: KeyScratchNoteFont, size: Double) {
-        modeColor = UIColor(keyboardHex: mode.colorHex)
-        caret.backgroundColor = modeColor
-        layer.borderColor = modeColor.withAlphaComponent(isEditingNote ? 1.0 : 0.6).cgColor
-        layer.borderWidth = isEditingNote ? 1 : 0.5
+    private func updateBorderAppearance() {
+        // Same subtle radius and hairline treatment as the keyboard keycaps.
+        // A restrained system-blue outline signals that keystrokes target notes.
+        layer.borderWidth = isEditingNote ? 0.9 : 0.65
+        layer.borderColor = (isEditingNote
+            ? UIColor.systemBlue.withAlphaComponent(0.60)
+            : UIColor.separator.withAlphaComponent(0.65)).cgColor
+    }
+
+    /// Normal typography, no old experimental color identity.
+    func configure(font: KeyScratchNoteFont, size: Double) {
+        updateBorderAppearance()
         let size = CGFloat(size)
         let base = UIFont.systemFont(ofSize: size, weight: .medium)
         switch font {
@@ -187,8 +190,9 @@ final class ScratchpadView: UIView, UITextViewDelegate, UIEditMenuInteractionDel
     override init(frame: CGRect) {
         super.init(frame: frame)
         backgroundColor = .secondarySystemBackground
-        layer.borderColor = UIColor.separator.cgColor
-        layer.borderWidth = 0.5
+        layer.cornerRadius = 6
+        layer.masksToBounds = true
+        updateBorderAppearance()
 
         // Most of the panel is now text, not a toolbar. An unobtrusive
         // icon remains as an optional fallback if a host tap emits no focus event.
@@ -263,10 +267,10 @@ final class ScratchpadView: UIView, UITextViewDelegate, UIEditMenuInteractionDel
         stack.translatesAutoresizingMaskIntoConstraints = false
         addSubview(stack)
         NSLayoutConstraint.activate([
-            stack.leadingAnchor.constraint(equalTo: leadingAnchor),
-            stack.trailingAnchor.constraint(equalTo: trailingAnchor),
-            stack.topAnchor.constraint(equalTo: topAnchor),
-            stack.bottomAnchor.constraint(equalTo: bottomAnchor)
+            stack.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 4),
+            stack.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -4),
+            stack.topAnchor.constraint(equalTo: topAnchor, constant: 3),
+            stack.bottomAnchor.constraint(equalTo: bottomAnchor, constant: -3)
         ])
         bringSubviewToFront(returnToApp)
     }
