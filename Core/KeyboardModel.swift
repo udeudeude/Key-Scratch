@@ -819,6 +819,32 @@ enum KeyboardPreset: String, CaseIterable, Identifiable {
     }
 }
 
+/// Adaptive geometry for the compact iPhone landscape keyboard. The right-hand
+/// keyboard stays a useful swipe width; the entire remaining extension area
+/// belongs to notes. Portrait respects the user's ordinary split width.
+enum KeyScratchAdaptiveLayout {
+    static func keyboardWidth(availableWidth: Double, landscape: Bool,
+                              portraitNoteFraction: Double) -> Double {
+        guard availableWidth > 0 else { return 0 }
+        if landscape {
+            return min(availableWidth, min(430, max(390, availableWidth * 0.60)))
+        }
+        return availableWidth * (1 - min(0.80, max(0, portraitNoteFraction)))
+    }
+
+    static func appearance(_ base: KeyboardPreferences, landscape: Bool) -> KeyboardPreferences {
+        guard landscape else { return base }
+        var compact = base
+        compact.keyHeight = min(compact.keyHeight, 40)
+        compact.controlHeight = min(compact.controlHeight, 36)
+        compact.rowSpacing = min(compact.rowSpacing, 4)
+        compact.letterSize = min(compact.letterSize, 21)
+        compact.showHeader = false
+        if compact.digitAccess == .numberRow { compact.digitAccess = .flick }
+        return compact.validated
+    }
+}
+
 struct KeyCell {
     let key: Key
     let hitFrame: CGRect
