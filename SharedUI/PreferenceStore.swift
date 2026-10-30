@@ -13,12 +13,21 @@ enum PreferenceStore {
               let preferences = try? JSONDecoder().decode(KeyboardPreferences.self, from: data) else {
             return KeyboardPreferences()
         }
-        return preferences.validated
+        return normalized(preferences)
+    }
+
+    /// Historical color-coded A/B modes are retained only for decoding older
+    /// files. Key Scratch now has one ordinary split layout and its adjustable
+    /// geometry; old Blue/Red/Amber/Purple choices migrate to it automatically.
+    static func normalized(_ preferences: KeyboardPreferences) -> KeyboardPreferences {
+        var result = preferences.validated
+        result.keyScratchMode = .split
+        return result
     }
 
     static func save(_ preferences: KeyboardPreferences) throws {
         guard let url = fileURL else { throw CocoaError(.fileNoSuchFile) }
-        try JSONEncoder().encode(preferences.validated).write(to: url, options: .atomic)
+        try JSONEncoder().encode(normalized(preferences)).write(to: url, options: .atomic)
     }
 }
 
