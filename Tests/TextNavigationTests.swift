@@ -152,8 +152,8 @@ final class TextNavigationTests: XCTestCase {
         for width in [165.0, 240.0, 393.0] {
             let cells = KeyboardGeometry.cells(width: width, state: state,
                                                preferences: p, needsGlobe: true)
-            guard let first = cells.first { $0.key.action == .text("a") },
-                  let last = cells.first { $0.key.action == .text("l") } else {
+            guard let first = cells.first(where: { $0.key.action == .text("a") }),
+                  let last = cells.first(where: { $0.key.action == .text("l") }) else {
                 return XCTFail("Missing middle-row letter")
             }
             XCTAssertGreaterThan(first.visualFrame.minX, 0)
