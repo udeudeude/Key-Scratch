@@ -1,168 +1,36 @@
-> **Key Scratch fork, experimental:** A split iPhone keyboard with local notes. The containing app now includes a full-size shared scratchpad editor, color-coded experiment modes, and improved iOS-style typing gestures. **Enable Allow Full Access** in iPhone Settings for note Copy/Paste and local app/keyboard note sharing. No text is uploaded by the keyboard. See [Key Scratch device setup and acceptance tests](docs/KEY-SCRATCH.md). Work in progress on `feature/scratchpad-first-pass`; do not merge into main without another iPhone test.
+# Key Scratch
 
-# Ortholinear
+A custom iPhone keyboard with an always-visible, editable scratchpad. Built from the open-source **Ortholinear** keyboard, retaining its swipe recognition, optional languages, and local-first design.
 
-A native, private Ukrainian + English keyboard for iPhone and iPad, with 13 optional layouts: Polish, German, French, Spanish, Czech, Slovak, Croatian/Bosnian/Montenegrin/Serbian (Latin and Cyrillic), Swedish, Norwegian, Danish, Dutch, and Russian. Straight rows, equal character cells, and configurable geometry. Swift 6, iOS 17+, UIKit keyboard extension, SwiftUI containing app. No third-party runtime code dependencies; bundled language data has separate licenses.
+## Features
 
-[Support](SUPPORT.md) · [Privacy](PRIVACY.md) · [Contributing](CONTRIBUTING.md) · [MIT license](LICENSE)
+- A compact iOS-style typing area beside a **persistent local note**.
+- Tap **Notes** to type into the scratchpad, **App** to return to the host text field. Hold the button to cycle enabled languages. The system globe is still available for other keyboards, including Emoji.
+- Swipe typing, suggested corrections, long-press accents, optional digit flicks, stable Delete/Return positions, smart punctuation and spacing.
+- Double-tap word selection, triple-tap paragraph selection, and a floating edit menu in the compact scratchpad. Selection is visibly highlighted.
+- **Full Access**, when the user enables it, permits Copy/Paste and local note sharing with the containing app. The companion app has a full-size note editor and Share/Export. No text is uploaded.
+- Portrait: adjustable split (30% notes by default). **Landscape: a shorter keyboard at the far right**, with the notes filling all remaining extension space to the left.
+- Thin, rounded scratchpad border and familiar iOS system colors. App icon depicts a metal key scratching car paint.
 
-![Ortholinear Ukrainian keyboard](docs/screenshots/app-store/iphone-home.png)
+## Install and test on iPhone
 
-Actual simulator captures: [iPhone](docs/screenshots/app-store/iphone-home.png) · [iPad](docs/screenshots/app-store/ipad-home.png).
+The development branch is `feature/scratchpad-first-pass`; don't merge it until on-device testing passes.
 
-## Run
-
-Open `Ortholinear.xcodeproj`, select the **Ortholinear** scheme and an iPhone simulator, and Run. The app includes an interactive test keyboard that works before you enable the system extension.
-
-For an iPhone or iPad:
-
-1. Set your development team on both the app and keyboard targets in Signing & Capabilities.
-2. If necessary, replace the bundle identifiers and `ORTHOLINEAR_APP_GROUP` with identifiers registered to your team. Both targets must have the same App Group entitlement. The app bundle ID must prefix the extension bundle ID.
-3. Build and run the app on the device.
-4. In iOS Settings, open **General → Keyboard → Keyboards → Add New Keyboard → Ortholinear**.
-5. In a text field, use the globe to choose **Key Scratch** in this fork, or Ortholinear in the upstream app. For Key Scratch's clipboard and shared notes, enable **Settings → General → Keyboard → Keyboards → Key Scratch → Allow Full Access**. Upstream Ortholinear does not request it.
-
-Set geometry in the containing app, then dismiss and reopen the system keyboard to load the changes. Use **Test the installed system keyboard** in the app to check the actual extension in text and email fields.
-
-The checked-in Xcode project is ready to open. `project.yml` is the source for regenerating it with [XcodeGen](https://github.com/yonaskolb/XcodeGen):
+For a Mac folder that already contains the signed Xcode project, run these commands **from that folder**:
 
 ```sh
-xcodegen generate
+curl -fL https://raw.githubusercontent.com/udeudeude/Key-Scratch/feature/scratchpad-first-pass/tools/update-device.sh -o update-key-scratch.sh
+sh update-key-scratch.sh
 ```
 
-## Behavior
+Reopen `Ortholinear.xcodeproj` (the existing development project name is kept to preserve local signing), choose **Product → Clean Build Folder**, and press **Command-R**. In iPhone Settings → General → Keyboard → Keyboards → Key Scratch, enable **Allow Full Access** for clipboard and local note sharing. Open the keyboard once to migrate older notes before opening the companion app's full-size Scratchpad.
 
-- Ukrainian and English with equal-width letters within each row, including the complete Ukrainian alphabet. English has an optional apostrophe; Ukrainian keeps it on the numbers page, where it types ʼ (U+02BC, as the macOS Ukrainian layout does). Hold it for ' ’ ".
-- Turn on **ї on long-press і** in customization to remove the separate ї key and widen the top row. Tap і for і; hold for ї, or hold І with Shift for Ї. The option is off by default.
-- Customization keeps a live keyboard preview visible as you adjust size and spacing sliders, with UA/EN switching and a side-by-side layout in landscape.
-- Open **Settings → Appearance → Theme and colors** to choose Automatic, Warm Light, Soft Dark, High Contrast, Tokyo Night, Catppuccin Mocha, or Nord. Keep the theme accent or choose teal, blue, purple, rose, or amber. Theme and accent settings persist and are shared with the extension.
-- Softer key corners, subtle borders, a calm tinted press state, and consistent Shift/Delete/Return/language icons. Optional small ґ/ї hints reveal long-press letters. Theme changes preserve key geometry.
-- Tap г for г; hold it for ґ. With Shift, hold Г for Ґ. There is no separate ґ key.
-- Larger default letters: 72 pt keys, 28 pt labels, no header, and no period or comma on the letter page. The remaining letters expand across the row.
-- Shift sits immediately before Я / Z on the third letter row. Its position is configurable.
-- Substantial Delete immediately after M / Ю on the third letter row, 72 pt tall by default. Return stays on the control row at 56 pt. Both share a dedicated width setting. Numbers and symbols keep Delete on the control row.
-- Big letters, Balanced, and Original grid presets; optional letter-page punctuation and header.
-- Optional automatic spacing after . , ! ? : ; …, enabled by default. Consecutive punctuation stays together, manual Space does not double the gap, and numeric continuations such as 3.14 work. URL and email fields use literal punctuation.
-- UA / EN toggle, one-shot shift, double-tap caps lock.
-- Sentences start with a capital where the host field asks for it (its `autocapitalizationType`: sentences, words, or all characters). Email, URL, and web search fields never get automatic capitals, and a Shift you turn off yourself stays off until you type. **Capitalize sentences** is on by default.
-- Two Spaces within 1.2 s after a word type “. ”. **Double-space for period** is on by default and skips URL and email fields.
-- Between words, when the suggestion row is otherwise idle (no words, tip, or message), it shows `. , ? ! :` and `« »` (Cyrillic) or `- "` (Latin) in fixed positions. While next-word predictions show, `. , ?` stay at the right so a period is still one tap. Marks attach to the word, even after a suggestion added a space.
-- **Digits on the letter page**: flick a top-row key down (at least 18 pt, less than 22 pt sideways) to type the small digit in its corner, which is the default and costs no height; or show a number row (about 45 pt at the default size); or turn both off. Other pages share the number row's height, so the keyboard never changes size.
-- **Glide typing** (English and Ukrainian, on by default): slide across a word's letters and lift. The word goes in with a space before it when needed, other readings appear in the suggestion row, and tapping one replaces it. A slide shorter than about one key still just moves to the neighbouring key. The decoder matches the trace's shape and position against the bundled dictionary on the device in about half a millisecond.
-- A word typed on the wrong layout, such as “ghvdsb” (the keys where привіт sits on this keyboard's default layout) while English is active, gets a “привіт ⇄” offer that fixes the word and switches language, when English and Ukrainian are both on.
-- The system keyboard also offers your iOS text replacements and contact names (via `requestSupplementaryLexicon`, which needs no Full Access).
-- In an empty field, the row shows a one-line tip about a gesture, at most three times per tip. Tap a tip to hide it. The app's test drive ticks off each gesture as you try it.
-- Backspace deletes immediately; after a 420 ms hold, character deletion gradually accelerates from one every 120 ms to one every 25 ms over four seconds. Releasing, sliding off Delete, or dismissing the keyboard stops repetition. Each new hold starts slowly.
-- Space, return, two number/symbol pages, keyboard dismissal. The 123 / ABC switch always stays at the far left of the control row.
-- Tap 123 to stay on numbers. Hold or slide from 123 onto a symbol and release to type it, then return to letters. Pause over #+= to reach the second symbols page. Releasing outside or holding and releasing in place cancels.
-- Immediate pressed-key feedback and a short release fade, including globe and header dismissal. Key frames stay fixed during feedback; Reduce Motion uses a brief static highlight.
-- Native globe interaction when `needsInputModeSwitchKey` is true, including Apple's keyboard picker on hold. On Face ID devices, iOS may supply the globe below the extension instead.
-- Hold punctuation for 420 ms, slide into the alternatives at the top of the keyboard, and release on an alternative. Release outside the keyboard to cancel. Available on period, comma, apostrophe, quote, hyphen, and question mark. The alternatives replace the suggestion row while you hold; with no suggestion row or header, they temporarily overlay the first row.
-- Swipe horizontally on space: 12 points per cursor step; no space inserted after a cursor drag.
-- Letter-key height: 36–88 pt; control-row height: 36–72 pt; letter size: 18–36 pt; Return/Delete relative width: 1.25–3.5; horizontal spacing: 0–8 pt; vertical spacing: 0–12 pt.
-- **Fill gaps between keys** keeps the visible gutters but partitions the whole grid into adjoining touch targets. Turning it off restricts touches to visible rectangles.
-- VoiceOver key labels, shift state, and alternative-character actions; system light and dark appearance.
-- Numeric input traits start on numbers; email, URL, and ASCII traits start in a Latin layout (English, unless you are already typing in another Latin language). Return labels reflect the host field.
+See [setup, behavior and caveats](docs/KEY-SCRATCH.md) and [device tests](docs/IOS_KEYBOARD_BEHAVIOR.md).
 
-```text
-й ц у к е н г ш щ з х ї
-ф і в а п р о л д ж є
-⇧ я ч с м и т ь б ю ⌫
-```
+## Platform limitations
 
-Other controls occupy a fourth row. Character touch cells have equal widths within each row; the narrow Shift key precedes the last row's letters. The two outer visible key faces absorb the outer half-gutter to reach the usable edges. The Original grid preset restores punctuation, the header, and Shift in the control row; ґ remains available by holding г in every preset.
+iOS controls the system keyboard-switcher controls outside the extension's permitted area. Within the extension, Key Scratch allocates the entire remaining width to the notes in landscape. Third-party keyboards cannot reliably detect every tap that leaves the host app's caret unchanged, or inspect the host app's soft-wrapped text-line geometry. The Notes/App button is a reliable focus control.
 
-## Privacy and shared settings
+## Origins
 
-`RequestsOpenAccess` is **false**. The keyboard extension makes no network requests; the App Store release of the app contacts Apple's App Store only for the optional Pro purchase. There are no analytics SDKs, typed-text logging, or network prediction services. Optional suggestions use bundled dictionaries and small local context tables. Preview text lives only in memory. Geometry, typing preferences, and starting language are stored locally. See [privacy details](PRIVACY.md).
-
-The containing app atomically writes `geometry.json` into the App Group. The extension only reads it, on appearance. Apple explicitly permits [read-only access to the containing app's shared container without Full Access](https://developer.apple.com/documentation/uikit/configuring-open-access-for-a-custom-keyboard). This is why settings work without giving the keyboard network access. A missing or malformed file falls back to validated defaults.
-
-**Keep simulator code signing enabled.** Normal Xcode simulator builds use ad-hoc signing without a paid team. Disabling signing removes App Group entitlements, so cross-process settings cannot work. An explicit save error appears in the app if the shared container is unavailable.
-
-## Validate
-
-```sh
-swift test
-xcodebuild -project Ortholinear.xcodeproj -scheme Ortholinear \
-  -destination 'platform=iOS Simulator,name=iPhone 17 Pro' \
-  -derivedDataPath build test
-```
-
-Core tests cover the complete Ukrainian alphabet, presets and preference migration, Shift and page-switch placement, action-key sizes, exhaustive sampled hit coverage across 320–1024 pt widths, visible-gap mode, and shift/caps transitions. UI tests exercise actual touch delivery in the preview, customization persistence, language switching, symbols, hold/quick symbol slides and cancellation, return, delete hold, cursor drag, punctuation hold, caps lock, onboarding, and landscape layout.
-
-For the separate system-extension integration test, use an English-language disposable simulator and turn off **Simulator → I/O → Keyboard → Connect Hardware Keyboard** so the software keyboard is visible. A simulator run without Simulator.app ignores that setting and may minimize the keyboard off-screen; keep it up there instead:
-
-```sh
-xcrun simctl spawn <udid> defaults write com.apple.keyboard.preferences AutomaticMinimizationEnabled -bool NO
-xcodebuild -project Ortholinear.xcodeproj -scheme OrtholinearSystemTests \
-  -destination 'platform=iOS Simulator,name=iPhone 17 Pro' \
-  -derivedDataPath build test
-```
-
-This test enables Ortholinear in Settings, selects it with the system globe picker, types into a real host field, moves between number, decimal, phone, URL and text fields with the keyboard open, and verifies that the extension reads a changed key height from the app's shared container. It leaves the extension enabled and retains its test preferences on that disposable simulator.
-
-See [device checks](docs/DEVICE-CHECKS.md) for the remaining checks before distribution.
-
-## Structure
-
-```text
-App/                 Setup, geometry settings, typing preview, system test fields
-KeyboardExtension/   UIInputViewController and textDocumentProxy integration
-Core/                Layouts, input state, preferences, pure geometry
-SharedUI/            UIKit touch surface, accessibility, shared settings reader
-Tests/               Swift Package core tests
-UITests/             XCUITest interaction tests
-IntegrationTests/    Separate real-extension launch and shared-settings regression
-Resources/           App icon and privacy manifest
-```
-
-## Deliberately later
-
-Automatic correction (suggestions change text only when tapped); smart quotes; haptics, which need Full Access; extra geometry modes (stagger, handedness, offsets, individual key widths). No third-party keyboard framework is bundled.
-
-iOS replaces custom keyboards in secure/password and phone-pad fields. Host apps can refuse third-party keyboards. These are [system restrictions](https://developer.apple.com/documentation/uikit/configuring-a-custom-keyboard-interface).
-
-Licensed under MIT.
-
-## Suggestion-only typing (0.4.0)
-
-English and Ukrainian suggestions run entirely offline. Three large buttons offer corrections, completions, or next words; text changes only when a suggestion is tapped. Space and punctuation never accept a correction automatically. Place the caret inside a word or select it to see alternatives. URL, email, and numeric fields do not request suggestions; web search fields, such as the Safari address bar, do, but never for anything that looks like a web address.
-
-Open **Keyboard settings → Suggestions → Words and corrections** to toggle the row, next words, and short sentence context. Use **⋯ → Teach** to save a word, or the same menu to forget words. The extension and app preview maintain separate local word lists (up to 200 per language), so teaching works without Full Access. No typing history is collected.
-
-The native Swift engine uses a compact symmetric-delete index, nearby-key ranking, and optional pruned bigram/trigram tables. The last two dictionaries used stay loaded, so switching UA ↔ EN doesn't reload them; a memory warning releases both. See [research](docs/SUGGESTIONS-RESEARCH.md) and [verification notes](docs/SUGGESTIONS-VERIFICATION.md) for measured scope and limitations. Dictionary resources have separate attribution/share-alike terms; the application code remains MIT. Full notices ship in the app under **Suggestions → Dictionary credits** and in [DictionaryCredits.txt](Core/SuggestionData/DictionaryCredits.txt).
-
-Regenerate data with `uv venv build/suggestion-tools`, then `uv pip install --python build/suggestion-tools/bin/python wordfreq==3.1.1 spylls==0.1.7`, then `build/suggestion-tools/bin/python Tools/build_suggestion_data.py`. The script downloads pinned public data into ignored build storage, filters common surface forms, creates indexes and context tables, and evaluates next words on a separate test split. Generated assets include license/provenance metadata. Python and the source corpora are not part of the app runtime.
-
-## Languages, layouts, and field memory
-
-Open **Keyboard settings → Languages and layouts** (first in the list) to choose which languages the language key cycles through: Українська, English, Polski, Deutsch, Français, Español, Čeština, Slovenčina, Latinica, Ћирилица, Svenska, Norsk, Dansk, Nederlands, and Русский. Ukrainian and English stay on by default, and at least one language must remain on. With a single language, the language key disappears and space gets wider.
-
-- **Polish** uses QWERTY; hold a, c, e, l, n, o, s, or z for ą ć ę ł ń ó ś ż ź.
-- **German** uses QWERTZ with ü, ö, and ä on the letter page; hold s for ß, or Shift + hold S for ẞ.
-- **French** uses AZERTY with its apostrophe always on the letter page; hold e, a, c, u, i, o, or y for é è ê ë, à â æ, ç, ù û ü, î ï, ô œ, and ÿ.
-- **Spanish** uses QWERTY with ñ; hold a, e, i, o, or u for á é í ó ú ü. Hold ? and slide to ¿.
-- **Czech** and **Slovak** use QWERTZ with held accents, as iOS does: ě š č ř ž ý á í é ů ú ď ť ň, and á ä č ď é í ľ ĺ ň ó ô ŕ š ť ú ý ž.
-- **Latinica** serves Croatian, Bosnian, Montenegrin, and Serbian Latin: QWERTZ with š đ č ć ž as keys; hold s or z for Montenegrin ś and ź. **Ћирилица** is the Serbian Cyrillic layout with љ њ ђ ћ џ ј.
-- **Swedish**, **Norwegian**, and **Danish** use QWERTY with å ä ö / å ø æ / å æ ø; hold e for é. **Dutch** uses QWERTY; hold a, e, i, o, or u for its accents.
-- **Russian** uses ЙЦУКЕН; hold е for ё and ь for ъ. It is offered only after answering “No” to “Do you support Russia’s invasion of Ukraine?”; answering “Yes” leaves it unavailable. Reset to defaults clears the answer.
-- Holding г for ґ is Ukrainian only.
-- **English** can use QWERTY, Colemak, Colemak-DH (ortholinear matrix bottom row), Dvorak, or Workman. Dvorak keeps ' , . at the start of the top row. Space shows the active variant, and suggestion key distances follow the layout you chose.
-
-Long-press hints mark every letter with held alternatives. English and Ukrainian use the bundled dictionaries. The other layouts get corrections and completions from `UITextChecker`, Apple's on-device spell checker, re-ranked by nearby keys.
-
-**Remember for each kind of field** is on by default. iOS doesn't tell keyboards which app, window, or chat they are in: one keyboard process serves every app, `documentIdentifier` changes each time a field gains focus, and conversation context isn't delivered to third-party keyboards. What does survive is a field's kind (its keyboard type, return key, and content type), so Ortholinear remembers by kind:
-
-- Message, search, email, and web address fields each reopen in the language you last used in that kind of field, in any app. The memory is saved in the keyboard's own container (field traits and language names, never text), so it survives iOS unloading the keyboard.
-- Email and URL fields start in a Latin layout. A language you choose there is kept for that kind of field, and the forced English doesn't carry into the next message.
-- A kind of field you haven't used yet continues in the last language you used in an ordinary field.
-- **Forget remembered languages**, changing the starting language, or turning off the language in use starts over from the starting language. The app can't write to the keyboard's container, so Forget bumps a counter in the shared settings and the keyboard clears its memory the next time it opens.
-
-## Layout Workshop
-
-Open **Keyboard settings → Layout Workshop** to rearrange a language's three letter rows. Tap a key to change what it types and what holding it offers, move it left, right, or to the row above or below, swap it with another key, or add and remove keys (up to 12 per row). Delete, Shift, and the control row keep their places, and letter keys in a row keep equal widths.
-
-Edits stay a draft until **Apply to keyboard**. **Try it** types with the draft first. A layout can be applied only when every letter of the language is reachable, directly or by holding a key; the **Check** section lists anything missing, duplicated, or longer than one character. **Use the built-in layout** removes a language's custom layout. A language with a custom layout ignores the optional-key toggles and, for English, the layout picker.
-
-Touch, long-press, digit flicks, suggestions, glide typing, and wrong-layout recovery all follow the custom positions; a held letter such as ґ is placed on its key unless it has a key of its own. **Share layout** and **Open a layout file** exchange single layouts as `.ortholayout` JSON files containing only the language and its keys. Opening a file loads it as a draft; nothing changes until it is applied.
+Key Scratch is a fork of [Igor Varyvoda's Ortholinear](https://github.com/IgorVaryvoda/Ortholinear). The codebase retains internal upstream target names and some legacy layout-file identifiers for compatibility. See the original repository and this repository's `LICENSE` for attribution and licensing.
