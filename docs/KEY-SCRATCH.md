@@ -8,7 +8,7 @@ The temporary five-color mode comparison is complete and **the colored modes and
 
 **Portrait:** notes on the left at 30% width by default; the setting remains adjustable. The right-hand keyboard keeps the same geometry and tappable hit targets.
 
-**Landscape:** rows are reduced to at most 40 pt, the bottom controls to 36 pt, with 4 pt row spacing and no extra header. The keyboard is positioned at the **right edge of the keyboard extension**, at a usable width of about 390–430 pt. Every remaining point of the extension's width belongs to the scratchpad at left and center. This never overwrites portrait settings. Apple's own globe and microphone controls may occupy reserved areas outside the extension; third-party keyboards cannot move those system controls.
+**Landscape:** rows are reduced to at most 34 pt, the bottom controls to 32 pt, and the suggestion strip to 30 pt, with 2 pt visual row spacing and no extra header. This yields an approximately **172 pt** keyboard, about 17% shorter than the previous 208 pt landscape layout, without disabling predictions. The keyboard is positioned at the **right edge of the keyboard extension**, at a usable width of about 390–430 pt. Every remaining point of the extension's width belongs to the scratchpad at left and center. This never overwrites portrait settings. Apple's own globe and microphone controls may occupy reserved areas outside the extension; third-party keyboards cannot move those system controls.
 
 The scratchpad now has a thin neutral border and 6 pt rounded corners matching the keycaps, with a subtle blue active-focus border. The new app icon refers to a **metal key scratching dark car paint**, rather than a computer keyboard key.
 
