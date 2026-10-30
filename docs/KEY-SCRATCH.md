@@ -2,25 +2,29 @@
 
 A fork of Ortholinear that adds a note panel beside its offline swipe keyboard. Development branch: `feature/scratchpad-first-pass`; draft PR #1. Keep main/upstream Ortholinear intact while the fork is tested on-device.
 
-## Working design from the first real iPhone XS Max experiment
+## Current design
 
-Five color-coded modes remain available in the companion app's **Key Scratch Lab**. Recorded single-swipe badge times were approximately Blue 12 ms, Red 10–15 ms, Green 12 ms, Amber 10 ms, Purple 15 ms. The user reported no noticeable lag in any mode; disabling suggestions did not help, and Purple's notes were too narrow. **Green, about 30% note width, with live suggestions, is the preferred starting configuration.**
+The temporary five-color mode comparison is complete and **the colored modes and latency badge are removed**. The normal keyboard uses the responsive dedicated swipe worker, live suggestions and one adjustable split. Older color-mode preferences automatically migrate to the standard layout. The companion app now has a straightforward **Scratchpad & layout** settings screen instead of the Experiment Lab.
 
-Mode comparisons: Blue ↔ Red tests the added panel; Red ↔ Green tests the independent glide worker; Green ↔ Amber tests live prediction; Green ↔ Purple tests panel width. Treat the milliseconds as individual local timing samples, not statistical benchmarks.
+**Portrait:** notes on the left at 30% width by default; the setting remains adjustable. The right-hand keyboard keeps the same geometry and tappable hit targets.
+
+**Landscape:** rows are reduced to at most 40 pt, the bottom controls to 36 pt, with 4 pt row spacing and no extra header. The keyboard is positioned at the **right edge of the keyboard extension**, at a usable width of about 390–430 pt. Every remaining point of the extension's width belongs to the scratchpad at left and center. This never overwrites portrait settings. Apple's own globe and microphone controls may occupy reserved areas outside the extension; third-party keyboards cannot move those system controls.
+
+The scratchpad now has a thin neutral border and 6 pt rounded corners matching the keycaps, with a subtle blue active-focus border. The new app icon refers to a **metal key scratching dark car paint**, rather than a computer keyboard key.
 
 ## iPhone-style controls and language switching
 
-The key formerly marked UA / EN now says **Notes** when the host app is receiving typing, and **App** when the scratchpad is receiving typing. Tap once to toggle the writing destination. Hold that same key to cycle the languages enabled under Key Scratch → Keyboard Settings → Languages. The full-width Blue reference mode has no notes area, so it doesn't display a nonfunctional Notes/App key.
+The key formerly marked UA / EN now says **Notes** when the host app is receiving typing, and **App** when the scratchpad is receiving typing. Tap once to toggle the writing destination. Hold that same key to cycle the languages enabled under Key Scratch → Keyboard Settings → Languages. The old color-coded reference modes are retired.
 
 The space bar reads **space**. The system globe still opens the next enabled iOS keyboard or a keyboard chooser on hold. To use Apple's Emoji keyboard, enable that keyboard in iOS Settings and switch to it with the globe. Key Scratch cannot open Apple's Emoji keyboard directly, and does not pretend otherwise.
 
 English is now the default for new installs. Existing default UA+EN setups migrate to English first while retaining Ukrainian as an enabled optional language. Additional layouts remain available in Settings, with no unrelated language gate.
 
-iPhone-style light/dark keyboard colors and keycap shadows are the default; alternate themes remain under Appearance. The companion app now uses iOS system colors and a distinct blue notebook-and-keys icon. A visible blue selection highlight is drawn over ranges selected in the compact notes editor.
+iPhone-style light/dark keyboard colors and keycap shadows are the default; alternate themes remain under Appearance. The companion app now uses iOS system colors and a distinct metal-car-key icon. A visible blue selection highlight is drawn over ranges selected in the compact notes editor.
 
 ## Default spacing and typing behavior
 
-Key Scratch's standard configuration uses **8 pt row gaps** and **3 pt column gaps**. Existing installations with the old untouched 2 pt gaps migrate to the new values; deliberately customized gap sizes are preserved. The experiment lab exposes both controls.
+Key Scratch's standard configuration uses **8 pt row gaps** and **3 pt column gaps**. Existing installations with the old untouched 2 pt gaps migrate to the new values; deliberately customized gap sizes are preserved. The Scratchpad & layout screen exposes both controls.
 
 Tiny numbers and accented-letter hint labels are **hidden by default**, without disabling their actions: short downward flicks on top-row letters still type digits when digit flicks are enabled, and pressing/holding letters still displays accented alternatives. To show hints again, enable **Appearance → Key hints**.
 
@@ -73,7 +77,7 @@ The script replaces existing source and plist files, preserving the local Xcode 
 
 Reopen `Ortholinear.xcodeproj`, select **Product → Clean Build Folder**, then **Command-R** to build/install on the plugged-in iPhone. Do not run XcodeGen again just to update these files: project regeneration may reset signing.
 
-Then enable Full Access in iOS Settings, open the keyboard once to migrate old notes, and open the companion app's full-size Scratchpad. Try Green before adjusting dimensions.
+Then enable Full Access in iOS Settings, open the keyboard once to migrate old notes, and open the companion app's full-size Scratchpad. Test Notes/App focus switching and landscape resizing before adjusting dimensions.
 
 ## Outstanding verification
 
