@@ -335,10 +335,10 @@ final class KeyboardViewController: UIInputViewController {
         let after = inNotes ? scratchpad.afterCaret : (textDocumentProxy.documentContextAfterInput ?? "")
         let selected = inNotes ? scratchpad.selectedNoteText : (textDocumentProxy.selectedText ?? "")
         let needsLeadingSpace = selected.isEmpty && (before.last.map {
-            !$0.isWhitespace && !"([{«„“'\"".contains($0)
+            !$0.isWhitespace && !"([{«„“'\"-‐‑–—/’ʼ".contains($0)
         } ?? false)
         let needsTrailingSpace = after.first.map {
-            !$0.isWhitespace && !".,!?;:)]}\"'".contains($0)
+            !$0.isWhitespace && !".,!?;:)]}\"'-‐‑–—/’ʼ".contains($0)
         } ?? true
         let inserted = (needsLeadingSpace ? " " : "") + text + (needsTrailingSpace ? " " : "")
         pendingGlide = (inserted, inNotes)
@@ -567,6 +567,7 @@ final class KeyboardViewController: UIInputViewController {
             case .space:
                 expandNote(before: " ")
                 expander.triggerTyped(as: insertNote(" "))
+                inputState.returnToLettersAfterSpace()
                 updateAutoShift()
                 keyboard.inputState = inputState
                 return
@@ -618,7 +619,10 @@ final class KeyboardViewController: UIInputViewController {
             let typed = inputState.consume(value)
             expand(before: typed)
             expander.triggerTyped(as: insert(typed))
-        case .space: expand(before: " "); expander.triggerTyped(as: insert(" "))
+        case .space:
+            expand(before: " ")
+            expander.triggerTyped(as: insert(" "))
+            inputState.returnToLettersAfterSpace()
         case .backspace:
             if !deleteRecentGlide(inNotes: false) {
                 punctuationSpacing.reset()
