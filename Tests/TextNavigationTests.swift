@@ -163,4 +163,45 @@ final class TextNavigationTests: XCTestCase {
         }
     }
 
+    func testSpaceReturnsToLettersFromNumbersAndSymbolsOnly() {
+        var state = InputState()
+        for page in [KeyboardPage.numbers, .symbols] {
+            state.page = page
+            state.returnToLettersAfterSpace()
+            XCTAssertEqual(state.page, .letters, "Space from \(page) returns to letters")
+        }
+        state.page = .letters
+        state.returnToLettersAfterSpace()
+        XCTAssertEqual(state.page, .letters)
+
+        // User-defined layers deliberately preserve their page across Space.
+        let custom = UUID()
+        state.page = .layer(custom)
+        state.returnToLettersAfterSpace()
+        XCTAssertEqual(state.page, .layer(custom))
+    }
+
+    func testNewKeySpacingAndHiddenHintsPersistThroughSaveAndMigration() throws {
+        let defaults = KeyboardPreferences()
+        XCTAssertEqual(defaults.rowSpacing, 8)
+        XCTAssertEqual(defaults.columnSpacing, 3)
+        XCTAssertFalse(defaults.showLongPressHints)
+        XCTAssertEqual(try JSONDecoder().decode(
+            KeyboardPreferences.self, from: JSONEncoder().encode(defaults)), defaults)
+
+        let oldDefaults = Data(
+            #"{"schemaVersion":7,"rowSpacing":2,"columnSpacing":2,"showLongPressHints":true}"#.utf8)
+        let migrated = try JSONDecoder().decode(KeyboardPreferences.self, from: oldDefaults)
+        XCTAssertEqual(migrated.rowSpacing, 8)
+        XCTAssertEqual(migrated.columnSpacing, 3)
+        XCTAssertFalse(migrated.showLongPressHints)
+
+        let deliberate = Data(
+            #"{"schemaVersion":7,"rowSpacing":5,"columnSpacing":6,"showLongPressHints":true}"#.utf8)
+        let custom = try JSONDecoder().decode(KeyboardPreferences.self, from: deliberate)
+        XCTAssertEqual(custom.rowSpacing, 5)
+        XCTAssertEqual(custom.columnSpacing, 6)
+        XCTAssertFalse(custom.showLongPressHints)
+    }
+
 }
