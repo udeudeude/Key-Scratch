@@ -630,7 +630,7 @@ private struct KeyScratchExperimentLab: View {
     var body: some View {
         NavigationStack {
             Form {
-                Section("Scratchpad") {
+                Section {
                     HStack {
                         Text("Notes width in portrait")
                         Spacer()
@@ -651,15 +651,19 @@ private struct KeyScratchExperimentLab: View {
                             Text(font.title).tag(font)
                         }
                     }
+                } header: {
+                    Text("Scratchpad")
                 } footer: {
                     Text("In landscape, the keyboard stays compact at the far right and the scratchpad fills the available space to its left. Portrait proportions are unchanged.")
                 }
 
-                Section("Keyboard size") {
+                Section {
                     adjustment("Letter row", value: $draft.keyHeight, bounds: 36...88)
                     adjustment("Control row", value: $draft.controlHeight, bounds: 36...72)
                     adjustment("Row spacing", value: $draft.rowSpacing, bounds: 0...12)
                     adjustment("Column spacing", value: $draft.columnSpacing, bounds: 0...8)
+                } header: {
+                    Text("Keyboard size")
                 } footer: {
                     Text("Landscape uses shorter keys and tighter gaps automatically. The entire area between visible keys remains tappable while Fill Gaps is enabled.")
                 }
