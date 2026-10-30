@@ -37,6 +37,19 @@ final class KeyboardView: UIControl {
     var returnTitle = "return" { didSet { if oldValue != returnTitle { refresh() } } }
     var returnEnabled = true { didSet { if oldValue != returnEnabled { refresh() } } }
     var editingScratchpad = false { didSet { if oldValue != editingScratchpad { refresh() } } }
+    /// Layout only: the portrait user preferences are never overwritten.
+    var compactLandscape = false {
+        didSet {
+            guard oldValue != compactLandscape else { return }
+            cancelTouches()
+            invalidateIntrinsicContentSize()
+            refresh()
+        }
+    }
+    private var sizedPreferences: KeyboardPreferences {
+        KeyScratchAdaptiveLayout.appearance(preferences, landscape: compactLandscape)
+    }
+    var layoutHeight: CGFloat { CGFloat(sizedPreferences.keyboardHeight) }
     /// Hosts turn this on only for languages and fields that can decode a trace.
     var glideEnabled = false { didSet { if !glideEnabled { for id in sessions.keys { sessions[id]?.trace = nil } } } }
     var onAction: ((KeyAction) -> Void)?
@@ -122,18 +135,19 @@ final class KeyboardView: UIControl {
     required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
 
     override var intrinsicContentSize: CGSize {
-        CGSize(width: UIView.noIntrinsicMetric, height: preferences.keyboardHeight)
+        CGSize(width: UIView.noIntrinsicMetric, height: layoutHeight)
     }
 
     override func layoutSubviews() {
         super.layoutSubviews()
         // Only physical geometry changes cancel a slide. Switching pages is part of it.
         if layoutSize != bounds.size { cancelTouches(); layoutSize = bounds.size }
+        let sized = sizedPreferences
         cells = KeyboardGeometry.cells(width: bounds.width, state: displayState,
-                                       preferences: preferences, needsGlobe: needsGlobe)
+                                       preferences: sized, needsGlobe: needsGlobe)
         globeButton.isHidden = !needsGlobe
         globeButton.frame = cells.first(where: { $0.key.action == .globe })?.hitFrame ?? .zero
-        suggestionBar.frame = CGRect(x: 0, y: preferences.showHeader ? 38 : 0, width: bounds.width, height: preferences.suggestionHeight)
+        suggestionBar.frame = CGRect(x: 0, y: sized.showHeader ? 38 : 0, width: bounds.width, height: sized.suggestionHeight)
         suggestionBar.style(palette)
         dismissButton.frame = CGRect(x: bounds.width - 44, y: 0, width: 44, height: 38)
         updateChrome()
@@ -382,7 +396,7 @@ final class KeyboardView: UIControl {
             let label = flicked ?? cell.key.label ?? (action == .space && sessions.values.contains(where: \.cursorMode) ? "↔" : title(action))
             var size: CGFloat = label.count > 2 ? 13 : 19
             if case .text = action, cell.key.label == nil {
-                size = min(preferences.validated.letterSize, max(14, frame.width - 3))
+                size = min(sizedPreferences.letterSize, max(14, frame.width - 3))
             }
             drawText(label, in: face, font: palette.legend(ofSize: size, weight: isText ? .regular : .medium),
                      color: flicked == nil ? color : palette.accent)
