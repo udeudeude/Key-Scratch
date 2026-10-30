@@ -735,6 +735,7 @@ private struct KeyScratchExperimentLab: View {
                     adjustment("Letter row", value: $draft.keyHeight, bounds: 36...88)
                     adjustment("Control row", value: $draft.controlHeight, bounds: 36...72)
                     adjustment("Row spacing", value: $draft.rowSpacing, bounds: 0...12)
+                    adjustment("Column spacing", value: $draft.columnSpacing, bounds: 0...8)
                 }
 
                 Section {
@@ -766,6 +767,8 @@ private struct KeyScratchExperimentLab: View {
                             "Letter row: \(Int(setup.keyHeight)) pt",
                             "Control row: \(Int(setup.controlHeight)) pt",
                             "Row spacing: \(Int(setup.rowSpacing)) pt",
+                            "Column spacing: \(Int(setup.columnSpacing)) pt",
+                            "Keycap hints: \(setup.showLongPressHints ? "on" : "off")",
                             "iPhone key positions: \(setup.iphoneKeyPositions ? "on" : "off")",
                             "Live suggestions: \(setup.keyScratchMode.hasLiveSuggestions ? "yes" : "no")",
                             "Glide worker: \(setup.keyScratchMode.usesDedicatedGlide ? "dedicated" : "original")"
