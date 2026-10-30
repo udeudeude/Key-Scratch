@@ -144,4 +144,23 @@ final class TextNavigationTests: XCTestCase {
         XCTAssertEqual(options.language(after: .german), .english)
     }
 
+    func testStaggeredMiddleRowRetainsFullWidthTouchCoverage() {
+        var state = InputState()
+        state.language = .english
+        var p = KeyboardPreferences()
+        p.iphoneKeyPositions = true
+        for width in [165.0, 240.0, 393.0] {
+            let cells = KeyboardGeometry.cells(width: width, state: state,
+                                               preferences: p, needsGlobe: true)
+            guard let first = cells.first { $0.key.action == .text("a") },
+                  let last = cells.first { $0.key.action == .text("l") } else {
+                return XCTFail("Missing middle-row letter")
+            }
+            XCTAssertGreaterThan(first.visualFrame.minX, 0)
+            XCTAssertLessThan(last.visualFrame.maxX, width)
+            XCTAssertEqual(first.hitFrame.minX, 0)
+            XCTAssertEqual(last.hitFrame.maxX, width, accuracy: 0.001)
+        }
+    }
+
 }
