@@ -18,6 +18,16 @@ English is now the default for new installs. Existing default UA+EN setups migra
 
 iPhone-style light/dark keyboard colors and keycap shadows are the default; alternate themes remain under Appearance. The companion app now uses iOS system colors and a distinct blue notebook-and-keys icon. A visible blue selection highlight is drawn over ranges selected in the compact notes editor.
 
+## Default spacing and typing behavior
+
+Key Scratch's standard configuration uses **8 pt row gaps** and **3 pt column gaps**. Existing installations with the old untouched 2 pt gaps migrate to the new values; deliberately customized gap sizes are preserved. The experiment lab exposes both controls.
+
+Tiny numbers and accented-letter hint labels are **hidden by default**, without disabling their actions: short downward flicks on top-row letters still type digits when digit flicks are enabled, and pressing/holding letters still displays accented alternatives. To show hints again, enable **Appearance → Key hints**.
+
+As on the iPhone keyboard, a tap on **space** from the 123 or #+= page switches back to the letter page, in both the host app and the compact scratchpad. User-created additional key pages stay open.
+
+Hyphens and similar joining punctuation now attach directly to the preceding glided or suggested word, rather than retaining an unwanted automatic space. This covers hyphens and other dashes, slashes, apostrophes, closing brackets and typographic closers, plus percent and degree signs. Automatically added spaces are removed when appropriate, but a space the person explicitly typed is preserved. A following glide after a hyphen or slash also attaches without an unwanted leading space.
+
 ## Note editing
 
 - Tap text in the narrow notes area to direct Ortholinear typing and swipe recognition to that area. Keyboard suggestions and text replacements also apply to notes.
