@@ -154,15 +154,20 @@ final class KeyboardCoreTests: XCTestCase {
     }
 
     func testRemovedPunctuationGivesWidthToRemainingLetters() {
+        // Original grid: new iPhone QWERTY intentionally omits punctuation
+        // from the letter rows regardless of the legacy layout setting.
         var p = KeyboardPreferences()
-        let normal = KeyboardGeometry.cells(width: 360, state: InputState(), preferences: p, needsGlobe: false)
+        p.iphoneKeyPositions = false
+        var state = InputState()
+        state.language = .ukrainian
+        let normal = KeyboardGeometry.cells(width: 360, state: state, preferences: p, needsGlobe: false)
         XCTAssertEqual(normal.first { $0.key.action == .text("я") }!.hitFrame.width, 360 / 12.2, accuracy: 0.001)
         p.showApostrophe = false
-        let lettersOnly = KeyboardGeometry.cells(width: 360, state: InputState(), preferences: p, needsGlobe: false)
+        let lettersOnly = KeyboardGeometry.cells(width: 360, state: state, preferences: p, needsGlobe: false)
         XCTAssertEqual(lettersOnly.first { $0.key.action == .text("я") }!.hitFrame.width, 360 / 12.2, accuracy: 0.001)
         p.showPunctuation = true
         p.showApostrophe = true
-        let originalKeys = KeyboardGeometry.cells(width: 360, state: InputState(), preferences: p, needsGlobe: false)
+        let originalKeys = KeyboardGeometry.cells(width: 360, state: state, preferences: p, needsGlobe: false)
         XCTAssertEqual(originalKeys.first { $0.key.action == .text("я") }!.hitFrame.width, 360 / 14.2, accuracy: 0.001)
     }
 
@@ -171,13 +176,16 @@ final class KeyboardCoreTests: XCTestCase {
             var state = InputState(); state.language = language
             for punctuation in [false, true] {
                 for apostrophe in [false, true] {
-                    let p = KeyboardPreferences(showPunctuation: punctuation, showApostrophe: apostrophe)
+                    var p = KeyboardPreferences(showPunctuation: punctuation, showApostrophe: apostrophe)
+                    p.iphoneKeyPositions = false
                     let rows = KeyboardLayout.rows(state: state, needsGlobe: false, preferences: p)
                     let values = rows.prefix(3).flatMap { $0 }.compactMap { key -> String? in
                         if case .text(let text) = key.action { return text }; return nil
                     }
                     let available = values + rows.prefix(3).flatMap { $0 }.flatMap(\.alternatives)
-                    XCTAssertEqual(Set(available.filter { $0.lowercased() != $0.uppercased() }), Set(language.alphabet.map(String.init)))
+                    let alphabet = Set(language.alphabet.map(String.init))
+                    // English long-press accents expand beyond its alphabet.
+                    XCTAssertEqual(Set(available.filter(alphabet.contains)), alphabet)
                     XCTAssertEqual(values.contains("."), punctuation)
                     XCTAssertEqual(values.contains(","), punctuation)
                     XCTAssertEqual(values.contains("'"), language == .french || apostrophe && language == .english)
@@ -198,13 +206,14 @@ final class KeyboardCoreTests: XCTestCase {
         p.controlHeight += 10
         XCTAssertEqual(p.keyboardHeight, originalHeight + 10)
         var cells = KeyboardGeometry.cells(width: 390, state: InputState(), preferences: p, needsGlobe: false)
-        XCTAssertEqual(cells[0].visualFrame.height, 72)
-        XCTAssertEqual(cells.last!.visualFrame.height, 66)
-        XCTAssertEqual(cells[0].hitFrame.minY, 44)
+        XCTAssertEqual(cells[0].visualFrame.height, p.keyHeight)
+        XCTAssertEqual(cells.last!.visualFrame.height, p.controlHeight)
+        XCTAssertEqual(cells[0].hitFrame.minY, p.headerHeight)
         XCTAssertEqual(cells.last!.hitFrame.maxY, p.keyboardHeight)
+        let earlierTop = cells[0].hitFrame.minY
         p.showHeader = true
         cells = KeyboardGeometry.cells(width: 390, state: InputState(), preferences: p, needsGlobe: false)
-        XCTAssertEqual(cells[0].hitFrame.minY, 82)
+        XCTAssertEqual(cells[0].hitFrame.minY, earlierTop + 38)
         XCTAssertEqual(p.keyboardHeight, originalHeight + 10 + 38)
         XCTAssertFalse(cells.contains { $0.key.action == .dismiss })
     }
