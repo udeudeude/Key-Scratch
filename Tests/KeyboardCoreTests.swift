@@ -359,8 +359,8 @@ final class KeyboardCoreTests: XCTestCase {
         XCTAssertEqual(p.language(after: .french), .german)
         XCTAssertEqual(KeyboardPreferences(languages: []).validated.languages, [.english])
 
-        let single = KeyboardPreferences(defaultLanguage: .polish, languages: [.polish],
-                                         keyScratchMode: .reference)
+        let single = KeyboardPreferences(keyScratchMode: .reference,
+                                         defaultLanguage: .polish, languages: [.polish])
         var state = InputState(); state.language = .polish
         XCTAssertFalse(KeyboardLayout.rows(state: state, needsGlobe: false, preferences: single).flatMap { $0 }.contains { $0.action == .language },
                        "One language has nothing to switch to")
