@@ -642,8 +642,8 @@ struct KeyboardPreferences: Codable, Equatable, Sendable {
 
     var validated: Self {
         var result = self
-        result.keyHeight = keyHeight.isFinite ? min(88, max(36, keyHeight)) : 62
-        result.controlHeight = controlHeight.isFinite ? min(72, max(36, controlHeight)) : 48
+        result.keyHeight = keyHeight.isFinite ? min(88, max(32, keyHeight)) : 62
+        result.controlHeight = controlHeight.isFinite ? min(72, max(30, controlHeight)) : 48
         result.letterSize = letterSize.isFinite ? min(36, max(18, letterSize)) : 24
         result.actionKeyWidth = actionKeyWidth.isFinite ? min(3.5, max(1.25, actionKeyWidth)) : 2.4
         result.columnSpacing = columnSpacing.isFinite ? min(8, max(0, columnSpacing)) : 3
@@ -674,7 +674,13 @@ struct KeyboardPreferences: Codable, Equatable, Sendable {
     /// The colorway the keyboard draws, when extras are enabled.
     var shownKeycaps: KeycapStyle? { extrasEnabled ? keycaps : nil }
     var shownExpansions: [TextExpansion] { extrasEnabled ? expansions.filter(\.isUsable) : [] }
-    var suggestionHeight: Double { suggestionsEnabled ? (validated.keyHeight <= 62 ? 36 : 44) : 0 }
+    var suggestionHeight: Double {
+        guard suggestionsEnabled else { return 0 }
+        // Only the compact landscape geometry reaches 34 pt rows. Retain
+        // familiar suggestion heights in portrait and other layouts.
+        if validated.keyHeight <= 34 { return 30 }
+        return validated.keyHeight <= 62 ? 36 : 44
+    }
     var headerHeight: Double { suggestionHeight + (showHeader ? KeyboardGeometry.ribbonHeight : 0) }
     /// A shorter row: it costs about 45 pt at the default key height.
     var numberRowHeight: Double {
@@ -835,10 +841,10 @@ enum KeyScratchAdaptiveLayout {
     static func appearance(_ base: KeyboardPreferences, landscape: Bool) -> KeyboardPreferences {
         guard landscape else { return base }
         var compact = base
-        compact.keyHeight = min(compact.keyHeight, 40)
-        compact.controlHeight = min(compact.controlHeight, 36)
-        compact.rowSpacing = min(compact.rowSpacing, 4)
-        compact.letterSize = min(compact.letterSize, 21)
+        compact.keyHeight = min(compact.keyHeight, 34)
+        compact.controlHeight = min(compact.controlHeight, 32)
+        compact.rowSpacing = min(compact.rowSpacing, 2)
+        compact.letterSize = min(compact.letterSize, 19)
         compact.showHeader = false
         if compact.digitAccess == .numberRow { compact.digitAccess = .flick }
         return compact.validated
