@@ -204,4 +204,40 @@ final class TextNavigationTests: XCTestCase {
         XCTAssertFalse(custom.showLongPressHints)
     }
 
+    func testLandscapeKeyboardTakesRightEdgeAndLeavesMostWidthForNotes() {
+        let base = KeyboardPreferences()
+        for width in [600.0, 665.0, 896.0] {
+            let keyboard = KeyScratchAdaptiveLayout.keyboardWidth(
+                availableWidth: width, landscape: true,
+                portraitNoteFraction: base.keyScratchNoteWidth)
+            let notes = width - keyboard
+            XCTAssertGreaterThanOrEqual(keyboard, 390)
+            XCTAssertLessThanOrEqual(keyboard, 430)
+            XCTAssertGreaterThan(notes, 0)
+            XCTAssertEqual(notes + keyboard, width, accuracy: 0.001)
+        }
+        let portrait = KeyScratchAdaptiveLayout.keyboardWidth(
+            availableWidth: 414, landscape: false, portraitNoteFraction: 0.30)
+        XCTAssertEqual(portrait, 414 * 0.70, accuracy: 0.001)
+    }
+
+    func testLandscapeShrinksKeyHeightsWithoutChangingPortraitPreferences() {
+        var base = KeyboardPreferences()
+        base.keyHeight = 68
+        base.controlHeight = 52
+        base.rowSpacing = 8
+        base.letterSize = 26
+        base.digitAccess = .numberRow
+        let compact = KeyScratchAdaptiveLayout.appearance(base, landscape: true)
+        XCTAssertEqual(compact.keyHeight, 40)
+        XCTAssertEqual(compact.controlHeight, 36)
+        XCTAssertEqual(compact.rowSpacing, 4)
+        XCTAssertEqual(compact.letterSize, 21)
+        XCTAssertEqual(compact.digitAccess, .flick)
+        XCTAssertLessThan(compact.keyboardHeight, base.keyboardHeight)
+        XCTAssertEqual(KeyScratchAdaptiveLayout.appearance(base, landscape: false), base)
+        XCTAssertEqual(base.keyHeight, 68)
+        XCTAssertEqual(base.rowSpacing, 8)
+    }
+
 }
