@@ -3,7 +3,6 @@ import UIKit
 final class KeyboardViewController: UIInputViewController {
     private let keyboard = KeyboardView()
     private let scratchpad = ScratchpadView()
-    private let modeLabel = UILabel()
     private let scratchpadDocumentID = UUID()
     private var scratchpadWidth: NSLayoutConstraint?
     private var heightConstraint: NSLayoutConstraint?
@@ -43,16 +42,6 @@ final class KeyboardViewController: UIInputViewController {
         view.addSubview(scratchpad)
         scratchpadWidth = scratchpad.widthAnchor.constraint(equalToConstant: 0)
         scratchpadWidth?.isActive = true
-        modeLabel.font = .systemFont(ofSize: 9, weight: .semibold)
-        modeLabel.adjustsFontSizeToFitWidth = true
-        modeLabel.minimumScaleFactor = 0.68
-        modeLabel.textAlignment = .center
-        modeLabel.textColor = .white
-        modeLabel.layer.cornerRadius = 3
-        modeLabel.layer.masksToBounds = true
-        modeLabel.isUserInteractionEnabled = false
-        modeLabel.accessibilityIdentifier = "key-scratch-mode"
-        view.addSubview(modeLabel)
         scratchpad.onInsert = { [weak self] text in
             self?.textDocumentProxy.insertText(text)
             self?.suggestions.refresh(force: true)
@@ -90,12 +79,6 @@ final class KeyboardViewController: UIInputViewController {
         suggestions.snapshot = { [weak self] in self?.suggestionSnapshot() }
         suggestions.apply = { [weak self] edit, snapshot in self?.applySuggestion(edit, snapshot: snapshot) }
         suggestions.insertWord = { [weak self] in self?.insertGlided($0) }
-        suggestions.onGlideLatency = { [weak self] milliseconds in
-            guard let self else { return }
-            let mode = self.keyboard.preferences.keyScratchMode
-            self.modeLabel.text = "\(mode.colorName.uppercased()) · \(Int(milliseconds.rounded())) ms"
-            self.modeLabel.accessibilityLabel = "\(mode.title), glide latency \(Int(milliseconds.rounded())) milliseconds"
-        }
         suggestions.glideContext = { [weak self] in self?.glideContext() }
         suggestions.switchLanguage = { [weak self] in self?.switchLanguage(to: $0) }
         keyboard.onAction = { [weak self] in self?.handle($0) }
@@ -178,17 +161,14 @@ final class KeyboardViewController: UIInputViewController {
         let preferences = PreferenceStore.load()
         adoptLanguageSettings(preferences)
         scratchpad.canUseClipboard = hasFullAccess
-        if preferences.keyScratchMode == .reference { scratchpad.deactivate() }
-        scratchpad.isHidden = preferences.keyScratchMode == .reference
-        scratchpad.configure(mode: preferences.keyScratchMode,
-                             font: preferences.keyScratchNoteFont,
+        // The temporary color-coded comparisons are finished. The public
+        // keyboard is the optimized split layout with neutral scratchpad chrome.
+        scratchpad.isHidden = false
+        scratchpad.configure(font: preferences.keyScratchNoteFont,
                              size: preferences.keyScratchNoteFontSize)
-        modeLabel.text = preferences.keyScratchMode.title.uppercased()
-        modeLabel.accessibilityLabel = preferences.keyScratchMode.title
-        modeLabel.backgroundColor = UIColor(keyboardHex: preferences.keyScratchMode.colorHex)
         keyboard.preferences = preferences
         view.setNeedsLayout()
-        heightConstraint?.constant = preferences.keyboardHeight
+        heightConstraint?.constant = keyboard.layoutHeight
         lastKeyboardType = nil
         suggestions.beginSession()
         synchronize()
@@ -202,17 +182,31 @@ final class KeyboardViewController: UIInputViewController {
 
     override func viewDidLayoutSubviews() {
         super.viewDidLayoutSubviews()
-        if keyboard.needsGlobe != needsInputModeSwitchKey { keyboard.needsGlobe = needsInputModeSwitchKey }
-        let fraction = keyboard.preferences.keyScratchMode.noteFraction(
-            userWidth: keyboard.preferences.keyScratchNoteWidth)
-        let width = (view.bounds.width * CGFloat(fraction)).rounded(.toNearestOrAwayFromZero)
-        if abs((scratchpadWidth?.constant ?? 0) - width) > 0.5 {
-            scratchpadWidth?.constant = width
+        if keyboard.needsGlobe != needsInputModeSwitchKey {
+            keyboard.needsGlobe = needsInputModeSwitchKey
         }
-        let badgeWidth: CGFloat = 122
-        modeLabel.frame = CGRect(x: 0, y: max(0, view.bounds.height - 16),
-                                 width: badgeWidth, height: 15)
-        view.bringSubviewToFront(modeLabel)
+        let available = Double(view.bounds.width)
+        guard available > 0 else { return }
+        // The host owns its outer keyboard controls and safe areas. Inside the
+        // extension's permitted width, our keyboard hugs the right edge and
+        // the scratchpad consumes *all* remaining width.
+        let landscape = view.window?.windowScene?.interfaceOrientation.isLandscape
+            ?? (traitCollection.verticalSizeClass == .compact && available >= 600)
+        if keyboard.compactLandscape != landscape {
+            keyboard.compactLandscape = landscape
+        }
+        let desiredHeight = keyboard.layoutHeight
+        if abs((heightConstraint?.constant ?? 0) - desiredHeight) > 0.5 {
+            heightConstraint?.constant = desiredHeight
+        }
+        let keyboardWidth = KeyScratchAdaptiveLayout.keyboardWidth(
+            availableWidth: available,
+            landscape: landscape,
+            portraitNoteFraction: keyboard.preferences.keyScratchNoteWidth)
+        let noteWidth = (available - keyboardWidth).rounded(.toNearestOrAwayFromZero)
+        if abs((scratchpadWidth?.constant ?? 0) - noteWidth) > 0.5 {
+            scratchpadWidth?.constant = noteWidth
+        }
     }
 
     override func textWillChange(_ textInput: (any UITextInput)?) {
