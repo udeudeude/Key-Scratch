@@ -564,10 +564,10 @@ enum KeyScratchNoteFont: String, Codable, CaseIterable, Identifiable, Sendable {
 }
 
 struct KeyboardPreferences: Codable, Equatable, Sendable {
-    let schemaVersion = 7
+    let schemaVersion = 8
     var keyHeight: Double = 62
-    var columnSpacing: Double = 2
-    var rowSpacing: Double = 2
+    var columnSpacing: Double = 3
+    var rowSpacing: Double = 8
     var fillGaps: Bool = true
     var defaultLanguage: KeyboardLanguage = .english
     var controlHeight: Double = 48
@@ -581,7 +581,7 @@ struct KeyboardPreferences: Codable, Equatable, Sendable {
     var yiOnLongPress: Bool = false
     var theme: KeyboardTheme = .system
     var accent: KeyboardAccent = .theme
-    var showLongPressHints: Bool = true
+    var showLongPressHints: Bool = false
     var autoCapitalize: Bool = true
     var doubleSpacePeriod: Bool = true
     var digitAccess: DigitAccess = .flick
@@ -637,8 +637,8 @@ struct KeyboardPreferences: Codable, Equatable, Sendable {
         result.controlHeight = controlHeight.isFinite ? min(72, max(36, controlHeight)) : 48
         result.letterSize = letterSize.isFinite ? min(36, max(18, letterSize)) : 24
         result.actionKeyWidth = actionKeyWidth.isFinite ? min(3.5, max(1.25, actionKeyWidth)) : 2.4
-        result.columnSpacing = columnSpacing.isFinite ? min(8, max(0, columnSpacing)) : 2
-        result.rowSpacing = rowSpacing.isFinite ? min(12, max(0, rowSpacing)) : 2
+        result.columnSpacing = columnSpacing.isFinite ? min(8, max(0, columnSpacing)) : 3
+        result.rowSpacing = rowSpacing.isFinite ? min(12, max(0, rowSpacing)) : 8
         result.keyScratchNoteWidth = keyScratchNoteWidth.isFinite ? min(0.42, max(0.18, keyScratchNoteWidth)) : 0.30
         result.keyScratchNoteFontSize = keyScratchNoteFontSize.isFinite ? min(16, max(9, keyScratchNoteFontSize)) : 11
         // Preserve the user's preferred language order. Older Ortholinear
@@ -767,8 +767,15 @@ extension KeyboardPreferences {
         if keyHeight == 72 && controlHeight == 56 && rowSpacing == 3 && letterSize == 28 {
             keyHeight = 62
             controlHeight = 48
-            rowSpacing = 2
+            rowSpacing = 8
             letterSize = 24
+        }
+        // v8 adopts a quieter, roomier iPhone-like layout on old installs.
+        // Preserve values that differ from the previous untouched defaults.
+        if previousSchema < 8 {
+            if rowSpacing == 2 { rowSpacing = 8 }
+            if columnSpacing == 2 { columnSpacing = 3 }
+            showLongPressHints = false
         }
         self = validated
     }
