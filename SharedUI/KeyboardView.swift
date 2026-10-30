@@ -166,7 +166,7 @@ final class KeyboardView: UIControl {
 
     private func updateChrome() {
         suggestionBar.isHidden = !preferences.suggestionsEnabled || popup != nil
-        dismissButton.isHidden = !preferences.showHeader || popup != nil
+        dismissButton.isHidden = !sizedPreferences.showHeader || popup != nil
     }
 
     func cancelTouches() {
@@ -263,7 +263,7 @@ final class KeyboardView: UIControl {
             return element
         }
         if needsGlobe { elements.append(globeButton) }
-        if preferences.showHeader { elements.append(dismissButton) }
+        if sizedPreferences.showHeader { elements.append(dismissButton) }
         if preferences.suggestionsEnabled && popup == nil { elements.insert(suggestionBar, at: 0) }
         accessibilityElements = elements
     }
@@ -451,7 +451,7 @@ final class KeyboardView: UIControl {
                 let pointSize = min(21, max(12, frame.width * 0.65))
                 drawText(title(.text(value)), in: frame, font: palette.legend(ofSize: pointSize, weight: .regular), color: palette.text)
             }
-        } else if preferences.showHeader {
+        } else if sizedPreferences.showHeader {
             palette.accent.withAlphaComponent((dismissButton.isHighlighted ? 1 : feedbackOpacity(for: .dismiss)) * palette.highlightOpacity).setFill()
             UIBezierPath(roundedRect: dismissButton.frame.insetBy(dx: 2, dy: 2), cornerRadius: 8).fill()
             let text = sessions.values.contains(where: \.cursorMode) ? "Slide to move cursor" : "Key Scratch · \(inputState.language.badge)"
