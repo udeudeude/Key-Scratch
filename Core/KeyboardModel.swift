@@ -184,6 +184,15 @@ struct InputState: Sendable {
         }
     }
 
+    /// iOS returns from its numeric and symbols pages after a Space.
+    /// Custom key layers remain open because they are user-defined palettes.
+    mutating func returnToLettersAfterSpace() {
+        switch page {
+        case .numbers, .symbols: page = .letters
+        case .letters, .layer: break
+        }
+    }
+
     mutating func consume(_ value: String) -> String {
         // Layer keys type exactly what they hold: a phrase, or a Greek π, never shifted.
         if page.isLayer { return value }
