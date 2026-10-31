@@ -844,7 +844,8 @@ private struct KeyScratchFullNotes: View {
                 HStack(spacing: 7) {
                     ScrollView(.horizontal, showsIndicators: false) {
                         HStack(spacing: 6) {
-                            ForEach(Array(notebook.pages.enumerated()), id: \.element.id) { index, page in
+                            ForEach(notebook.pages.indices, id: \.self) { index in
+                                let page = notebook.pages[index]
                                 Button("Page \(index + 1)") { switchPage(to: page.id) }
                                     .font(.system(size: 13, weight: notebook.selectedID == page.id ? .semibold : .regular))
                                     .padding(.horizontal, 12)
