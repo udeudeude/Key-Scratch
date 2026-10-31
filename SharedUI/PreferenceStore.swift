@@ -32,11 +32,50 @@ enum PreferenceStore {
 }
 
  
-/// A single local note shared by the containing app and keyboard extension.
-/// A shared App Group lets the companion app provide full-size editing and export
-/// while the keyboard keeps its compact, offline scratchpad. No network involved.
+/// Several independent plain-text pages, shared by the keyboard and companion
+/// app. The original single note migrates into page 1 without being discarded.
+struct ScratchpadPage: Codable, Equatable, Identifiable, Sendable {
+    var id: String
+    var text: String
+    init(id: String = UUID().uuidString, text: String = "") {
+        self.id = id
+        self.text = text
+    }
+}
+
+struct ScratchpadNotebook: Codable, Equatable, Sendable {
+    var pages: [ScratchpadPage]
+    var selectedID: String
+
+    static let maximumPages = 8
+
+    static func initial(legacy: String) -> ScratchpadNotebook {
+        let pages = [ScratchpadPage(text: legacy), ScratchpadPage(), ScratchpadPage()]
+        return ScratchpadNotebook(pages: pages, selectedID: pages[0].id)
+    }
+
+    var selectedIndex: Int {
+        pages.firstIndex(where: { $0.id == selectedID }) ?? 0
+    }
+
+    var selectedPage: ScratchpadPage { pages[selectedIndex] }
+
+    var normalized: ScratchpadNotebook {
+        var result = self
+        var seen = Set<String>()
+        result.pages = pages.filter { !$0.id.isEmpty && seen.insert($0.id).inserted }
+            .prefix(Self.maximumPages).map { $0 }
+        if result.pages.isEmpty { result.pages = [ScratchpadPage()] }
+        if !result.pages.contains(where: { $0.id == result.selectedID }) {
+            result.selectedID = result.pages[0].id
+        }
+        return result
+    }
+}
+
 enum ScratchpadStore {
-    private static let key = "key-scratch.local-note.v1"
+    private static let legacyKey = "key-scratch.local-note.v1"
+    private static let notebookKey = "key-scratch.notebook.v2"
 
     private static var sharedDefaults: UserDefaults? {
         guard let group = Bundle.main.object(forInfoDictionaryKey: "OrtholinearAppGroup") as? String,
@@ -44,22 +83,77 @@ enum ScratchpadStore {
         return UserDefaults(suiteName: group)
     }
 
-    /// Nil means the shared note has not yet been initialized or migrated.
-    static func load() -> String? { sharedDefaults?.string(forKey: key) }
+    static func loadNotebook() -> ScratchpadNotebook? {
+        guard let data = sharedDefaults?.data(forKey: notebookKey),
+              let notebook = try? JSONDecoder().decode(ScratchpadNotebook.self, from: data) else { return nil }
+        return notebook.normalized
+    }
 
     @discardableResult
-    static func save(_ note: String) -> Bool {
-        guard let defaults = sharedDefaults else { return false }
-        defaults.set(note, forKey: key)
+    static func saveNotebook(_ notebook: ScratchpadNotebook) -> Bool {
+        guard let defaults = sharedDefaults,
+              let data = try? JSONEncoder().encode(notebook.normalized) else { return false }
+        defaults.set(data, forKey: notebookKey)
         return true
     }
 
-    /// Existing extension installations kept their note in extension-local
-    /// defaults. Migrate once; never replace a shared note with stale local data.
+    /// Prefer the new multi-page record, then the old shared note, then the
+    /// keyboard extension's local note. No existing note is ever overwritten.
+    static func migrateNotebook(legacy: String?) -> ScratchpadNotebook {
+        if let existing = loadNotebook() { return existing }
+        let text = sharedDefaults?.string(forKey: legacyKey) ?? legacy ?? ""
+        let notebook = ScratchpadNotebook.initial(legacy: text)
+        _ = saveNotebook(notebook)
+        return notebook
+    }
+
+    /// Update only the current page from fresh shared data; do not replace
+    /// changes another app made to unrelated pages since this view appeared.
+    @discardableResult
+    static func savePage(id: String, text: String) -> Bool {
+        guard var notebook = loadNotebook(), let index = notebook.pages.firstIndex(where: { $0.id == id })
+        else { return false }
+        notebook.pages[index].text = text
+        return saveNotebook(notebook)
+    }
+
+    @discardableResult
+    static func selectPage(id: String) -> ScratchpadNotebook? {
+        guard var notebook = loadNotebook(), notebook.pages.contains(where: { $0.id == id })
+        else { return nil }
+        notebook.selectedID = id
+        return saveNotebook(notebook) ? notebook : nil
+    }
+
+    static func addPage() -> ScratchpadNotebook? {
+        guard var notebook = loadNotebook(), notebook.pages.count < ScratchpadNotebook.maximumPages else { return nil }
+        let page = ScratchpadPage()
+        notebook.pages.append(page)
+        notebook.selectedID = page.id
+        return saveNotebook(notebook) ? notebook : nil
+    }
+
+    static func removePage(id: String) -> ScratchpadNotebook? {
+        guard var notebook = loadNotebook(), notebook.pages.count > 1,
+              let index = notebook.pages.firstIndex(where: { $0.id == id }) else { return nil }
+        notebook.pages.remove(at: index)
+        if notebook.selectedID == id { notebook.selectedID = notebook.pages[min(index, notebook.pages.count - 1)].id }
+        return saveNotebook(notebook) ? notebook : nil
+    }
+
+    // Compatibility with the old one-note consumers while they migrate.
+    static func load() -> String? {
+        if let notebook = loadNotebook() { return notebook.selectedPage.text }
+        return sharedDefaults?.string(forKey: legacyKey)
+    }
+
+    @discardableResult
+    static func save(_ note: String) -> Bool {
+        let notebook = migrateNotebook(legacy: note)
+        return savePage(id: notebook.selectedID, text: note)
+    }
+
     static func migrate(legacy: String?) -> String {
-        if let shared = load() { return shared }
-        let note = legacy ?? ""
-        _ = save(note)
-        return note
+        migrateNotebook(legacy: legacy).selectedPage.text
     }
 }
