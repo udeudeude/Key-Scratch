@@ -4,7 +4,7 @@ final class KeyboardViewController: UIInputViewController {
     private let keyboard = KeyboardView()
     private let scratchpad = ScratchpadView()
     private let favoritePad = FavoriteSymbolsPanel()
-    private let scratchpadDocumentID = UUID()
+    private var scratchpadDocumentID = UUID()
     private var scratchpadWidth: NSLayoutConstraint?
     private var heightConstraint: NSLayoutConstraint?
     private var normalSplitConstraints: [NSLayoutConstraint] = []
@@ -72,6 +72,17 @@ final class KeyboardViewController: UIInputViewController {
             self?.updateAutoShift()
             if let self { self.keyboard.inputState = self.inputState }
             self?.suggestions.refresh(force: true)
+        }
+        scratchpad.onPageChange = { [weak self] in
+            guard let self else { return }
+            self.scratchpadDocumentID = UUID()
+            self.pendingGlide = nil
+            self.noteSpacing.reset()
+            self.expander.forget()
+            self.suggestions.cancelGlide()
+            self.updateAutoShift()
+            self.keyboard.inputState = self.inputState
+            self.suggestions.refresh(force: true)
         }
         scratchpad.onTextChange = { [weak self] in
             // Ordinary input already changes the snapshot; do not force-rebuild
