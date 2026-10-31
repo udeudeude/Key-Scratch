@@ -5,12 +5,12 @@ A custom iPhone keyboard with an always-visible, editable scratchpad. Built from
 ## Features
 
 - A compact iOS-style typing area beside a **persistent local note**.
-- Tap **Notes** to type into the scratchpad, **App** to return to the host text field. Hold the button to cycle enabled languages. The system globe is still available for other keyboards, including Emoji.
+- Tap the **scratchpad** to type into it, or a text field in the host app to type there. The former Notes/App key is now **★ Favorites**: it opens personal one-tap emoji and Unicode symbols, with recent characters first. Edit favorites in the companion app's **Scratchpad & layout** screen. Hold ★ to cycle enabled languages. The system globe still switches among installed keyboards, including Apple's Emoji keyboard.
 - Swipe typing, suggested corrections, long-press accents, optional digit flicks, stable Delete/Return positions, smart punctuation and spacing.
 - Double-tap word selection, triple-tap paragraph selection, and a floating edit menu in the compact scratchpad. Selection is visibly highlighted.
 - **Full Access**, when the user enables it, permits Copy/Paste and local note sharing with the containing app. The companion app has a full-size note editor and Share/Export. No text is uploaded.
-- Portrait: adjustable split (30% notes by default). **Landscape: a shorter keyboard at the far right**, with the notes filling all remaining extension space to the left.
-- Thin, rounded scratchpad border and familiar iOS system colors. App icon depicts a metal key scratching car paint.
+- Portrait: adjustable split (30% notes by default). **Landscape: a 172 pt compact keyboard at the far right**, with the notes filling all remaining extension space to the left. iOS-owned globe, microphone and home-indicator areas are outside the extension's layout.
+- Thin, rounded scratchpad border and familiar iOS system colors. The home-screen icon **and matching in-app header** depict a metal key scratching car paint. English-first sample text replaces the legacy Ukrainian placeholder.
 
 ## Install and test on iPhone
 
@@ -29,7 +29,7 @@ See [setup, behavior and caveats](docs/KEY-SCRATCH.md) and [device tests](docs/I
 
 ## Platform limitations
 
-iOS controls the system keyboard-switcher controls outside the extension's permitted area. Within the extension, Key Scratch allocates the entire remaining width to the notes in landscape. Third-party keyboards cannot reliably detect every tap that leaves the host app's caret unchanged, or inspect the host app's soft-wrapped text-line geometry. The Notes/App button is a reliable focus control.
+iOS controls the system keyboard-switcher controls outside the extension's permitted area. Within the extension, Key Scratch allocates the entire remaining width to the notes in landscape. Third-party keyboards cannot reliably detect every tap that leaves the host app's caret unchanged, or inspect the host app's soft-wrapped text-line geometry. Tap the note or host text field to choose where typing goes.
 
 ## Origins
 
