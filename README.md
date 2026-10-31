@@ -5,6 +5,7 @@ A custom iPhone keyboard with an always-visible, editable scratchpad. Built from
 ## Features
 
 - A compact iOS-style typing area beside **persistent, independent scratchpad pages** (three to start, up to eight). Tabs along the bottom switch pages; the companion app offers full-size page editing and page management. Original single-page notes migrate intact to Page 1.
+- An optional **local image shelf on each page**: import from Photos in the companion app, preview or remove individual images, and tap thumbnails in the keyboard to copy an image for pasting elsewhere. Photos are downscaled, with small thumbnails so normal typing remains responsive. Maximum 12 images per page.
 - Tap the **scratchpad** to type into it, or a text field in the host app to type there. The former Notes/App key is now **★ Favorites**: it opens personal one-tap emoji and Unicode symbols, with recent characters first. Edit favorites in the companion app's **Scratchpad & layout** screen. Hold ★ to cycle enabled languages. The system globe still switches among installed keyboards, including Apple's Emoji keyboard.
 - Swipe typing, suggested corrections, long-press accents, optional digit flicks, stable Delete/Return positions, smart punctuation and spacing.
 - Double-tap word selection, triple-tap paragraph selection, and a floating edit menu in the compact scratchpad. Selection is visibly highlighted.
