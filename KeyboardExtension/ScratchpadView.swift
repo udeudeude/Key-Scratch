@@ -26,12 +26,18 @@ final class ScratchpadView: UIView, UITextViewDelegate, UIEditMenuInteractionDel
     private lazy var editMenu = UIEditMenuInteraction(delegate: self)
     private let returnToApp = UIButton(type: .system)
     private let message = UILabel()
+    private let tabsPanel = UIStackView()
+    private let tabsScroller = UIScrollView()
+    private let tabsRow = UIStackView()
+    private let addTab = UIButton(type: .system)
+    private var notebook = ScratchpadNotebook.initial(legacy: "")
     private let storeKey = "key-scratch.local-note.v1"
     private(set) var isEditingNote = false
 
     var onInsert: ((String) -> Void)?
     var onEditingChange: ((Bool) -> Void)?
     var onTextChange: (() -> Void)?
+    var onPageChange: (() -> Void)?
     var canUseClipboard = false
 
     var beforeCaret: String { pieces().before }
@@ -76,7 +82,8 @@ final class ScratchpadView: UIView, UITextViewDelegate, UIEditMenuInteractionDel
     func deactivate() {
         guard isEditingNote else { return }
         isEditingNote = false
-        returnToApp.isHidden = true
+        // Keep the insert arrow available even when focus is in the host.
+        returnToApp.isHidden = false
         updateBorderAppearance()
         onEditingChange?(false)
         updateCaret()
@@ -189,6 +196,7 @@ final class ScratchpadView: UIView, UITextViewDelegate, UIEditMenuInteractionDel
             $0.backgroundColor = (style == .standard ? UIColor.systemBlue : ink).withAlphaComponent(0.27)
         }
         updateBorderAppearance()
+        renderTabs()
         editor.setNeedsLayout()
         updateCaret()
     }
@@ -286,20 +294,21 @@ final class ScratchpadView: UIView, UITextViewDelegate, UIEditMenuInteractionDel
 
         // Most of the panel is now text, not a toolbar. An unobtrusive
         // icon remains as an optional fallback if a host tap emits no focus event.
-        returnToApp.setImage(UIImage(systemName: "arrow.up.forward.square"), for: .normal)
+        returnToApp.setImage(UIImage(systemName: "arrow.up.forward.square.fill"), for: .normal)
         returnToApp.tintColor = .secondaryLabel
         returnToApp.backgroundColor = .tertiarySystemBackground
         returnToApp.layer.cornerRadius = 5
-        returnToApp.accessibilityLabel = "Return to app typing"
+        returnToApp.accessibilityLabel = "Insert selected note text in app, or entire page"
+        returnToApp.accessibilityIdentifier = "insert-note-into-host"
         returnToApp.addTarget(self, action: #selector(returnToAppTapped), for: .touchUpInside)
-        returnToApp.isHidden = true
+        returnToApp.isHidden = false
         returnToApp.translatesAutoresizingMaskIntoConstraints = false
         addSubview(returnToApp)
         NSLayoutConstraint.activate([
-            returnToApp.topAnchor.constraint(equalTo: topAnchor, constant: 2),
-            returnToApp.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -2),
-            returnToApp.widthAnchor.constraint(equalToConstant: 24),
-            returnToApp.heightAnchor.constraint(equalToConstant: 24)
+            returnToApp.topAnchor.constraint(equalTo: topAnchor, constant: 1),
+            returnToApp.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -1),
+            returnToApp.widthAnchor.constraint(equalToConstant: 36),
+            returnToApp.heightAnchor.constraint(equalToConstant: 36)
         ])
 
         // San Francisco's text cut is optically tuned for tiny point sizes,
@@ -318,7 +327,8 @@ final class ScratchpadView: UIView, UITextViewDelegate, UIEditMenuInteractionDel
         caret.isUserInteractionEnabled = false
         editor.addSubview(caret)
         editor.textContainerInset = UIEdgeInsets(top: 2, left: 2, bottom: 19, right: 2)
-        editor.text = ScratchpadStore.migrate(legacy: UserDefaults.standard.string(forKey: storeKey))
+        notebook = ScratchpadStore.migrateNotebook(legacy: UserDefaults.standard.string(forKey: storeKey))
+        editor.text = notebook.selectedPage.text
         editor.accessibilityLabel = "Scratchpad note. Tap to type with Key Scratch."
         // Recognize multi-taps before moving the caret. Without this failure
         // hierarchy, the single-tap cursor handler can undo the selection
@@ -351,7 +361,8 @@ final class ScratchpadView: UIView, UITextViewDelegate, UIEditMenuInteractionDel
         message.numberOfLines = 3
         message.isHidden = true
 
-        let stack = UIStackView(arrangedSubviews: [message, editor])
+        configureTabs()
+        let stack = UIStackView(arrangedSubviews: [message, editor, tabsPanel])
         stack.axis = .vertical
         stack.spacing = 2
         stack.translatesAutoresizingMaskIntoConstraints = false
@@ -597,7 +608,94 @@ final class ScratchpadView: UIView, UITextViewDelegate, UIEditMenuInteractionDel
         return UIMenu(children: actions)
     }
 
-    @objc private func returnToAppTapped() { deactivate() }
+    private func configureTabs() {
+        tabsPanel.axis = .horizontal
+        tabsPanel.alignment = .fill
+        tabsPanel.spacing = 2
+        tabsPanel.heightAnchor.constraint(equalToConstant: 28).isActive = true
+        tabsScroller.showsHorizontalScrollIndicator = false
+        tabsScroller.alwaysBounceHorizontal = true
+        tabsScroller.translatesAutoresizingMaskIntoConstraints = false
+        tabsRow.axis = .horizontal
+        tabsRow.spacing = 2
+        tabsRow.translatesAutoresizingMaskIntoConstraints = false
+        tabsScroller.addSubview(tabsRow)
+        NSLayoutConstraint.activate([
+            tabsRow.leadingAnchor.constraint(equalTo: tabsScroller.contentLayoutGuide.leadingAnchor),
+            tabsRow.trailingAnchor.constraint(equalTo: tabsScroller.contentLayoutGuide.trailingAnchor),
+            tabsRow.topAnchor.constraint(equalTo: tabsScroller.contentLayoutGuide.topAnchor),
+            tabsRow.bottomAnchor.constraint(equalTo: tabsScroller.contentLayoutGuide.bottomAnchor),
+            tabsRow.heightAnchor.constraint(equalTo: tabsScroller.frameLayoutGuide.heightAnchor)
+        ])
+        addTab.setTitle("+", for: .normal)
+        addTab.titleLabel?.font = .systemFont(ofSize: 19)
+        addTab.accessibilityLabel = "Add scratchpad page"
+        addTab.accessibilityIdentifier = "add-scratchpad-page"
+        addTab.addTarget(self, action: #selector(addPageTapped), for: .touchUpInside)
+        addTab.widthAnchor.constraint(equalToConstant: 25).isActive = true
+        tabsPanel.addArrangedSubview(tabsScroller)
+        tabsPanel.addArrangedSubview(addTab)
+        renderTabs()
+    }
+
+    private func renderTabs() {
+        for item in tabsRow.arrangedSubviews {
+            tabsRow.removeArrangedSubview(item)
+            item.removeFromSuperview()
+        }
+        for (index, page) in notebook.pages.enumerated() {
+            let tab = UIButton(type: .system)
+            tab.tag = index
+            tab.setTitle("\(index + 1)", for: .normal)
+            tab.titleLabel?.font = .systemFont(ofSize: 11, weight: page.id == notebook.selectedID ? .bold : .medium)
+            tab.accessibilityLabel = "Scratchpad page \(index + 1) of \(notebook.pages.count)"
+            tab.accessibilityIdentifier = "scratchpad-tab-\(index + 1)"
+            tab.backgroundColor = page.id == notebook.selectedID
+                ? UIColor.systemBlue.withAlphaComponent(0.18) : UIColor.clear
+            tab.layer.cornerRadius = 4
+            tab.setTitleColor(visualStyle == .standard ? .label : editor.textColor, for: .normal)
+            tab.widthAnchor.constraint(equalToConstant: 30).isActive = true
+            tab.addTarget(self, action: #selector(pageTapped(_:)), for: .touchUpInside)
+            tabsRow.addArrangedSubview(tab)
+        }
+        addTab.isHidden = notebook.pages.count >= ScratchpadNotebook.maximumPages
+        addTab.tintColor = visualStyle == .standard ? .systemBlue : editor.textColor
+    }
+
+    private func displaySelectedPage() {
+        editor.text = notebook.selectedPage.text
+        editor.selectedRange = NSRange(location: (editor.text as NSString).length, length: 0)
+        editor.setContentOffset(.zero, animated: false)
+        renderTabs()
+        updateCaret()
+        onPageChange?()
+        onTextChange?()
+    }
+
+    @objc private func pageTapped(_ sender: UIButton) {
+        guard notebook.pages.indices.contains(sender.tag) else { return }
+        let id = notebook.pages[sender.tag].id
+        guard id != notebook.selectedID else { return }
+        // Every edit is saved immediately; select from fresh shared data so
+        // edits from the companion app on other pages are never overwritten.
+        notebook = ScratchpadStore.selectPage(id: id) ?? notebook
+        notebook.selectedID = id
+        displaySelectedPage()
+    }
+
+    @objc private func addPageTapped() {
+        guard notebook.pages.count < ScratchpadNotebook.maximumPages else { return }
+        if let updated = ScratchpadStore.addPage() {
+            notebook = updated
+        } else {
+            let newPage = ScratchpadPage()
+            notebook.pages.append(newPage)
+            notebook.selectedID = newPage.id
+        }
+        displaySelectedPage()
+    }
+
+    @objc private func returnToAppTapped() { insertNote() }
 
     private func inform(_ text: String) {
         message.text = text
@@ -648,18 +746,26 @@ final class ScratchpadView: UIView, UITextViewDelegate, UIEditMenuInteractionDel
     /// Refresh after the containing app edits the shared note.
     /// Do not silently overwrite an active selection or in-progress note edit.
     func reloadSharedNote() {
-        guard !isEditingNote, let shared = ScratchpadStore.load(),
-              shared != editor.text else { return }
-        editor.text = shared
-        editor.selectedRange = NSRange(location: (shared as NSString).length, length: 0)
+        guard !isEditingNote, let shared = ScratchpadStore.loadNotebook(),
+              shared != notebook || shared.selectedPage.text != editor.text else { return }
+        notebook = shared
+        let text = shared.selectedPage.text
+        editor.text = text
+        editor.selectedRange = NSRange(location: (text as NSString).length, length: 0)
+        renderTabs()
         updateCaret()
         onTextChange?()
     }
 
     private func save() {
-        // Maintain the previous extension-local copy as an offline fallback.
-        // The shared App Group copy is the canonical source once available.
-        UserDefaults.standard.set(editor.text, forKey: storeKey)
-        _ = ScratchpadStore.save(editor.text)
+        let pageID = notebook.selectedID
+        if let index = notebook.pages.firstIndex(where: { $0.id == pageID }) {
+            notebook.pages[index].text = editor.text ?? ""
+        }
+        // Preserve the legacy extension-local backup for page 1 only.
+        if notebook.selectedID == notebook.pages.first?.id {
+            UserDefaults.standard.set(editor.text, forKey: storeKey)
+        }
+        _ = ScratchpadStore.savePage(id: pageID, text: editor.text ?? "")
     }
 }
