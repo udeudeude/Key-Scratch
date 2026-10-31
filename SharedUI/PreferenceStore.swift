@@ -32,47 +32,6 @@ enum PreferenceStore {
 }
 
  
-/// Several independent plain-text pages, shared by the keyboard and companion
-/// app. The original single note migrates into page 1 without being discarded.
-struct ScratchpadPage: Codable, Equatable, Identifiable, Sendable {
-    var id: String
-    var text: String
-    init(id: String = UUID().uuidString, text: String = "") {
-        self.id = id
-        self.text = text
-    }
-}
-
-struct ScratchpadNotebook: Codable, Equatable, Sendable {
-    var pages: [ScratchpadPage]
-    var selectedID: String
-
-    static let maximumPages = 8
-
-    static func initial(legacy: String) -> ScratchpadNotebook {
-        let pages = [ScratchpadPage(text: legacy), ScratchpadPage(), ScratchpadPage()]
-        return ScratchpadNotebook(pages: pages, selectedID: pages[0].id)
-    }
-
-    var selectedIndex: Int {
-        pages.firstIndex(where: { $0.id == selectedID }) ?? 0
-    }
-
-    var selectedPage: ScratchpadPage { pages[selectedIndex] }
-
-    var normalized: ScratchpadNotebook {
-        var result = self
-        var seen = Set<String>()
-        result.pages = pages.filter { !$0.id.isEmpty && seen.insert($0.id).inserted }
-            .prefix(Self.maximumPages).map { $0 }
-        if result.pages.isEmpty { result.pages = [ScratchpadPage()] }
-        if !result.pages.contains(where: { $0.id == result.selectedID }) {
-            result.selectedID = result.pages[0].id
-        }
-        return result
-    }
-}
-
 enum ScratchpadStore {
     private static let legacyKey = "key-scratch.local-note.v1"
     private static let notebookKey = "key-scratch.notebook.v2"
