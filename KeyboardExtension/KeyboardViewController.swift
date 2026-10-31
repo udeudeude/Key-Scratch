@@ -7,6 +7,9 @@ final class KeyboardViewController: UIInputViewController {
     private let scratchpadDocumentID = UUID()
     private var scratchpadWidth: NSLayoutConstraint?
     private var heightConstraint: NSLayoutConstraint?
+    private var normalSplitConstraints: [NSLayoutConstraint] = []
+    private var leftSplitConstraints: [NSLayoutConstraint] = []
+    private var isLeftHanded = false
     private var inputState = InputState()
     private var punctuationSpacing = PunctuationSpacing()
     private var noteSpacing = PunctuationSpacing()
@@ -77,14 +80,22 @@ final class KeyboardViewController: UIInputViewController {
         }
         scratchpad.canUseClipboard = hasFullAccess
         NSLayoutConstraint.activate([
-            scratchpad.leadingAnchor.constraint(equalTo: view.leadingAnchor),
             scratchpad.topAnchor.constraint(equalTo: view.topAnchor),
             scratchpad.bottomAnchor.constraint(equalTo: view.bottomAnchor),
-            keyboard.leadingAnchor.constraint(equalTo: scratchpad.trailingAnchor),
-            keyboard.trailingAnchor.constraint(equalTo: view.trailingAnchor),
             keyboard.topAnchor.constraint(equalTo: view.topAnchor),
             keyboard.bottomAnchor.constraint(equalTo: view.bottomAnchor)
         ])
+        normalSplitConstraints = [
+            scratchpad.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            keyboard.leadingAnchor.constraint(equalTo: scratchpad.trailingAnchor),
+            keyboard.trailingAnchor.constraint(equalTo: view.trailingAnchor)
+        ]
+        leftSplitConstraints = [
+            keyboard.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            scratchpad.leadingAnchor.constraint(equalTo: keyboard.trailingAnchor),
+            scratchpad.trailingAnchor.constraint(equalTo: view.trailingAnchor)
+        ]
+        NSLayoutConstraint.activate(normalSplitConstraints)
         let height = view.heightAnchor.constraint(equalToConstant: keyboard.preferences.keyboardHeight)
         height.priority = .init(999)
         height.isActive = true
@@ -179,7 +190,9 @@ final class KeyboardViewController: UIInputViewController {
         // keyboard is the optimized split layout with neutral scratchpad chrome.
         scratchpad.isHidden = false
         scratchpad.configure(font: preferences.keyScratchNoteFont,
-                             size: preferences.keyScratchNoteFontSize)
+                             size: preferences.keyScratchNoteFontSize,
+                             style: preferences.scratchpadVisualStyle)
+        applyHandedness(preferences.leftHandedLayout)
         favoritePad.isHidden = true
         keyboard.preferences = preferences
         view.setNeedsLayout()
@@ -195,16 +208,26 @@ final class KeyboardViewController: UIInputViewController {
         super.viewWillDisappear(animated)
     }
 
+    private func applyHandedness(_ leftHanded: Bool) {
+        guard isLeftHanded != leftHanded else { return }
+        NSLayoutConstraint.deactivate(isLeftHanded ? leftSplitConstraints : normalSplitConstraints)
+        NSLayoutConstraint.activate(leftHanded ? leftSplitConstraints : normalSplitConstraints)
+        isLeftHanded = leftHanded
+        view.setNeedsLayout()
+    }
+
     override func viewDidLayoutSubviews() {
         super.viewDidLayoutSubviews()
+        // Draw the note's frame in exactly the same color as the keyboard
+        // background, including dark mode and selectable keyboard themes.
+        scratchpad.keyboardSurroundColor = keyboard.backgroundColor ?? .systemGray5
         if keyboard.needsGlobe != needsInputModeSwitchKey {
             keyboard.needsGlobe = needsInputModeSwitchKey
         }
         let available = Double(view.bounds.width)
         guard available > 0 else { return }
-        // The host owns its outer keyboard controls and safe areas. Inside the
-        // extension's permitted width, our keyboard hugs the right edge and
-        // the scratchpad consumes *all* remaining width.
+        // The host owns outer system controls. Left-handed mode reverses
+        // the split in both orientations while keeping the same dimensions.
         let landscape = view.window?.windowScene?.interfaceOrientation.isLandscape
             ?? (traitCollection.verticalSizeClass == .compact && available >= 600)
         if keyboard.compactLandscape != landscape {
