@@ -331,4 +331,42 @@ final class TextNavigationTests: XCTestCase {
         XCTAssertEqual(noSelection.isEmpty ? book.selectedPage.text : noSelection, "one two")
     }
 
+    func testOldNotebooksDecodeWithoutImagesAndPreserveAllText() throws {
+        // Existing on-device notebooks predate photos. Decoding them must
+        // never discard the user's notes or selected page.
+        let old = #"{"pages":[{"id":"first","text":"Important notes"},{"id":"second","text":"Keep this too"}],"selectedID":"second"}"#
+        let restored = try JSONDecoder().decode(ScratchpadNotebook.self, from: Data(old.utf8))
+        XCTAssertEqual(restored.pages.count, 2)
+        XCTAssertEqual(restored.pages[0].text, "Important notes")
+        XCTAssertEqual(restored.selectedPage.text, "Keep this too")
+        XCTAssertTrue(restored.pages.allSatisfy { $0.images.isEmpty })
+        XCTAssertEqual(try JSONDecoder().decode(ScratchpadNotebook.self,
+            from: JSONEncoder().encode(restored)), restored)
+    }
+
+    func testImagesRemainAttachedToTheirPageAndDeduplicateSafely() throws {
+        var book = ScratchpadNotebook.initial(legacy: "Page one")
+        let one = ScratchpadImage()
+        let two = ScratchpadImage()
+        book.pages[0].images = [one, one, ScratchpadImage(id: "../outside"), two]
+        book.pages[1].images = [ScratchpadImage()]
+        let normalized = book.normalized
+        XCTAssertEqual(normalized.pages[0].images.map(\.id), [one.id, two.id])
+        XCTAssertEqual(normalized.pages[1].images.count, 1)
+        let restored = try JSONDecoder().decode(ScratchpadNotebook.self,
+            from: JSONEncoder().encode(normalized))
+        XCTAssertEqual(restored, normalized)
+        XCTAssertEqual(restored.pages[0].text, "Page one")
+    }
+
+    func testPageImageLimitDoesNotChangeTextOrOtherPages() {
+        var book = ScratchpadNotebook.initial(legacy: "Safe text")
+        book.pages[0].images = (0..<20).map { _ in ScratchpadImage() }
+        book.pages[1].text = "Other notes"
+        let result = book.normalized
+        XCTAssertEqual(result.pages[0].images.count, ScratchpadNotebook.maximumImagesPerPage)
+        XCTAssertEqual(result.pages[0].text, "Safe text")
+        XCTAssertEqual(result.pages[1].text, "Other notes")
+    }
+
 }
