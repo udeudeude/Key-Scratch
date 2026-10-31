@@ -14,8 +14,6 @@ final class ScratchpadView: UIView, UITextViewDelegate, UIEditMenuInteractionDel
     private let scanlineFilm = UIView()
     private var cornerGlow: [CAGradientLayer] = []
     private var visualStyle: ScratchpadVisualStyle = .standard
-    private var configuredFont: KeyScratchNoteFont = .text
-    private var configuredSize: Double = 11
     var keyboardSurroundColor: UIColor = .systemGray5 {
         didSet {
             if !keyboardSurroundColor.isEqual(oldValue) { perimeter.strokeColor = keyboardSurroundColor.cgColor }
@@ -121,8 +119,6 @@ final class ScratchpadView: UIView, UITextViewDelegate, UIEditMenuInteractionDel
     /// deep glass, phosphor/amber/composite ink, very subtle fixed scanlines,
     /// and four static corner blooms. No WebView, timers, or animations.
     func configure(font: KeyScratchNoteFont, size: Double, style: ScratchpadVisualStyle = .standard) {
-        configuredFont = font
-        configuredSize = size
         visualStyle = style
         let amount = CGFloat(size)
         let base = UIFont.systemFont(ofSize: amount, weight: .medium)
@@ -167,7 +163,7 @@ final class ScratchpadView: UIView, UITextViewDelegate, UIEditMenuInteractionDel
         returnToApp.backgroundColor = style == .standard ? .tertiarySystemBackground : glass
         message.textColor = style == .standard ? .secondaryLabel : ink
 
-        if cornerGlow.isEmpty {
+        if style != .standard && cornerGlow.isEmpty {
             for _ in 0..<4 {
                 let glow = CAGradientLayer()
                 glow.type = .radial
