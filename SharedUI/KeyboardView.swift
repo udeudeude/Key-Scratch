@@ -56,7 +56,7 @@ final class KeyboardView: UIControl {
     var onCursor: ((Int) -> Void)?
     var onCursorVertical: ((Int) -> Void)?
     var onDismiss: (() -> Void)?
-    /// Long-press the Notes/App key to cycle enabled languages.
+    /// Long-press the favorites star to cycle enabled languages.
     var onLanguageHold: (() -> Void)?
     var onGlide: (([CGPoint]) -> Void)?
     var onGesture: ((KeyboardGesture) -> Void)?
@@ -196,7 +196,7 @@ final class KeyboardView: UIControl {
         case .space: return "space"
         case .enter: return returnTitle
         case .language: return nextLanguage.badge
-        case .noteFocus: return editingScratchpad ? "App" : "Notes"
+        case .favorites: return "★"
         case .page: return displayState.page == .letters ? "123" : "ABC"
         case .globe: return ""
         case .dismiss: return "⌄"
@@ -218,7 +218,7 @@ final class KeyboardView: UIControl {
         case .space: return "Space"
         case .enter: return "Return"
         case .language: return "Switch to \(nextLanguage.title)"
-        case .noteFocus: return editingScratchpad ? "Return typing to the app. Hold for next language." : "Type in scratchpad. Hold for next language."
+        case .favorites: return "Favorite emoji and Unicode symbols. Hold for next language."
         case .page: return displayState.page == .letters ? "Numbers" : "Letters"
         case .dismiss: return "Dismiss keyboard"
         case .layers: return KeyboardLayout.firstLayerPage(preferences).map { KeyboardLayout.pageName($0, preferences: preferences) } ?? "Layers"
@@ -483,7 +483,7 @@ final class KeyboardView: UIControl {
                      font: .systemFont(ofSize: 10, weight: .semibold), color: color)
         case .dismiss:
             drawSymbol("keyboard.chevron.compact.down", in: frame, size: 21, color: color)
-        case .noteFocus:
+        case .favorites:
             // Draw the contextual "Notes" or "App" label via normal key text.
             return false
         case .globe: break // Native button keeps Apple's tap-and-hold behavior.
@@ -538,7 +538,7 @@ final class KeyboardView: UIControl {
             sessions[id] = session
             if key.action == .backspace { emit(.backspace) }
             if key.action == .backspace || key.action == .space
-                || key.action == .noteFocus || !key.alternatives.isEmpty {
+                || key.action == .favorites || !key.alternatives.isEmpty {
                 let delay = key.action == .backspace ? DeleteRepeat.initialDelay
                     : (key.action == .space ? 0.32 : 0.42)
                 let timer = Timer(timeInterval: delay, repeats: false) { [weak self] _ in
@@ -558,7 +558,7 @@ final class KeyboardView: UIControl {
         } else if key.action == .space {
             sessions[id]?.cursorMode = true
             setNeedsDisplay()
-        } else if key.action == .noteFocus {
+        } else if key.action == .favorites {
             // A language hold never toggles editing focus on release.
             sessions[id]?.focusHeld = true
             onLanguageHold?()
