@@ -30,6 +30,9 @@ final class ScratchpadView: UIView, UITextViewDelegate, UIEditMenuInteractionDel
     private let tabsScroller = UIScrollView()
     private let tabsRow = UIStackView()
     private let addTab = UIButton(type: .system)
+    private let imageShelf = UIScrollView()
+    private let imageRow = UIStackView()
+    private var activeImagePreview: UIView?
     private var notebook = ScratchpadNotebook.initial(legacy: "")
     private let storeKey = "key-scratch.local-note.v1"
     private(set) var isEditingNote = false
@@ -197,6 +200,7 @@ final class ScratchpadView: UIView, UITextViewDelegate, UIEditMenuInteractionDel
         }
         updateBorderAppearance()
         renderTabs()
+        renderImages()
         editor.setNeedsLayout()
         updateCaret()
     }
@@ -362,7 +366,8 @@ final class ScratchpadView: UIView, UITextViewDelegate, UIEditMenuInteractionDel
         message.isHidden = true
 
         configureTabs()
-        let stack = UIStackView(arrangedSubviews: [message, editor, tabsPanel])
+        configureImageShelf()
+        let stack = UIStackView(arrangedSubviews: [message, editor, imageShelf, tabsPanel])
         stack.axis = .vertical
         stack.spacing = 2
         stack.translatesAutoresizingMaskIntoConstraints = false
@@ -667,6 +672,7 @@ final class ScratchpadView: UIView, UITextViewDelegate, UIEditMenuInteractionDel
         editor.selectedRange = NSRange(location: (editor.text as NSString).length, length: 0)
         editor.setContentOffset(.zero, animated: false)
         renderTabs()
+        renderImages()
         updateCaret()
         onPageChange?()
         onTextChange?()
@@ -693,6 +699,137 @@ final class ScratchpadView: UIView, UITextViewDelegate, UIEditMenuInteractionDel
             notebook.selectedID = newPage.id
         }
         displaySelectedPage()
+    }
+
+    private func configureImageShelf() {
+        imageShelf.showsHorizontalScrollIndicator = false
+        imageShelf.alwaysBounceHorizontal = true
+        imageShelf.translatesAutoresizingMaskIntoConstraints = false
+        imageShelf.isHidden = true
+        let height = imageShelf.heightAnchor.constraint(equalToConstant: 45)
+        // UIStackView collapses this arranged view entirely when no images
+        // exist. A non-required height avoids an Auto Layout conflict.
+        height.priority = .defaultHigh
+        height.isActive = true
+
+        imageRow.axis = .horizontal
+        imageRow.alignment = .center
+        imageRow.spacing = 4
+        imageRow.translatesAutoresizingMaskIntoConstraints = false
+        imageShelf.addSubview(imageRow)
+        NSLayoutConstraint.activate([
+            imageRow.leadingAnchor.constraint(equalTo: imageShelf.contentLayoutGuide.leadingAnchor, constant: 2),
+            imageRow.trailingAnchor.constraint(equalTo: imageShelf.contentLayoutGuide.trailingAnchor, constant: -2),
+            imageRow.topAnchor.constraint(equalTo: imageShelf.contentLayoutGuide.topAnchor),
+            imageRow.bottomAnchor.constraint(equalTo: imageShelf.contentLayoutGuide.bottomAnchor),
+            imageRow.heightAnchor.constraint(equalTo: imageShelf.frameLayoutGuide.heightAnchor)
+        ])
+        renderImages()
+    }
+
+    private func renderImages() {
+        for child in imageRow.arrangedSubviews {
+            imageRow.removeArrangedSubview(child)
+            child.removeFromSuperview()
+        }
+        let images = notebook.selectedPage.images
+        imageShelf.isHidden = images.isEmpty
+        for (index, image) in images.enumerated() {
+            let button = UIButton(type: .custom)
+            button.tag = index
+            button.backgroundColor = .tertiarySystemFill
+            button.layer.cornerRadius = 6
+            button.clipsToBounds = true
+            button.accessibilityLabel = "Copy scratchpad photo \(index + 1). Hold to preview."
+            button.accessibilityIdentifier = "copy-scratchpad-image-\(index + 1)"
+            button.imageView?.contentMode = .scaleAspectFill
+            button.contentHorizontalAlignment = .fill
+            button.contentVerticalAlignment = .fill
+            if let url = ScratchpadImageStore.imageURL(id: image.id, thumbnail: true),
+               let photo = UIImage(contentsOfFile: url.path) {
+                button.setImage(photo, for: .normal)
+            } else {
+                button.setImage(UIImage(systemName: "photo"), for: .normal)
+                button.tintColor = .secondaryLabel
+            }
+            button.widthAnchor.constraint(equalToConstant: 42).isActive = true
+            button.heightAnchor.constraint(equalToConstant: 42).isActive = true
+            button.addTarget(self, action: #selector(imageTapped(_:)), for: .touchUpInside)
+            let hold = UILongPressGestureRecognizer(target: self, action: #selector(imageHeld(_:)))
+            hold.minimumPressDuration = 0.5
+            button.addGestureRecognizer(hold)
+            imageRow.addArrangedSubview(button)
+        }
+        imageShelf.setContentOffset(.zero, animated: false)
+    }
+
+    @objc private func imageTapped(_ sender: UIButton) {
+        guard notebook.selectedPage.images.indices.contains(sender.tag) else { return }
+        guard canUseClipboard else {
+            inform("Enable Full Access to copy photos")
+            return
+        }
+        let image = notebook.selectedPage.images[sender.tag]
+        guard let url = ScratchpadImageStore.imageURL(id: image.id),
+              let photo = UIImage(contentsOfFile: url.path) else {
+            inform("Photo file unavailable")
+            return
+        }
+        UIPasteboard.general.image = photo
+        inform("Photo copied · Paste in app")
+    }
+
+    @objc private func imageHeld(_ gesture: UILongPressGestureRecognizer) {
+        guard gesture.state == .began,
+              let button = gesture.view as? UIButton,
+              notebook.selectedPage.images.indices.contains(button.tag) else { return }
+        showPhotoPreview(notebook.selectedPage.images[button.tag])
+    }
+
+    private func showPhotoPreview(_ reference: ScratchpadImage) {
+        guard let url = ScratchpadImageStore.imageURL(id: reference.id),
+              let photo = UIImage(contentsOfFile: url.path) else {
+            inform("Photo file unavailable")
+            return
+        }
+        activeImagePreview?.removeFromSuperview()
+        let overlay = UIView()
+        overlay.backgroundColor = UIColor(white: 0.035, alpha: 0.98)
+        overlay.layer.cornerRadius = 6
+        overlay.translatesAutoresizingMaskIntoConstraints = false
+        let image = UIImageView(image: photo)
+        image.contentMode = .scaleAspectFit
+        image.translatesAutoresizingMaskIntoConstraints = false
+        let done = UIButton(type: .system)
+        done.setTitle("Done", for: .normal)
+        done.tintColor = .white
+        done.titleLabel?.font = .systemFont(ofSize: 14, weight: .semibold)
+        done.accessibilityLabel = "Close image preview"
+        done.addTarget(self, action: #selector(dismissPhotoPreview), for: .touchUpInside)
+        done.translatesAutoresizingMaskIntoConstraints = false
+        overlay.addSubview(image)
+        overlay.addSubview(done)
+        addSubview(overlay)
+        NSLayoutConstraint.activate([
+            overlay.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 3),
+            overlay.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -3),
+            overlay.topAnchor.constraint(equalTo: topAnchor, constant: 3),
+            overlay.bottomAnchor.constraint(equalTo: bottomAnchor, constant: -3),
+            done.topAnchor.constraint(equalTo: overlay.topAnchor),
+            done.trailingAnchor.constraint(equalTo: overlay.trailingAnchor),
+            done.widthAnchor.constraint(equalToConstant: 52),
+            done.heightAnchor.constraint(equalToConstant: 32),
+            image.leadingAnchor.constraint(equalTo: overlay.leadingAnchor, constant: 5),
+            image.trailingAnchor.constraint(equalTo: overlay.trailingAnchor, constant: -5),
+            image.topAnchor.constraint(equalTo: done.bottomAnchor),
+            image.bottomAnchor.constraint(equalTo: overlay.bottomAnchor, constant: -4)
+        ])
+        activeImagePreview = overlay
+    }
+
+    @objc private func dismissPhotoPreview() {
+        activeImagePreview?.removeFromSuperview()
+        activeImagePreview = nil
     }
 
     @objc private func returnToAppTapped() { insertNote() }
@@ -753,6 +890,7 @@ final class ScratchpadView: UIView, UITextViewDelegate, UIEditMenuInteractionDel
         editor.text = text
         editor.selectedRange = NSRange(location: (text as NSString).length, length: 0)
         renderTabs()
+        renderImages()
         updateCaret()
         onTextChange?()
     }
