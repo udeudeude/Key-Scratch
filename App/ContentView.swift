@@ -809,24 +809,60 @@ private struct KeyScratchExperimentLab: View {
 }
 
 
-/// Full-size companion editor for the very same local note shown in the keyboard.
-/// The keyboard extension is short-lived; the App Group note is shared locally
-/// without accounts, synchronization services, or network access.
+/// Full-size companion editor of the *same pages* as the keyboard extension.
+/// App Group storage is the source of truth. Text changes save only the
+/// selected page, preserving any edits to the other pages.
 private struct KeyScratchFullNotes: View {
     @Environment(\.dismiss) private var dismiss
+    @State private var notebook = ScratchpadNotebook.initial(legacy: "")
     @State private var note = ""
     @State private var loaded = false
     @State private var showClearConfirmation = false
+    @State private var showDeleteConfirmation = false
     @State private var notice: String?
     @FocusState private var focused: Bool
+
+    private var editableNote: Binding<String> {
+        Binding(get: { note }, set: { next in
+            note = next
+            guard loaded else { return }
+            if notebook.pages.indices.contains(notebook.selectedIndex) {
+                notebook.pages[notebook.selectedIndex].text = next
+            }
+            notice = ScratchpadStore.savePage(id: notebook.selectedID, text: next)
+                ? nil : "Shared note storage unavailable. Check App Group signing."
+        })
+    }
 
     var body: some View {
         NavigationStack {
             VStack(alignment: .leading, spacing: 12) {
-                Text("The note shown beside your keyboard, with room to edit it.")
+                Text("Your pages appear beside the keyboard. Tap a tab to switch.")
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
-                TextEditor(text: $note)
+
+                HStack(spacing: 7) {
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: 6) {
+                            ForEach(Array(notebook.pages.enumerated()), id: \.element.id) { index, page in
+                                Button("Page \(index + 1)") { switchPage(to: page.id) }
+                                    .font(.system(size: 13, weight: notebook.selectedID == page.id ? .semibold : .regular))
+                                    .padding(.horizontal, 12)
+                                    .padding(.vertical, 7)
+                                    .background(notebook.selectedID == page.id
+                                        ? Color.accentColor.opacity(0.16) : Color.secondary.opacity(0.07),
+                                        in: RoundedRectangle(cornerRadius: 9))
+                                    .accessibilityIdentifier("full-scratchpad-page-\(index + 1)")
+                            }
+                        }
+                    }
+                    Button { addPage() } label: { Image(systemName: "plus.circle.fill") }
+                        .disabled(!loaded || notebook.pages.count >= ScratchpadNotebook.maximumPages)
+                        .accessibilityLabel("Add scratchpad page")
+                }
+                .buttonStyle(.plain)
+
+                TextEditor(text: editableNote)
                     .focused($focused)
                     .font(.system(size: 16))
                     .scrollContentBackground(.hidden)
@@ -834,15 +870,17 @@ private struct KeyScratchFullNotes: View {
                     .background(.secondary.opacity(0.08), in: RoundedRectangle(cornerRadius: 12))
                     .accessibilityIdentifier("full-scratchpad-editor")
                     .disabled(!loaded)
+
                 if let notice {
                     Text(notice).font(.caption).foregroundStyle(.secondary)
                 }
+
                 HStack(spacing: 12) {
                     Button {
                         UIPasteboard.general.string = note
-                        notice = "Copied all note text"
+                        notice = "Copied this page"
                     } label: {
-                        Label("Copy all", systemImage: "doc.on.doc")
+                        Label("Copy page", systemImage: "doc.on.doc")
                     }
                     .disabled(note.isEmpty)
                     ShareLink(item: note) {
@@ -850,16 +888,21 @@ private struct KeyScratchFullNotes: View {
                     }
                     .disabled(note.isEmpty)
                     Spacer()
-                    Button(role: .destructive) {
-                        showClearConfirmation = true
-                    } label: {
-                        Image(systemName: "trash")
+                    Button(role: .destructive) { showClearConfirmation = true } label: {
+                        Image(systemName: "eraser")
                     }
                     .disabled(note.isEmpty)
-                    .accessibilityLabel("Clear entire note")
+                    .accessibilityLabel("Clear current page")
+                    if notebook.pages.count > 1 {
+                        Button(role: .destructive) { showDeleteConfirmation = true } label: {
+                            Image(systemName: "trash")
+                        }
+                        .accessibilityLabel("Delete current scratchpad page")
+                    }
                 }
                 .buttonStyle(.bordered)
-                Text("For normal selection, Cut, Copy, Paste, and Select All, touch and hold inside the editor. Changes save on this iPhone and appear in the keyboard when it opens again.")
+
+                Text("Select, Cut, Copy or Paste using the normal iPhone edit menu. Edits are saved locally to the active page. The keyboard's bottom tabs switch between those same pages.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
@@ -867,36 +910,66 @@ private struct KeyScratchFullNotes: View {
             .navigationTitle("Scratchpad")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("Done") { dismiss() }
-                }
+                ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() } }
             }
         }
         .onAppear {
-            // Do not write an empty new note over an older extension-only note.
-            // The extension imports that old note the first time it starts.
-            if let shared = ScratchpadStore.load() {
-                note = shared
+            // Preserve any extension-only legacy note until the keyboard has
+            // migrated it. An empty editor must never overwrite old content.
+            if let shared = ScratchpadStore.loadNotebook() {
+                notebook = shared
+                note = shared.selectedPage.text
+                loaded = true
+            } else if let legacy = ScratchpadStore.load() {
+                notebook = ScratchpadStore.migrateNotebook(legacy: legacy)
+                note = notebook.selectedPage.text
                 loaded = true
             } else {
                 loaded = false
                 notice = "Open the updated Key Scratch keyboard once to import your existing note, then reopen this editor."
             }
         }
-        .onChange(of: note) { _, value in
-            guard loaded else { return }
-            if !ScratchpadStore.save(value) {
-                notice = "Shared note storage is unavailable. Check App Group signing before closing."
-            } else {
-                notice = nil
-            }
-        }
-        .confirmationDialog("Erase the entire scratchpad?", isPresented: $showClearConfirmation,
+        .confirmationDialog("Clear this page?", isPresented: $showClearConfirmation,
                             titleVisibility: .visible) {
-            Button("Erase note", role: .destructive) { note = "" }
+            Button("Erase page text", role: .destructive) { editableNote.wrappedValue = "" }
             Button("Cancel", role: .cancel) {}
         } message: {
-            Text("This cannot be undone. Use Share / export if you want a backup first.")
+            Text("This can't be undone. Other pages will be preserved.")
+        }
+        .confirmationDialog("Delete this page?", isPresented: $showDeleteConfirmation,
+                            titleVisibility: .visible) {
+            Button("Delete page", role: .destructive) {
+                if let updated = ScratchpadStore.removePage(id: notebook.selectedID) {
+                    notebook = updated
+                    note = updated.selectedPage.text
+                } else {
+                    notice = "Could not delete this page."
+                }
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("The entire current page will be deleted. Other pages remain.")
+        }
+    }
+
+    private func switchPage(to id: String) {
+        guard loaded, id != notebook.selectedID else { return }
+        if let updated = ScratchpadStore.selectPage(id: id) {
+            notebook = updated
+        } else {
+            notebook.selectedID = id
+            notice = "Page selection couldn't be saved."
+        }
+        note = notebook.selectedPage.text
+    }
+
+    private func addPage() {
+        guard loaded else { return }
+        if let updated = ScratchpadStore.addPage() {
+            notebook = updated
+            note = updated.selectedPage.text
+        } else {
+            notice = "Could not add a page. Maximum: \(ScratchpadNotebook.maximumPages)."
         }
     }
 }
