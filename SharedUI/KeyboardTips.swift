@@ -9,7 +9,7 @@ enum KeyboardTip: String, CaseIterable, Sendable {
         case .symbolSlide: "Tip: hold 123 and slide to a symbol"
         case .glide: "Tip: slide across letters to type a word"
         case .flick: "Tip: flick a top-row key down for its digit"
-        case .hold: "Tip: hold a key with a small letter for more"
+        case .hold: "Tip: hold a letter for accented characters"
         case .spaceCursor: "Tip: slide on Space to move the cursor"
         case .doubleSpace: "Tip: tap Space twice to end a sentence"
         }
