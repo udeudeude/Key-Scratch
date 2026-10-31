@@ -243,4 +243,26 @@ final class TextNavigationTests: XCTestCase {
         XCTAssertEqual(base.rowSpacing, 8)
     }
 
+    func testFavoriteSymbolsAreEditableUnicodeAndPersistAcrossSettings() throws {
+        let defaults = KeyboardPreferences()
+        XCTAssertTrue(defaults.favoriteSymbols.contains("❤️"))
+        XCTAssertTrue(defaults.favoriteSymbols.contains("≠"))
+        XCTAssertTrue(defaults.favoriteSymbols.contains("→"))
+        var chosen = defaults
+        chosen.favoriteSymbols = ["🫶", "∴", "∞", "🫶", "", "≠"]
+        chosen = chosen.validated
+        XCTAssertEqual(chosen.favoriteSymbols, ["🫶", "∴", "∞", "≠"])
+        let stored = try JSONEncoder().encode(chosen)
+        let restored = try JSONDecoder().decode(KeyboardPreferences.self, from: stored)
+        XCTAssertEqual(restored.favoriteSymbols, chosen.favoriteSymbols)
+    }
+
+    func testOldKeyboardSettingsAcquireFavoritesWithoutOverwritingOtherPreferences() throws {
+        let original = Data(#"{"keyHeight":64,"defaultLanguage":"english"}"#.utf8)
+        let preferences = try JSONDecoder().decode(KeyboardPreferences.self, from: original)
+        XCTAssertEqual(preferences.keyHeight, 64)
+        XCTAssertTrue(preferences.favoriteSymbols.contains("★"))
+        XCTAssertEqual(preferences.favoriteSymbols.count, 32)
+    }
+
 }
