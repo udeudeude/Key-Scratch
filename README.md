@@ -10,7 +10,9 @@ A custom iPhone keyboard with an always-visible, editable scratchpad. Built from
 - Double-tap word selection, triple-tap paragraph selection, and a floating edit menu in the compact scratchpad. Selection is visibly highlighted.
 - **Full Access**, when the user enables it, permits Copy/Paste and local note sharing with the containing app. The companion app has a full-size note editor and Share/Export. No text is uploaded.
 - Portrait: adjustable split (30% notes by default). **Landscape: a 172 pt compact keyboard at the far right**, with the notes filling all remaining extension space to the left. iOS-owned globe, microphone and home-indicator areas are outside the extension's layout.
-- Thin, rounded scratchpad border and familiar iOS system colors. The home-screen icon **and matching in-app header** depict a metal key scratching car paint. English-first sample text replaces the legacy Ukrainian placeholder.
+- **Left-handed layout** reverses keyboard and scratchpad in both orientations, with the same adjustable proportions.
+- Optional **CRT scratchpad style** inspired by [Temporarily Leave the Universe](https://github.com/udeudeude/Temporarily-Leave-the-Universe): green phosphor, amber or composite-TV palettes, all rendered natively without a browser or animation loop.
+- Thin, rounded scratchpad outline along the top and sides in the same color as the keyboard backing, and familiar iOS system colors. The home-screen icon **and matching in-app header** depict a metal key scratching car paint. English-first sample text replaces the legacy Ukrainian placeholder.
 
 ## Install and test on iPhone
 
