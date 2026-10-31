@@ -14,7 +14,7 @@ The scratchpad now has a thin neutral border and 6 pt rounded corners matching t
 
 ## iPhone-style controls and language switching
 
-The key formerly marked UA / EN now says **Notes** when the host app is receiving typing, and **App** when the scratchpad is receiving typing. Tap once to toggle the writing destination. Hold that same key to cycle the languages enabled under Key Scratch → Keyboard Settings → Languages. The old color-coded reference modes are retired.
+Tap the compact note panel to type there. Tap a host-app text field to return typing to the app. The bottom-row key is now **★**, opening a scrollable favorites panel containing both emoji and Unicode symbols. Choosing one inserts it into the currently active text destination and remembers it among the eight most recent symbols. Edit the favorites (up to 48) in **Scratchpad & layout** in the companion app; hold ★ to cycle enabled languages. It does not invoke Apple's native emoji picker.
 
 The space bar reads **space**. The system globe still opens the next enabled iOS keyboard or a keyboard chooser on hold. To use Apple's Emoji keyboard, enable that keyboard in iOS Settings and switch to it with the globe. Key Scratch cannot open Apple's Emoji keyboard directly, and does not pretend otherwise.
 
@@ -35,7 +35,7 @@ Hyphens and similar joining punctuation now attach directly to the preceding gli
 ## Note editing
 
 - Tap text in the narrow notes area to direct Ortholinear typing and swipe recognition to that area. Keyboard suggestions and text replacements also apply to notes.
-- Tap twice to select a word, or three times to select a paragraph. Gesture handling gives higher tap counts priority, but requires another physical-device test. Long-press a word for a floating edit menu; **Select Paragraph** there provides a more reliable fallback.
+- Tap twice to select a word, or three times to select a paragraph. Gesture handling gives higher tap counts priority, but requires another physical-device test. Long-press a word for a floating edit menu. Triple-tap selects the paragraph directly, so the redundant **Select Paragraph** menu entry is removed.
 - Long-press the note for **Copy, Cut, Paste, Select All, Select Paragraph, Insert in App**, or a guarded **Clear…** submenu. These are actions on the scratchpad, not the app above the keyboard. Copy/Cut/Paste require Allow Full Access.
 - Changing focus to a host app is automatic when iOS informs the extension about a text-field or selection change. An unchanged-caret tap into the already-selected host field may not generate a notification. A small upper-right arrow in the notes area is the reliable fallback.
 - Notes are stored locally. Older extension-only notes are migrated to the local App Group on the first launch of the updated keyboard. The extension also keeps a local fallback copy.
@@ -77,7 +77,7 @@ The script replaces existing source and plist files, preserving the local Xcode 
 
 Reopen `Ortholinear.xcodeproj`, select **Product → Clean Build Folder**, then **Command-R** to build/install on the plugged-in iPhone. Do not run XcodeGen again just to update these files: project regeneration may reset signing.
 
-Then enable Full Access in iOS Settings, open the keyboard once to migrate old notes, and open the companion app's full-size Scratchpad. Test Notes/App focus switching and landscape resizing before adjusting dimensions.
+Then enable Full Access in iOS Settings, open the keyboard once to migrate old notes, and open the companion app's full-size Scratchpad. Test scratchpad/host tap focus, the ★ favorites panel and landscape resizing before adjusting dimensions.
 
 ## Outstanding verification
 
