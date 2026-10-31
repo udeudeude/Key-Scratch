@@ -117,7 +117,7 @@ final class TextNavigationTests: XCTestCase {
         XCTAssertTrue(a?.alternatives.contains("á") == true)
         XCTAssertTrue(e?.alternatives.contains("é") == true)
     }
-    func testFocusToggleReplacesLanguageKeyInSplitModes() {
+    func testFavoritesKeyReplacesNotesAppToggle() {
         let p = KeyboardPreferences()
         XCTAssertEqual(p.defaultLanguage, .english)
         XCTAssertEqual(p.languages, [.english])
@@ -125,15 +125,15 @@ final class TextNavigationTests: XCTestCase {
             var options = p
             options.keyScratchMode = mode
             let rows = KeyboardLayout.rows(state: InputState(), needsGlobe: true, preferences: options)
-            XCTAssertEqual(rows[3].filter { $0.action == .noteFocus }.count, 1)
+            XCTAssertEqual(rows[3].filter { $0.action == .favorites }.count, 1)
             XCTAssertFalse(rows[3].contains { $0.action == .language })
             XCTAssertEqual(rows[3].last?.action, .enter)
         }
         var reference = p
         reference.keyScratchMode = .reference
         let rows = KeyboardLayout.rows(state: InputState(), needsGlobe: true, preferences: reference)
-        XCTAssertFalse(rows[3].contains { $0.action == .noteFocus },
-                       "Blue reference has no notes panel and should not offer an inert focus key")
+        XCTAssertEqual(rows[3].filter { $0.action == .favorites }.count, 1,
+                       "Favorites are available in every keyboard layout")
     }
 
     func testLanguageOrderRemainsUserControlled() {
