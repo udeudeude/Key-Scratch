@@ -10,6 +10,17 @@ import UIKit
 final class ScratchpadView: UIView, UITextViewDelegate, UIEditMenuInteractionDelegate {
     private let editor = UITextView()
     private let caret = UIView()
+    private let perimeter = CAShapeLayer()
+    private let scanlineFilm = UIView()
+    private var cornerGlow: [CAGradientLayer] = []
+    private var visualStyle: ScratchpadVisualStyle = .standard
+    private var configuredFont: KeyScratchNoteFont = .text
+    private var configuredSize: Double = 11
+    var keyboardSurroundColor: UIColor = .systemGray5 {
+        didSet {
+            if !keyboardSurroundColor.isEqual(oldValue) { perimeter.strokeColor = keyboardSurroundColor.cgColor }
+        }
+    }
     /// UITextView's native selection highlight can disappear when the view is
     /// deliberately non-first-responder inside a keyboard extension.
     /// Show selectionRects in iOS blue without changing the selected text.
@@ -73,34 +84,115 @@ final class ScratchpadView: UIView, UITextViewDelegate, UIEditMenuInteractionDel
         updateCaret()
     }
 
+    /// Draw the top and both sides only. Their color matches the keys' backing
+    /// surface rather than using iOS's blue focus border or a default separator.
     private func updateBorderAppearance() {
-        // Same subtle radius and hairline treatment as the keyboard keycaps.
-        // A restrained system-blue outline signals that keystrokes target notes.
-        layer.borderWidth = isEditingNote ? 0.9 : 0.65
-        layer.borderColor = (isEditingNote
-            ? UIColor.systemBlue.withAlphaComponent(0.60)
-            : UIColor.separator.withAlphaComponent(0.65)).cgColor
+        layer.borderWidth = 0
+        perimeter.strokeColor = keyboardSurroundColor.cgColor
+        perimeter.lineWidth = 0.85
+        perimeter.fillColor = UIColor.clear.cgColor
+        setNeedsLayout()
     }
 
-    /// Normal typography, no old experimental color identity.
-    func configure(font: KeyScratchNoteFont, size: Double) {
-        updateBorderAppearance()
-        let size = CGFloat(size)
-        let base = UIFont.systemFont(ofSize: size, weight: .medium)
-        switch font {
-        case .text:
-            editor.font = base
-        case .rounded, .serif, .monospaced:
-            let design: UIFontDescriptor.SystemDesign
-            switch font {
-            case .rounded: design = .rounded
-            case .serif: design = .serif
-            case .monospaced: design = .monospaced
-            case .text: design = .rounded // Unreachable: handled by the outer switch.
-            }
-            let descriptor = base.fontDescriptor.withDesign(design)
-            editor.font = descriptor.map { UIFont(descriptor: $0, size: size) } ?? base
+    override func layoutSubviews() {
+        super.layoutSubviews()
+        let r: CGFloat = min(6, bounds.width / 4, bounds.height / 4)
+        let path = UIBezierPath()
+        path.move(to: CGPoint(x: 0.45, y: bounds.height))
+        path.addLine(to: CGPoint(x: 0.45, y: r))
+        path.addQuadCurve(to: CGPoint(x: r, y: 0.45), controlPoint: CGPoint(x: 0.45, y: 0.45))
+        path.addLine(to: CGPoint(x: bounds.width - r, y: 0.45))
+        path.addQuadCurve(to: CGPoint(x: bounds.width - 0.45, y: r),
+                          controlPoint: CGPoint(x: bounds.width - 0.45, y: 0.45))
+        path.addLine(to: CGPoint(x: bounds.width - 0.45, y: bounds.height))
+        perimeter.path = path.cgPath
+        perimeter.frame = bounds
+        scanlineFilm.frame = bounds
+        for (index, glow) in cornerGlow.enumerated() {
+            let cornerWidth = min(80, bounds.width * 0.45)
+            let cornerHeight = min(45, bounds.height * 0.24)
+            glow.frame = CGRect(x: index.isMultiple(of: 2) ? 0 : bounds.width - cornerWidth,
+                                y: index < 2 ? 0 : bounds.height - cornerHeight,
+                                width: cornerWidth, height: cornerHeight)
         }
+    }
+
+    /// UIKit-only interpretation of Temporarily Leave the Universe's display:
+    /// deep glass, phosphor/amber/composite ink, very subtle fixed scanlines,
+    /// and four static corner blooms. No WebView, timers, or animations.
+    func configure(font: KeyScratchNoteFont, size: Double, style: ScratchpadVisualStyle = .standard) {
+        configuredFont = font
+        configuredSize = size
+        visualStyle = style
+        let amount = CGFloat(size)
+        let base = UIFont.systemFont(ofSize: amount, weight: .medium)
+        if style == .standard {
+            switch font {
+            case .text: editor.font = base
+            case .rounded, .serif, .monospaced:
+                let design: UIFontDescriptor.SystemDesign
+                switch font {
+                case .rounded: design = .rounded
+                case .serif: design = .serif
+                case .monospaced: design = .monospaced
+                case .text: design = .rounded
+                }
+                let descriptor = base.fontDescriptor.withDesign(design)
+                editor.font = descriptor.map { UIFont(descriptor: $0, size: amount) } ?? base
+            }
+        } else {
+            editor.font = UIFont(name: "CourierNewPSMT", size: amount)
+                ?? .monospacedSystemFont(ofSize: amount, weight: .regular)
+        }
+        let ink: UIColor
+        let glass: UIColor
+        switch style {
+        case .standard:
+            ink = .label
+            glass = .secondarySystemBackground
+        case .phosphorGreen:
+            ink = UIColor(red: 0.47, green: 0.94, blue: 0.44, alpha: 1)
+            glass = UIColor(red: 0.004, green: 0.016, blue: 0.004, alpha: 1)
+        case .amber:
+            ink = UIColor(red: 1, green: 0.73, blue: 0.22, alpha: 1)
+            glass = UIColor(red: 0.016, green: 0.008, blue: 0, alpha: 1)
+        case .composite:
+            ink = UIColor(white: 0.95, alpha: 1)
+            glass = UIColor(red: 0.008, green: 0.008, blue: 0.016, alpha: 1)
+        }
+        backgroundColor = glass
+        editor.textColor = ink
+        caret.backgroundColor = style == .standard ? .systemBlue : ink
+        returnToApp.tintColor = style == .standard ? .secondaryLabel : ink
+        returnToApp.backgroundColor = style == .standard ? .tertiarySystemBackground : glass
+        message.textColor = style == .standard ? .secondaryLabel : ink
+
+        if cornerGlow.isEmpty {
+            for _ in 0..<4 {
+                let glow = CAGradientLayer()
+                glow.type = .radial
+                glow.isHidden = true
+                layer.insertSublayer(glow, at: 0)
+                cornerGlow.append(glow)
+            }
+        }
+        let glowColor: UIColor = switch style {
+        case .standard: .clear
+        case .phosphorGreen: UIColor(red: 0.34, green: 0.91, blue: 0.37, alpha: 0.19)
+        case .amber: UIColor(red: 1, green: 0.67, blue: 0, alpha: 0.18)
+        case .composite: UIColor(red: 0.68, green: 0.55, blue: 1, alpha: 0.16)
+        }
+        for (i, glow) in cornerGlow.enumerated() {
+            glow.colors = [glowColor.cgColor, glowColor.withAlphaComponent(0).cgColor]
+            glow.startPoint = CGPoint(x: i.isMultiple(of: 2) ? 0 : 1, y: i < 2 ? 0 : 1)
+            glow.endPoint = CGPoint(x: i.isMultiple(of: 2) ? 1 : 0, y: i < 2 ? 1 : 0)
+            glow.isHidden = style == .standard
+        }
+        scanlineFilm.alpha = style == .standard ? 0 : 0.18
+        selectionHighlights.forEach {
+            $0.backgroundColor = (style == .standard ? UIColor.systemBlue : ink).withAlphaComponent(0.27)
+        }
+        updateBorderAppearance()
         editor.setNeedsLayout()
         updateCaret()
     }
@@ -192,6 +284,8 @@ final class ScratchpadView: UIView, UITextViewDelegate, UIEditMenuInteractionDel
         backgroundColor = .secondarySystemBackground
         layer.cornerRadius = 6
         layer.masksToBounds = true
+        perimeter.isHidden = false
+        layer.addSublayer(perimeter)
         updateBorderAppearance()
 
         // Most of the panel is now text, not a toolbar. An unobtrusive
@@ -272,7 +366,18 @@ final class ScratchpadView: UIView, UITextViewDelegate, UIEditMenuInteractionDel
             stack.topAnchor.constraint(equalTo: topAnchor, constant: 3),
             stack.bottomAnchor.constraint(equalTo: bottomAnchor, constant: -3)
         ])
+        // Fixed, noninteractive film; scrollable text remains independent.
+        // Cache one tiny image instead of drawing a scanline for every frame.
+        let film = UIGraphicsImageRenderer(size: CGSize(width: 2, height: 4)).image { ctx in
+            UIColor.black.withAlphaComponent(0.68).setFill()
+            ctx.fill(CGRect(x: 0, y: 2, width: 2, height: 1))
+        }
+        scanlineFilm.backgroundColor = UIColor(patternImage: film)
+        scanlineFilm.isUserInteractionEnabled = false
+        scanlineFilm.alpha = 0
+        addSubview(scanlineFilm)
         bringSubviewToFront(returnToApp)
+        layer.addSublayer(perimeter)
     }
 
     required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
@@ -379,7 +484,8 @@ final class ScratchpadView: UIView, UITextViewDelegate, UIEditMenuInteractionDel
                 overlay = selectionHighlights[index]
             } else {
                 overlay = UIView()
-                overlay.backgroundColor = UIColor.systemBlue.withAlphaComponent(0.26)
+                let ink = visualStyle == .standard ? UIColor.systemBlue : editor.textColor ?? .systemGreen
+                overlay.backgroundColor = ink.withAlphaComponent(0.27)
                 overlay.isUserInteractionEnabled = false
                 editor.addSubview(overlay)
                 selectionHighlights.append(overlay)
