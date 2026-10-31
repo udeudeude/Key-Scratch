@@ -47,7 +47,7 @@
 				<string>public.json</string>
 			</array>
 			<key>UTTypeDescription</key>
-			<string>Key Scratch keyboard layout (legacy Ortholinear format)</string>
+			<string>Key Scratch keyboard layout</string>
 			<key>UTTypeIdentifier</key>
 			<string>com.varyvoda.ortholinear.layout</string>
 			<key>UTTypeTagSpecification</key>
