@@ -952,3 +952,68 @@ enum KeyboardGeometry {
         return cell.key.flicks[direction].map { (direction, $0) }
     }
 }
+
+/// A reference to two downscaled JPEGs inside the private app-group container.
+/// Actual image bytes live outside UserDefaults and aren't sent to any server.
+struct ScratchpadImage: Codable, Equatable, Identifiable, Sendable {
+    var id: String
+    init(id: String = UUID().uuidString) { self.id = id }
+}
+
+struct ScratchpadPage: Codable, Equatable, Identifiable, Sendable {
+    var id: String
+    var text: String
+    var images: [ScratchpadImage]
+
+    init(id: String = UUID().uuidString, text: String = "", images: [ScratchpadImage] = []) {
+        self.id = id
+        self.text = text
+        self.images = images
+    }
+
+    private enum CodingKeys: String, CodingKey { case id, text, images }
+
+    /// Existing v2 notebooks contain only id/text. Their pages remain intact.
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = try c.decode(String.self, forKey: .id)
+        text = try c.decode(String.self, forKey: .text)
+        images = try c.decodeIfPresent([ScratchpadImage].self, forKey: .images) ?? []
+    }
+}
+
+struct ScratchpadNotebook: Codable, Equatable, Sendable {
+    var pages: [ScratchpadPage]
+    var selectedID: String
+
+    static let maximumPages = 8
+    static let maximumImagesPerPage = 12
+
+    static func initial(legacy: String) -> ScratchpadNotebook {
+        let pages = [ScratchpadPage(text: legacy), ScratchpadPage(), ScratchpadPage()]
+        return ScratchpadNotebook(pages: pages, selectedID: pages[0].id)
+    }
+
+    var selectedIndex: Int { pages.firstIndex(where: { $0.id == selectedID }) ?? 0 }
+    var selectedPage: ScratchpadPage { pages[selectedIndex] }
+
+    var normalized: ScratchpadNotebook {
+        var result = self
+        var seen = Set<String>()
+        result.pages = pages.filter { !$0.id.isEmpty && seen.insert($0.id).inserted }
+            .prefix(Self.maximumPages).map { page in
+                var page = page
+                var imageIDs = Set<String>()
+                page.images = page.images.filter {
+                    UUID(uuidString: $0.id) != nil && imageIDs.insert($0.id).inserted
+                }.prefix(Self.maximumImagesPerPage).map { $0 }
+                return page
+            }
+        if result.pages.isEmpty { result.pages = [ScratchpadPage()] }
+        if !result.pages.contains(where: { $0.id == result.selectedID }) {
+            result.selectedID = result.pages[0].id
+        }
+        return result
+    }
+}
+
