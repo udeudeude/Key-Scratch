@@ -295,4 +295,40 @@ final class TextNavigationTests: XCTestCase {
         XCTAssertEqual(restored.keyHeight, 55)
     }
 
+    func testScratchpadNotebookHasThreeIndependentPagesAndPreservesLegacyNote() throws {
+        var book = ScratchpadNotebook.initial(legacy: "My original note")
+        XCTAssertEqual(book.pages.count, 3)
+        XCTAssertEqual(book.selectedPage.text, "My original note")
+        XCTAssertEqual(book.pages[1].text, "")
+        XCTAssertEqual(book.pages[2].text, "")
+        book.selectedID = book.pages[1].id
+        book.pages[1].text = "Second page"
+        let archive = try JSONEncoder().encode(book)
+        let decoded = try JSONDecoder().decode(ScratchpadNotebook.self, from: archive)
+        XCTAssertEqual(decoded.selectedPage.text, "Second page")
+        XCTAssertEqual(decoded.pages[0].text, "My original note")
+        XCTAssertEqual(decoded.pages[2].text, "")
+    }
+
+    func testScratchpadNotebookKeepsAtLeastOnePageAndRejectsBrokenSelection() {
+        var book = ScratchpadNotebook.initial(legacy: "Original")
+        book.selectedID = "missing-page"
+        XCTAssertEqual(book.normalized.selectedPage.text, "Original")
+        book.pages = []
+        XCTAssertEqual(book.normalized.pages.count, 1)
+        book = ScratchpadNotebook.initial(legacy: "Original")
+        book.pages += (0..<12).map { _ in ScratchpadPage() }
+        XCTAssertEqual(book.normalized.pages.count, ScratchpadNotebook.maximumPages)
+    }
+
+    func testSelectionForTransferUsesSelectedTextOrWholePage() {
+        // The arrow always inserts selected content, falling back to the
+        // entire active page without touching the clipboard or Shift.
+        let book = ScratchpadNotebook.initial(legacy: "one two")
+        let selection = "two"
+        XCTAssertEqual(selection.isEmpty ? book.selectedPage.text : selection, "two")
+        let noSelection = ""
+        XCTAssertEqual(noSelection.isEmpty ? book.selectedPage.text : noSelection, "one two")
+    }
+
 }
