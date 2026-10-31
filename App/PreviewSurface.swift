@@ -92,7 +92,7 @@ final class PreviewContainer: UIView, UITextViewDelegate {
         editor.smartQuotesType = .no
         editor.smartDashesType = .no
         editor.delegate = self
-        placeholder.text = "Спробуй. Make yourself at home."
+        placeholder.text = "Try Key Scratch. Swipe or tap to type."
         placeholder.font = .systemFont(ofSize: 16)
         placeholder.textColor = .placeholderText
         placeholder.isUserInteractionEnabled = false
