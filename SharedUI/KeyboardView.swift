@@ -763,6 +763,8 @@ final class FavoriteSymbolsPanel: UIView {
     private let closeButton = UIButton(type: .system)
     private let scroller = UIScrollView()
     private let grid = UIStackView()
+    private var shownSymbols: [String] = []
+    private var displayedColumns = 0
 
     override init(frame: CGRect) {
         super.init(frame: frame)
@@ -817,20 +819,36 @@ final class FavoriteSymbolsPanel: UIView {
     required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
 
     func configure(symbols: [String]) {
+        shownSymbols = symbols
+        displayedColumns = 0
+        setNeedsLayout()
+    }
+
+    override func layoutSubviews() {
+        super.layoutSubviews()
+        // In portrait the split keyboard is narrow: six comfortable columns,
+        // not eight cramped touch targets. Landscape can show eight.
+        let columns = max(4, min(8, Int(max(0, bounds.width - 8) / 44)))
+        guard columns != displayedColumns else { return }
+        displayedColumns = columns
+        rebuildRows(columns: columns)
+    }
+
+    private func rebuildRows(columns: Int) {
         for row in grid.arrangedSubviews {
             grid.removeArrangedSubview(row)
             row.removeFromSuperview()
         }
-        for offset in stride(from: 0, to: symbols.count, by: 8) {
+        for offset in stride(from: 0, to: shownSymbols.count, by: columns) {
             let row = UIStackView()
             row.axis = .horizontal
             row.distribution = .fillEqually
             row.spacing = 3
-            for column in 0..<8 {
+            for column in 0..<columns {
                 let index = offset + column
                 let button = UIButton(type: .system)
-                if index < symbols.count {
-                    let symbol = symbols[index]
+                if index < shownSymbols.count {
+                    let symbol = shownSymbols[index]
                     button.setTitle(symbol, for: .normal)
                     button.titleLabel?.font = .systemFont(ofSize: 22)
                     button.accessibilityLabel = "Insert \(symbol)"
