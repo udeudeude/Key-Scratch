@@ -44,6 +44,7 @@ fetch "App/SuggestionSettings.swift"
 fetch "App/LayoutWorkshop.swift"
 fetch "App/OrtholinearApp.swift"
 fetch "App/ContentView.swift"
+fetch "App/PreviewSurface.swift"
 fetch "KeyboardExtension/ScratchpadView.swift"
 fetch "KeyboardExtension/KeyboardViewController.swift"
 fetch "SharedUI/SuggestionBar.swift"
@@ -52,6 +53,11 @@ fetch "App/Info.plist"
 # The app icon is a binary PNG. Download it atomically rather than treating it
 # as Swift source; keep signed local project intact.
 fetch "Resources/Assets.xcassets/AppIcon.appiconset/AppIcon.png"
+# A normal image set is required for UIImage/SwiftUI Image lookup; the special
+# AppIcon asset cannot be loaded by Image("AppIcon") in the app's header.
+mkdir -p "Resources/Assets.xcassets/KeyScratchIcon.imageset"
+fetch "Resources/Assets.xcassets/KeyScratchIcon.imageset/Contents.json"
+fetch "Resources/Assets.xcassets/KeyScratchIcon.imageset/KeyScratchIcon.png"
 
 # App Store Ortholinear is optimized. Compare it against an optimized Key Scratch,
 # not Swift's (much slower) default Debug configuration.
