@@ -438,10 +438,16 @@ struct GeometrySettings: View {
                 Toggle("English apostrophe", isOn: $preferences.showApostrophe)
                     .disabled(preferences.iphoneKeyPositions)
                     .accessibilityIdentifier("show-apostrophe")
-                Toggle("ї on long-press і", isOn: $preferences.yiOnLongPress)
-                    .accessibilityIdentifier("yi-on-long-press")
+                if preferences.validated.languages.contains(.ukrainian) {
+                    Toggle("ї on long-press і", isOn: $preferences.yiOnLongPress)
+                        .accessibilityIdentifier("yi-on-long-press")
+                }
             } header: { Label("Letters · Optional keys", systemImage: "character.cursor.ibeam") } footer: {
-                Text("Fewer keys means wider letters. Punctuation stays available under 123. Moving ї to long-press і removes its separate key; hold І with Shift for Ї." + (preferences.customLayouts.isEmpty ? "" : " Languages arranged in the Layout Workshop keep the keys you gave them."))
+                Text("Punctuation remains available under 123." +
+                     (preferences.validated.languages.contains(.ukrainian)
+                         ? " Ukrainian: the ї option puts it on long-press і."
+                         : "") +
+                     (preferences.customLayouts.isEmpty ? "" : " Your custom layouts retain the keys you assigned."))
             }
             Section {
                 VStack(alignment: .leading, spacing: 10) {
@@ -464,12 +470,12 @@ struct GeometrySettings: View {
                 Toggle("Glide typing", isOn: $preferences.glideTyping)
                     .accessibilityIdentifier("glide-typing")
             } header: { Label("Typing", systemImage: "keyboard") } footer: {
-                Text("Capitals follow each text field, so email and web addresses stay lowercase. Automatic spacing adds a space after punctuation; apostrophes and numbers such as 3.14 stay together. Glide typing works in English and Ukrainian: slide across the letters of a word and lift, and other readings appear above the keys. Hold Delete to gradually delete faster.")
+                Text("Capitals follow each text field, so email and web addresses stay lowercase. Automatic spacing adds a space after punctuation; apostrophes and numbers such as 3.14 stay together. For swipe typing, slide across a word and lift; suggestions appear above the keys. Hold Delete to gradually delete faster.")
             }
             Section {
                 Button("Reset to defaults") { preferences = KeyboardPreferences() }
             } footer: {
-                Text("Settings save on this device. Dismiss and reopen the system keyboard to apply changes. The language key switches languages as you type.")
+                Text("Settings save on this device. Dismiss and reopen the system keyboard to apply changes. Hold the ★ key to switch between enabled languages.")
             }
         }
         .accessibilityIdentifier("geometry-controls")
