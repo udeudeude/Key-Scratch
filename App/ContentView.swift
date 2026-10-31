@@ -647,6 +647,19 @@ private struct KeyScratchExperimentLab: View {
                         }
                     }
                     .accessibilityIdentifier("scratchpad-visual-style")
+                    if draft.scratchpadVisualStyle != .standard {
+                        Text("KEY SCRATCH / FIELD NOTES\nThe universe is still there. ✓")
+                            .font(.custom("CourierNewPSMT", size: 12))
+                            .foregroundStyle(terminalInk)
+                            .frame(maxWidth: .infinity, minHeight: 74, alignment: .leading)
+                            .padding(.horizontal, 12)
+                            .background(terminalGlass, in: RoundedRectangle(cornerRadius: 7))
+                            .overlay {
+                                RoundedRectangle(cornerRadius: 7)
+                                    .strokeBorder(terminalInk.opacity(0.32), lineWidth: 0.7)
+                            }
+                            .accessibilityLabel("Preview of terminal scratchpad appearance")
+                    }
                 } header: {
                     Text("Scratchpad")
                 } footer: {
@@ -760,6 +773,24 @@ private struct KeyScratchExperimentLab: View {
             }
         }
         .tint(accent)
+    }
+
+    private var terminalInk: Color {
+        switch draft.scratchpadVisualStyle {
+        case .standard: .primary
+        case .phosphorGreen: Color(red: 0.47, green: 0.94, blue: 0.44)
+        case .amber: Color(red: 1, green: 0.73, blue: 0.22)
+        case .composite: Color(white: 0.95)
+        }
+    }
+
+    private var terminalGlass: Color {
+        switch draft.scratchpadVisualStyle {
+        case .standard: .clear
+        case .phosphorGreen: Color(red: 0.004, green: 0.016, blue: 0.004)
+        case .amber: Color(red: 0.016, green: 0.008, blue: 0)
+        case .composite: Color(red: 0.008, green: 0.008, blue: 0.016)
+        }
     }
 
     private func adjustment(_ title: String, value: Binding<Double>,
