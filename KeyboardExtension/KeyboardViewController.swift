@@ -220,7 +220,7 @@ final class KeyboardViewController: UIInputViewController {
         super.viewDidLayoutSubviews()
         // Draw the note's frame in exactly the same color as the keyboard
         // background, including dark mode and selectable keyboard themes.
-        scratchpad.keyboardSurroundColor = keyboard.backgroundColor ?? .systemGray5
+        scratchpad.keyboardSurroundColor = keyboard.keyBackdropColor
         if keyboard.needsGlobe != needsInputModeSwitchKey {
             keyboard.needsGlobe = needsInputModeSwitchKey
         }
