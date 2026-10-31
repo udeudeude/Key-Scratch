@@ -565,6 +565,21 @@ enum KeyScratchNoteFont: String, Codable, CaseIterable, Identifiable, Sendable {
     }
 }
 
+/// Native, low-overhead visual interpretations of the terminal display in
+/// Temporarily Leave the Universe. The editor remains a normal UITextView.
+enum ScratchpadVisualStyle: String, Codable, CaseIterable, Identifiable, Sendable {
+    case standard, phosphorGreen, amber, composite
+    var id: String { rawValue }
+    var title: String {
+        switch self {
+        case .standard: "Standard"
+        case .phosphorGreen: "Terminal · green"
+        case .amber: "Terminal · amber"
+        case .composite: "Terminal · composite TV"
+        }
+    }
+}
+
 struct KeyboardPreferences: Codable, Equatable, Sendable {
     let schemaVersion = 8
     var keyHeight: Double = 62
@@ -594,6 +609,8 @@ struct KeyboardPreferences: Codable, Equatable, Sendable {
     var keyScratchNoteWidth: Double = 0.30
     var keyScratchNoteFontSize: Double = 11
     var keyScratchNoteFont: KeyScratchNoteFont = .text
+    var leftHandedLayout: Bool = false
+    var scratchpadVisualStyle: ScratchpadVisualStyle = .standard
     /// User-editable one-tap Unicode/emoji choices for the keyboard star key.
     var favoriteSymbols: [String] = [
         "😀", "😂", "🙂", "🙃", "🤔", "👍", "❤️", "✨",
@@ -633,6 +650,7 @@ struct KeyboardPreferences: Codable, Equatable, Sendable {
         case controlHeight, letterSize, actionKeyWidth, shiftPlacement, showPunctuation, showApostrophe, showHeader, autoSpacePunctuation
         case yiOnLongPress, autoCapitalize, doubleSpacePeriod, digitAccess, glideTyping
         case keyScratchMode, keyScratchNoteWidth, keyScratchNoteFontSize, keyScratchNoteFont, favoriteSymbols
+        case leftHandedLayout, scratchpadVisualStyle
         case iphoneKeyPositions, appleKeyAppearance
         case theme, accent, showLongPressHints
         case suggestionsEnabled, nextWordSuggestions, contextualSuggestions
@@ -703,10 +721,10 @@ struct KeyboardPreferences: Codable, Equatable, Sendable {
         let suggestions = (suggestionsEnabled, nextWordSuggestions, contextualSuggestions)
         let typing = (autoCapitalize, doubleSpacePeriod, digitAccess, glideTyping, iphoneKeyPositions)
         let custom = (customLayouts, layers, showLayerKey, keycaps, expansions, extrasEnabled)
-        let scratch = (keyScratchMode, keyScratchNoteWidth, keyScratchNoteFontSize, keyScratchNoteFont, favoriteSymbols)
+        let scratch = (keyScratchMode, keyScratchNoteWidth, keyScratchNoteFontSize, keyScratchNoteFont, favoriteSymbols, leftHandedLayout, scratchpadVisualStyle)
         self = preset.preferences
         (customLayouts, layers, showLayerKey, keycaps, expansions, extrasEnabled) = custom
-        (keyScratchMode, keyScratchNoteWidth, keyScratchNoteFontSize, keyScratchNoteFont, favoriteSymbols) = scratch
+        (keyScratchMode, keyScratchNoteWidth, keyScratchNoteFontSize, keyScratchNoteFont, favoriteSymbols, leftHandedLayout, scratchpadVisualStyle) = scratch
         (defaultLanguage, languages, englishLayout, rememberLanguage, languageMemoryGeneration, invasionAnswer) = language
         (theme, accent, showLongPressHints, appleKeyAppearance) = appearance
         (suggestionsEnabled, nextWordSuggestions, contextualSuggestions) = suggestions
@@ -743,6 +761,8 @@ extension KeyboardPreferences {
         keyScratchNoteWidth = try c.decodeIfPresent(Double.self, forKey: .keyScratchNoteWidth) ?? keyScratchNoteWidth
         keyScratchNoteFontSize = try c.decodeIfPresent(Double.self, forKey: .keyScratchNoteFontSize) ?? keyScratchNoteFontSize
         keyScratchNoteFont = (try? c.decodeIfPresent(KeyScratchNoteFont.self, forKey: .keyScratchNoteFont)) ?? keyScratchNoteFont
+        leftHandedLayout = (try? c.decodeIfPresent(Bool.self, forKey: .leftHandedLayout)) ?? leftHandedLayout
+        scratchpadVisualStyle = (try? c.decodeIfPresent(ScratchpadVisualStyle.self, forKey: .scratchpadVisualStyle)) ?? scratchpadVisualStyle
         favoriteSymbols = (try? c.decodeIfPresent([String].self, forKey: .favoriteSymbols)) ?? favoriteSymbols
         theme = try c.decodeIfPresent(KeyboardTheme.self, forKey: .theme) ?? theme
         accent = try c.decodeIfPresent(KeyboardAccent.self, forKey: .accent) ?? accent
