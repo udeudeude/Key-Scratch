@@ -50,6 +50,7 @@ final class KeyboardView: UIControl {
         KeyScratchAdaptiveLayout.appearance(preferences, landscape: compactLandscape)
     }
     var layoutHeight: CGFloat { CGFloat(sizedPreferences.keyboardHeight) }
+    var keyBackdropColor: UIColor { palette.background }
     /// Hosts turn this on only for languages and fields that can decode a trace.
     var glideEnabled = false { didSet { if !glideEnabled { for id in sessions.keys { sessions[id]?.trace = nil } } } }
     var onAction: ((KeyAction) -> Void)?
