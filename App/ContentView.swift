@@ -639,10 +639,18 @@ private struct KeyScratchExperimentLab: View {
                             Text(font.title).tag(font)
                         }
                     }
+                    Toggle("Left-handed layout", isOn: $draft.leftHandedLayout)
+                        .accessibilityIdentifier("left-handed-keyboard-layout")
+                    Picker("Scratchpad appearance", selection: $draft.scratchpadVisualStyle) {
+                        ForEach(ScratchpadVisualStyle.allCases) { style in
+                            Text(style.title).tag(style)
+                        }
+                    }
+                    .accessibilityIdentifier("scratchpad-visual-style")
                 } header: {
                     Text("Scratchpad")
                 } footer: {
-                    Text("In landscape, the keyboard stays compact at the far right and the scratchpad fills the available space to its left. Portrait proportions are unchanged.")
+                    Text("Standard: notes left, keys right. Left-handed: keys left, notes right, in portrait and landscape. Terminal styles adapt the green, amber and composite-television visuals of Temporarily Leave the Universe without running a web browser.")
                 }
 
                 Section {
@@ -724,6 +732,8 @@ private struct KeyScratchExperimentLab: View {
                             "Portrait notes: \(Int(setup.keyScratchNoteWidth * 100))%",
                             "Landscape: compact keyboard right, notes fill remainder",
                             "Note: \(setup.keyScratchNoteFont.title), \(Int(setup.keyScratchNoteFontSize)) pt",
+                            "Left-handed: \(setup.leftHandedLayout)",
+                            "Scratchpad appearance: \(setup.scratchpadVisualStyle.title)",
                             "Letters: \(Int(setup.keyHeight)) pt; controls: \(Int(setup.controlHeight)) pt",
                             "Gaps: \(Int(setup.rowSpacing)) pt rows, \(Int(setup.columnSpacing)) pt columns",
                             "Fill gaps: \(setup.fillGaps); hints: \(setup.showLongPressHints)"
