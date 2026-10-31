@@ -458,18 +458,6 @@ final class ScratchpadView: UIView, UITextViewDelegate, UIEditMenuInteractionDel
                                 attributes: canUseClipboard ? [] : [.disabled]) { [weak self] _ in
             self?.pasteClipboard()
         })
-        if hasText {
-            actions.append(UIAction(title: "Select Paragraph") { [weak self] _ in
-                guard let self else { return }
-                let text = self.editor.text as NSString
-                let position = min(self.safeSelection().location, max(0, text.length - 1))
-                self.editor.selectedRange = text.paragraphRange(
-                    for: NSRange(location: position, length: 0))
-                self.updateCaret()
-                self.onTextChange?()
-                self.editMenu.reloadVisibleMenu()
-            })
-        }
         if hasText && editor.selectedRange.length != (editor.text as NSString).length {
             actions.append(UIAction(title: "Select All") { [weak self] _ in
                 guard let self else { return }
