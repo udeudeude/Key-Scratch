@@ -62,6 +62,7 @@ struct PreviewSurface: UIViewRepresentable {
 final class PreviewContainer: UIView, UITextViewDelegate {
     let editor = UITextView()
     let keyboard = KeyboardView()
+    private let favoritesPanel = FavoriteSymbolsPanel()
     private let placeholder = UILabel()
     private var state = InputState()
     private var punctuationSpacing = PunctuationSpacing()
@@ -98,6 +99,24 @@ final class PreviewContainer: UIView, UITextViewDelegate {
         placeholder.isUserInteractionEnabled = false
         placeholder.isAccessibilityElement = false
         [editor, keyboard, placeholder].forEach { $0.translatesAutoresizingMaskIntoConstraints = false; addSubview($0) }
+        favoritesPanel.translatesAutoresizingMaskIntoConstraints = false
+        favoritesPanel.isHidden = true
+        keyboard.addSubview(favoritesPanel)
+        NSLayoutConstraint.activate([
+            favoritesPanel.leadingAnchor.constraint(equalTo: keyboard.leadingAnchor),
+            favoritesPanel.trailingAnchor.constraint(equalTo: keyboard.trailingAnchor),
+            favoritesPanel.topAnchor.constraint(equalTo: keyboard.topAnchor),
+            favoritesPanel.bottomAnchor.constraint(equalTo: keyboard.bottomAnchor)
+        ])
+        favoritesPanel.onClose = { [weak self] in self?.favoritesPanel.isHidden = true }
+        favoritesPanel.onPick = { [weak self] symbol in
+            guard let self else { return }
+            self.favoritesPanel.isHidden = true
+            self.punctuationSpacing.reset()
+            self.editor.insertText(symbol)
+            self.placeholder.isHidden = true
+            self.suggestions.refresh()
+        }
         height = keyboard.heightAnchor.constraint(equalToConstant: keyboard.preferences.keyboardHeight)
         NSLayoutConstraint.activate([
             editor.topAnchor.constraint(equalTo: topAnchor), editor.leadingAnchor.constraint(equalTo: leadingAnchor),
@@ -171,6 +190,7 @@ final class PreviewContainer: UIView, UITextViewDelegate {
             state.language = preferences.validated.defaultLanguage
         }
         keyboard.preferences = preferences
+        favoritesPanel.isHidden = true
         height.constant = preferences.keyboardHeight
         if isActive && !wasActive { suggestions.beginSession() }
         updateAutoShift()
@@ -309,6 +329,9 @@ final class PreviewContainer: UIView, UITextViewDelegate {
                 autoShifted = false
                 manualShiftContext = textBeforeCaret
             } else { state.page = KeyboardLayout.page(after: state.page, preferences: keyboard.preferences) }
+        case .favorites:
+            favoritesPanel.configure(symbols: keyboard.preferences.favoriteSymbols)
+            favoritesPanel.isHidden.toggle()
         case .page: state.page = state.page == .letters ? .numbers : .letters
         case .layers: state.page = KeyboardLayout.firstLayerPage(keyboard.preferences) ?? .letters
         case .command(let command):
