@@ -36,11 +36,29 @@ final class KeyboardView: UIControl {
     }
     var returnTitle = "return" { didSet { if oldValue != returnTitle { refresh() } } }
     var returnEnabled = true { didSet { if oldValue != returnEnabled { refresh() } } }
+    var editingScratchpad = false { didSet { if oldValue != editingScratchpad { refresh() } } }
+    /// Layout only: the portrait user preferences are never overwritten.
+    var compactLandscape = false {
+        didSet {
+            guard oldValue != compactLandscape else { return }
+            cancelTouches()
+            invalidateIntrinsicContentSize()
+            refresh()
+        }
+    }
+    private var sizedPreferences: KeyboardPreferences {
+        KeyScratchAdaptiveLayout.appearance(preferences, landscape: compactLandscape)
+    }
+    var layoutHeight: CGFloat { CGFloat(sizedPreferences.keyboardHeight) }
+    var keyBackdropColor: UIColor { palette.background }
     /// Hosts turn this on only for languages and fields that can decode a trace.
     var glideEnabled = false { didSet { if !glideEnabled { for id in sessions.keys { sessions[id]?.trace = nil } } } }
     var onAction: ((KeyAction) -> Void)?
     var onCursor: ((Int) -> Void)?
+    var onCursorVertical: ((Int) -> Void)?
     var onDismiss: (() -> Void)?
+    /// Long-press the favorites star to cycle enabled languages.
+    var onLanguageHold: (() -> Void)?
     var onGlide: (([CGPoint]) -> Void)?
     var onGesture: ((KeyboardGesture) -> Void)?
     let suggestionBar = SuggestionBar()
@@ -71,7 +89,9 @@ final class KeyboardView: UIControl {
         let start: CGPoint
         var began = ProcessInfo.processInfo.systemUptime
         var cursorSteps = 0
+        var cursorRows = 0
         var cursorMode = false
+        var focusHeld = false
         var timer: Timer?
         var startCell: Int
         var flick: String?
@@ -116,18 +136,19 @@ final class KeyboardView: UIControl {
     required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
 
     override var intrinsicContentSize: CGSize {
-        CGSize(width: UIView.noIntrinsicMetric, height: preferences.keyboardHeight)
+        CGSize(width: UIView.noIntrinsicMetric, height: layoutHeight)
     }
 
     override func layoutSubviews() {
         super.layoutSubviews()
         // Only physical geometry changes cancel a slide. Switching pages is part of it.
         if layoutSize != bounds.size { cancelTouches(); layoutSize = bounds.size }
+        let sized = sizedPreferences
         cells = KeyboardGeometry.cells(width: bounds.width, state: displayState,
-                                       preferences: preferences, needsGlobe: needsGlobe)
+                                       preferences: sized, needsGlobe: needsGlobe)
         globeButton.isHidden = !needsGlobe
         globeButton.frame = cells.first(where: { $0.key.action == .globe })?.hitFrame ?? .zero
-        suggestionBar.frame = CGRect(x: 0, y: preferences.showHeader ? 38 : 0, width: bounds.width, height: preferences.suggestionHeight)
+        suggestionBar.frame = CGRect(x: 0, y: sized.showHeader ? 38 : 0, width: bounds.width, height: sized.suggestionHeight)
         suggestionBar.style(palette)
         dismissButton.frame = CGRect(x: bounds.width - 44, y: 0, width: 44, height: 38)
         updateChrome()
@@ -146,7 +167,7 @@ final class KeyboardView: UIControl {
 
     private func updateChrome() {
         suggestionBar.isHidden = !preferences.suggestionsEnabled || popup != nil
-        dismissButton.isHidden = !preferences.showHeader || popup != nil
+        dismissButton.isHidden = !sizedPreferences.showHeader || popup != nil
     }
 
     func cancelTouches() {
@@ -173,12 +194,10 @@ final class KeyboardView: UIControl {
             guard displayState.page == .letters else { return KeyboardLayout.pageTitle(nextPage, preferences: preferences) }
             return displayState.shift == .locked ? "⇪" : "⇧"
         case .backspace: return "⌫"
-        case .space:
-            let language = displayState.language
-            let layout = preferences.englishLayout
-            return language == .english && layout != .qwerty ? "\(language.title) · \(layout.title)" : language.title
+        case .space: return "space"
         case .enter: return returnTitle
         case .language: return nextLanguage.badge
+        case .favorites: return "★"
         case .page: return displayState.page == .letters ? "123" : "ABC"
         case .globe: return ""
         case .dismiss: return "⌄"
@@ -200,6 +219,7 @@ final class KeyboardView: UIControl {
         case .space: return "Space"
         case .enter: return "Return"
         case .language: return "Switch to \(nextLanguage.title)"
+        case .favorites: return "Favorite emoji and Unicode symbols. Hold for next language."
         case .page: return displayState.page == .letters ? "Numbers" : "Letters"
         case .dismiss: return "Dismiss keyboard"
         case .layers: return KeyboardLayout.firstLayerPage(preferences).map { KeyboardLayout.pageName($0, preferences: preferences) } ?? "Layers"
@@ -244,7 +264,7 @@ final class KeyboardView: UIControl {
             return element
         }
         if needsGlobe { elements.append(globeButton) }
-        if preferences.showHeader { elements.append(dismissButton) }
+        if sizedPreferences.showHeader { elements.append(dismissButton) }
         if preferences.suggestionsEnabled && popup == nil { elements.insert(suggestionBar, at: 0) }
         accessibilityElements = elements
     }
@@ -290,13 +310,37 @@ final class KeyboardView: UIControl {
 
     private var palette: KeyboardPalette {
         let increasedContrast = traitCollection.accessibilityContrast == .high
-        if let keycaps = preferences.shownKeycaps {
-            return KeyboardPalette(colors: .resolve(keycaps: keycaps, increasedContrast: increasedContrast),
-                                   font: keycaps.font, shape: keycaps.shape)
+        let dark = traitCollection.userInterfaceStyle == .dark
+        let keycaps = preferences.shownKeycaps
+        var style: KeyboardPalette
+        if let keycaps {
+            style = KeyboardPalette(colors: .resolve(keycaps: keycaps, increasedContrast: increasedContrast),
+                                    font: keycaps.font, shape: keycaps.shape)
+        } else {
+            style = KeyboardPalette(colors: .resolve(theme: preferences.theme, accent: preferences.accent,
+                                                     systemDark: dark, increasedContrast: increasedContrast))
         }
-        return KeyboardPalette(colors: .resolve(theme: preferences.theme, accent: preferences.accent,
-                                                systemDark: traitCollection.userInterfaceStyle == .dark,
-                                                increasedContrast: increasedContrast))
+        // Respect custom keycaps when the user explicitly chose them.
+        style.iosAppearance = preferences.appleKeyAppearance && keycaps == nil
+        style.darkAppearance = dark
+        return style
+    }
+
+    /// Position accent choices next to the held key instead of requiring a
+    /// long journey into the suggestion ribbon. Clamp inside the extension.
+    private func heldAlternativesFrame(owner: ObjectIdentifier, count: Int) -> CGRect {
+        let keyCenter: CGPoint
+        let top: CGFloat
+        if let index = sessions[owner]?.startCell, cells.indices.contains(index) {
+            keyCenter = CGPoint(x: cells[index].visualFrame.midX, y: cells[index].visualFrame.midY)
+            top = cells[index].visualFrame.minY
+        } else {
+            keyCenter = CGPoint(x: bounds.midX, y: 38)
+            top = 38
+        }
+        let width = min(max(1, bounds.width - 8), CGFloat(count) * 38)
+        let x = min(max(4, keyCenter.x - width / 2), max(4, bounds.width - width - 4))
+        return CGRect(x: x, y: max(1, top - 37), width: width, height: 34)
     }
 
     override func draw(_ rect: CGRect) {
@@ -317,9 +361,16 @@ final class KeyboardView: UIControl {
             let selectedShift = action == .shift && displayState.page == .letters && inputState.shift != .off
             let pressed = active.contains(index) || selectedShift
             let frame = cell.visualFrame.insetBy(dx: 0.25, dy: 0.25)
-            let radius = min(8, frame.width / 4)
-            let accentKey = action == .enter ? palette.colors.accentKey.map(UIColor.init(keyboardHex:)) : nil
+            let radius = min(palette.iosAppearance ? 5 : 8, frame.width / 4)
+            let accentKey = !palette.iosAppearance && action == .enter
+                ? palette.colors.accentKey.map(UIColor.init(keyboardHex:)) : nil
             let fill = accentKey ?? (isText ? palette.key : palette.control)
+            if palette.iosAppearance {
+                let drop = UIBezierPath(roundedRect: frame.offsetBy(dx: 0, dy: 1.4),
+                                        cornerRadius: radius)
+                UIColor.black.withAlphaComponent(palette.darkAppearance ? 0.38 : 0.17).setFill()
+                drop.fill()
+            }
             var path = UIBezierPath(roundedRect: frame, cornerRadius: radius)
             var face = frame
             if palette.shape == .sculpted, frame.height > 12 {
@@ -346,7 +397,7 @@ final class KeyboardView: UIControl {
             let label = flicked ?? cell.key.label ?? (action == .space && sessions.values.contains(where: \.cursorMode) ? "↔" : title(action))
             var size: CGFloat = label.count > 2 ? 13 : 19
             if case .text = action, cell.key.label == nil {
-                size = min(preferences.validated.letterSize, max(14, frame.width - 3))
+                size = min(sizedPreferences.letterSize, max(14, frame.width - 3))
             }
             drawText(label, in: face, font: palette.legend(ofSize: size, weight: isText ? .regular : .medium),
                      color: flicked == nil ? color : palette.accent)
@@ -386,11 +437,11 @@ final class KeyboardView: UIControl {
             trail.stroke()
         }
         if let popup {
-            let width = min(bounds.width - 12, CGFloat(popup.values.count) * 52)
-            let origin = (bounds.width - width) / 2
+            let ribbon = heldAlternativesFrame(owner: popup.owner, count: popup.values.count)
             for (index, value) in popup.values.enumerated() {
-                let frame = CGRect(x: origin + CGFloat(index) * width / CGFloat(popup.values.count),
-                                   y: 2, width: width / CGFloat(popup.values.count), height: 34)
+                let frame = CGRect(x: ribbon.minX + CGFloat(index) * ribbon.width / CGFloat(popup.values.count),
+                                   y: ribbon.minY, width: ribbon.width / CGFloat(popup.values.count),
+                                   height: ribbon.height)
                 let path = UIBezierPath(roundedRect: frame.insetBy(dx: 1, dy: 0), cornerRadius: 8)
                 palette.key.setFill(); path.fill()
                 if index == popup.selected {
@@ -398,12 +449,13 @@ final class KeyboardView: UIControl {
                 }
                 (index == popup.selected ? palette.accent : palette.border).setStroke()
                 path.lineWidth = max(1, palette.borderWidth); path.stroke()
-                drawText(title(.text(value)), in: frame, font: palette.legend(ofSize: 22, weight: .regular), color: palette.text)
+                let pointSize = min(21, max(12, frame.width * 0.65))
+                drawText(title(.text(value)), in: frame, font: palette.legend(ofSize: pointSize, weight: .regular), color: palette.text)
             }
-        } else if preferences.showHeader {
+        } else if sizedPreferences.showHeader {
             palette.accent.withAlphaComponent((dismissButton.isHighlighted ? 1 : feedbackOpacity(for: .dismiss)) * palette.highlightOpacity).setFill()
             UIBezierPath(roundedRect: dismissButton.frame.insetBy(dx: 2, dy: 2), cornerRadius: 8).fill()
-            let text = sessions.values.contains(where: \.cursorMode) ? "Slide to move cursor" : "\(inputState.language.badge)  ·  ORTHOLINEAR"
+            let text = sessions.values.contains(where: \.cursorMode) ? "Slide to move cursor" : "Key Scratch · \(inputState.language.badge)"
             drawText(text, in: CGRect(x: 10, y: 0, width: bounds.width - 64, height: 38),
                      font: .monospacedSystemFont(ofSize: 10, weight: .medium), color: palette.secondary, alignment: .left)
         }
@@ -432,6 +484,9 @@ final class KeyboardView: UIControl {
                      font: .systemFont(ofSize: 10, weight: .semibold), color: color)
         case .dismiss:
             drawSymbol("keyboard.chevron.compact.down", in: frame, size: 21, color: color)
+        case .favorites:
+            // Draw the contextual "Notes" or "App" label via normal key text.
+            return false
         case .globe: break // Native button keeps Apple's tap-and-hold behavior.
         default: return false
         }
@@ -483,8 +538,10 @@ final class KeyboardView: UIControl {
             }
             sessions[id] = session
             if key.action == .backspace { emit(.backspace) }
-            if key.action == .backspace || !key.alternatives.isEmpty {
-                let delay = key.action == .backspace ? DeleteRepeat.initialDelay : 0.42
+            if key.action == .backspace || key.action == .space
+                || key.action == .favorites || !key.alternatives.isEmpty {
+                let delay = key.action == .backspace ? DeleteRepeat.initialDelay
+                    : (key.action == .space ? 0.32 : 0.42)
                 let timer = Timer(timeInterval: delay, repeats: false) { [weak self] _ in
                     MainActor.assumeIsolated { self?.beginHold(id: id, key: key) }
                 }
@@ -499,9 +556,20 @@ final class KeyboardView: UIControl {
         guard sessions[id] != nil else { return }
         if key.action == .backspace {
             repeatDelete(id: id)
+        } else if key.action == .space {
+            sessions[id]?.cursorMode = true
+            setNeedsDisplay()
+        } else if key.action == .favorites {
+            // A language hold never toggles editing focus on release.
+            sessions[id]?.focusHeld = true
+            onLanguageHold?()
+            setNeedsDisplay()
         } else if popup == nil {
             sessions[id]?.trace = nil
-            popup = (id, key.alternatives, 0)
+            guard case .text(let original) = key.action else { return }
+            // Releasing without moving still types the original letter.
+            // Swipe left or right across the floating strip to pick an accent.
+            popup = (id, [original] + key.alternatives, 0)
             setNeedsDisplay()
         }
     }
@@ -547,23 +615,32 @@ final class KeyboardView: UIControl {
                 continue
             }
             if var current = popup, current.owner == id {
-                let width = min(bounds.width - 12, CGFloat(current.values.count) * 52)
-                let origin = (bounds.width - width) / 2
-                // Drag up into the ribbon to choose an alternative; release in place for the first.
-                if point.y < KeyboardGeometry.ribbonHeight {
-                    current.selected = min(current.values.count - 1, max(0, Int((point.x - origin) / (width / CGFloat(current.values.count)))))
+                let ribbon = heldAlternativesFrame(owner: id, count: current.values.count)
+                // Horizontal dragging works even if the finger remains near the
+                // held key, rather than reaching the top of the keyboard.
+                if abs(point.x - session.start.x) > 10 || ribbon.contains(point) {
+                    let unit = ribbon.width / CGFloat(current.values.count)
+                    current.selected = min(current.values.count - 1,
+                                           max(0, Int((point.x - ribbon.minX) / unit)))
                     popup = current
                 }
                 continue
             }
             if session.original == .space {
-                let delta = point.x - session.start.x
-                if abs(delta) >= 12 { session.cursorMode = true }
+                let dx = point.x - session.start.x
+                let dy = point.y - session.start.y
+                if hypot(dx, dy) >= 12 { session.cursorMode = true }
                 if session.cursorMode {
-                    let steps = Int(delta / 12)
-                    let offset = steps - session.cursorSteps
-                    if offset != 0 { onCursor?(offset) }
-                    session.cursorSteps = steps
+                    session.timer?.invalidate()
+                    session.timer = nil
+                    let horizontal = Int(dx / 12)
+                    let vertical = Int(dy / 20)
+                    let xSteps = horizontal - session.cursorSteps
+                    let yRows = vertical - session.cursorRows
+                    if xSteps != 0 { onCursor?(xSteps) }
+                    if yRows != 0 { onCursorVertical?(yRows) }
+                    session.cursorSteps = horizontal
+                    session.cursorRows = vertical
                     sessions[id] = session
                     continue
                 }
@@ -647,6 +724,8 @@ final class KeyboardView: UIControl {
                 onGesture?(.flick)
             } else if session.cursorMode {
                 onGesture?(.spaceCursor)
+            } else if session.focusHeld {
+                // Long press already switched language.
             } else if session.original != .backspace,
                       let index = KeyboardGeometry.hit(at: touch.location(in: self), cells: cells) {
                 emit(cells[index].key.action)
@@ -672,5 +751,121 @@ private extension UIColor {
         var (hue, saturation, brightness, alpha): (CGFloat, CGFloat, CGFloat, CGFloat) = (0, 0, 0, 0)
         guard getHue(&hue, saturation: &saturation, brightness: &brightness, alpha: &alpha) else { return self }
         return UIColor(hue: hue, saturation: saturation, brightness: brightness * (1 - amount), alpha: alpha)
+    }
+}
+
+/// In-keyboard favorites surface: not an attempt to invoke Apple's emoji UI.
+/// The header stays visible in the 172 pt compact landscape keyboard.
+final class FavoriteSymbolsPanel: UIView {
+    var onPick: ((String) -> Void)?
+    var onClose: (() -> Void)?
+
+    private let titleLabel = UILabel()
+    private let closeButton = UIButton(type: .system)
+    private let scroller = UIScrollView()
+    private let grid = UIStackView()
+    private var shownSymbols: [String] = []
+    private var displayedColumns = 0
+
+    override init(frame: CGRect) {
+        super.init(frame: frame)
+        backgroundColor = .systemGray5
+        layer.borderWidth = 0.5
+        layer.borderColor = UIColor.separator.cgColor
+        isAccessibilityElement = false
+
+        titleLabel.text = "★  Favorites · recent first"
+        titleLabel.font = .systemFont(ofSize: 12, weight: .semibold)
+        titleLabel.textColor = .secondaryLabel
+        titleLabel.translatesAutoresizingMaskIntoConstraints = false
+        addSubview(titleLabel)
+
+        closeButton.setTitle("Done", for: .normal)
+        closeButton.titleLabel?.font = .systemFont(ofSize: 13, weight: .semibold)
+        closeButton.accessibilityLabel = "Close favorite symbols"
+        closeButton.addAction(UIAction { [weak self] _ in self?.onClose?() }, for: .touchUpInside)
+        closeButton.translatesAutoresizingMaskIntoConstraints = false
+        addSubview(closeButton)
+
+        scroller.translatesAutoresizingMaskIntoConstraints = false
+        scroller.showsVerticalScrollIndicator = true
+        scroller.alwaysBounceVertical = false
+        addSubview(scroller)
+        grid.axis = .vertical
+        grid.spacing = 3
+        grid.distribution = .fill
+        grid.translatesAutoresizingMaskIntoConstraints = false
+        scroller.addSubview(grid)
+
+        NSLayoutConstraint.activate([
+            titleLabel.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 9),
+            titleLabel.topAnchor.constraint(equalTo: topAnchor, constant: 3),
+            titleLabel.heightAnchor.constraint(equalToConstant: 26),
+            closeButton.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -6),
+            closeButton.topAnchor.constraint(equalTo: topAnchor),
+            closeButton.widthAnchor.constraint(greaterThanOrEqualToConstant: 48),
+            closeButton.heightAnchor.constraint(equalToConstant: 30),
+            scroller.topAnchor.constraint(equalTo: titleLabel.bottomAnchor, constant: 2),
+            scroller.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 4),
+            scroller.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -4),
+            scroller.bottomAnchor.constraint(equalTo: bottomAnchor, constant: -3),
+            grid.topAnchor.constraint(equalTo: scroller.contentLayoutGuide.topAnchor),
+            grid.leadingAnchor.constraint(equalTo: scroller.contentLayoutGuide.leadingAnchor),
+            grid.trailingAnchor.constraint(equalTo: scroller.contentLayoutGuide.trailingAnchor),
+            grid.bottomAnchor.constraint(equalTo: scroller.contentLayoutGuide.bottomAnchor),
+            grid.widthAnchor.constraint(equalTo: scroller.frameLayoutGuide.widthAnchor)
+        ])
+    }
+
+    required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
+
+    func configure(symbols: [String]) {
+        shownSymbols = symbols
+        displayedColumns = 0
+        setNeedsLayout()
+    }
+
+    override func layoutSubviews() {
+        super.layoutSubviews()
+        // In portrait the split keyboard is narrow: six comfortable columns,
+        // not eight cramped touch targets. Landscape can show eight.
+        let columns = max(4, min(8, Int(max(0, bounds.width - 8) / 44)))
+        guard columns != displayedColumns else { return }
+        displayedColumns = columns
+        rebuildRows(columns: columns)
+    }
+
+    private func rebuildRows(columns: Int) {
+        for row in grid.arrangedSubviews {
+            grid.removeArrangedSubview(row)
+            row.removeFromSuperview()
+        }
+        for offset in stride(from: 0, to: shownSymbols.count, by: columns) {
+            let row = UIStackView()
+            row.axis = .horizontal
+            row.distribution = .fillEqually
+            row.spacing = 3
+            for column in 0..<columns {
+                let index = offset + column
+                let button = UIButton(type: .system)
+                if index < shownSymbols.count {
+                    let symbol = shownSymbols[index]
+                    button.setTitle(symbol, for: .normal)
+                    button.titleLabel?.font = .systemFont(ofSize: 22)
+                    button.accessibilityLabel = "Insert \(symbol)"
+                    button.backgroundColor = .secondarySystemGroupedBackground
+                    button.layer.cornerRadius = 6
+                    button.addAction(UIAction { [weak self] _ in
+                        self?.onPick?(symbol)
+                    }, for: .touchUpInside)
+                } else {
+                    button.isEnabled = false
+                }
+                row.addArrangedSubview(button)
+            }
+            row.heightAnchor.constraint(equalToConstant: 38).isActive = true
+            grid.addArrangedSubview(row)
+        }
+        scroller.setContentOffset(.zero, animated: false)
     }
 }

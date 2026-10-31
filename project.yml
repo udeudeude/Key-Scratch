@@ -1,6 +1,6 @@
 name: Ortholinear
 options:
-  bundleIdPrefix: com.varyvoda
+  bundleIdPrefix: com.udeudeude
   deploymentTarget:
     iOS: "17.0"
 settings:
@@ -8,10 +8,9 @@ settings:
     SWIFT_VERSION: "6.0"
     TARGETED_DEVICE_FAMILY: "1,2"
     CODE_SIGN_STYLE: Automatic
-    DEVELOPMENT_TEAM: 2Z5ZVRKA23
-    MARKETING_VERSION: "0.6.1"
-    CURRENT_PROJECT_VERSION: "22"
-    ORTHOLINEAR_APP_GROUP: group.com.varyvoda.Ortholinear
+    MARKETING_VERSION: "0.6.2"
+    CURRENT_PROJECT_VERSION: "23"
+    ORTHOLINEAR_APP_GROUP: group.com.udeudeude.KeyScratch
     ENABLE_USER_SCRIPT_SANDBOXING: YES
 targets:
   Ortholinear:
@@ -27,8 +26,8 @@ targets:
       - Resources
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.varyvoda.Ortholinear
-        INFOPLIST_KEY_CFBundleDisplayName: Ortholinear
+        PRODUCT_BUNDLE_IDENTIFIER: com.udeudeude.KeyScratch
+        INFOPLIST_KEY_CFBundleDisplayName: Key Scratch
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
     info:
       path: App/Info.plist
@@ -59,13 +58,13 @@ targets:
     sources: [KeyboardExtension, Core, SharedUI, Resources/PrivacyInfo.xcprivacy]
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.varyvoda.Ortholinear.Keyboard
+        PRODUCT_BUNDLE_IDENTIFIER: com.udeudeude.KeyScratch.Keyboard
         APPLICATION_EXTENSION_API_ONLY: YES
         SKIP_INSTALL: YES
     info:
       path: KeyboardExtension/Info.plist
       properties:
-        CFBundleDisplayName: Ortholinear
+        CFBundleDisplayName: Key Scratch
         CFBundleShortVersionString: $(MARKETING_VERSION)
         CFBundleVersion: $(CURRENT_PROJECT_VERSION)
         OrtholinearAppGroup: $(ORTHOLINEAR_APP_GROUP)
@@ -75,8 +74,8 @@ targets:
           NSExtensionAttributes:
             IsASCIICapable: true
             PrefersRightToLeft: false
-            PrimaryLanguage: uk-UA
-            RequestsOpenAccess: false
+            PrimaryLanguage: en-US
+            RequestsOpenAccess: true
     entitlements:
       path: KeyboardExtension/OrtholinearKeyboard.entitlements
       properties:
@@ -90,7 +89,7 @@ targets:
     settings:
       base:
         GENERATE_INFOPLIST_FILE: YES
-        PRODUCT_BUNDLE_IDENTIFIER: com.varyvoda.Ortholinear.UITests
+        PRODUCT_BUNDLE_IDENTIFIER: com.udeudeude.KeyScratch.UITests
   OrtholinearSystemTests:
     type: bundle.ui-testing
     platform: iOS
@@ -100,12 +99,15 @@ targets:
     settings:
       base:
         GENERATE_INFOPLIST_FILE: YES
-        PRODUCT_BUNDLE_IDENTIFIER: com.varyvoda.Ortholinear.SystemTests
+        PRODUCT_BUNDLE_IDENTIFIER: com.udeudeude.KeyScratch.SystemTests
 schemes:
   Ortholinear:
     build:
       targets:
         Ortholinear: all
+    # Compare an optimized Release run with the App Store's optimized Ortholinear.
+    run:
+      config: Release
     test:
       targets: [OrtholinearUITests]
   OrtholinearSystemTests:

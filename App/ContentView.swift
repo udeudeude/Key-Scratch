@@ -1,9 +1,7 @@
 import SwiftUI
 
-private let accent = Color(red: 0.12, green: 0.43, blue: 0.38)
-private let paper = Color(uiColor: UIColor { $0.userInterfaceStyle == .dark
-    ? UIColor(red: 0.08, green: 0.10, blue: 0.10, alpha: 1)
-    : UIColor(red: 0.96, green: 0.95, blue: 0.92, alpha: 1) })
+private let accent = Color(uiColor: .systemBlue)
+private let paper = Color(uiColor: .systemGroupedBackground)
 
 struct ContentView: View {
     /// The app's own copy keeps every extra on; the published copy is what the edition allows.
@@ -11,6 +9,8 @@ struct ContentView: View {
     @State private var showGeometry = false
     @State private var showSetup = false
     @State private var showSystemTest = false
+    @State private var showKeyScratchLab = false
+    @State private var showFullNotes = false
     @State private var saveError: String?
     @State private var triedGestures: Set<KeyboardGesture> = []
 
@@ -18,8 +18,13 @@ struct ContentView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 26) {
                 HStack(spacing: 10) {
-                    GridMark().frame(width: 30, height: 30)
-                    Text("ortholinear").font(.system(size: 23, weight: .semibold, design: .rounded))
+                    Image("KeyScratchIcon")
+                        .resizable()
+                        .interpolation(.high)
+                        .frame(width: 36, height: 36)
+                        .clipShape(RoundedRectangle(cornerRadius: 9))
+                        .accessibilityLabel("Key Scratch car-key icon")
+                    Text("Key Scratch").font(.system(size: 23, weight: .bold))
                     Spacer()
                     Text(languageBadge).font(.system(size: 10, weight: .semibold, design: .monospaced))
                         .padding(.horizontal, 10).padding(.vertical, 7)
@@ -31,11 +36,57 @@ struct ContentView: View {
                 }
                 .padding(.top, 12)
 
+                Button { showKeyScratchLab = true } label: {
+                    HStack(spacing: 12) {
+                        Image(systemName: "rectangle.split.2x1")
+                            .font(.title3)
+                            .frame(width: 30)
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("Scratchpad & layout")
+                                .font(.system(size: 17, weight: .semibold))
+                                .foregroundStyle(.primary)
+                            Text("Adjust notes, key spacing and landscape layout")
+                                .font(.system(size: 12))
+                                .foregroundStyle(.secondary)
+                        }
+                        Spacer(minLength: 0)
+                        Image(systemName: "chevron.right")
+                            .foregroundStyle(.secondary)
+                    }
+                    .padding(14)
+                    .background(.primary.opacity(0.065), in: RoundedRectangle(cornerRadius: 13))
+                }
+                .buttonStyle(.plain)
+                .accessibilityIdentifier("key-scratch-layout-settings")
+
+                Button { showFullNotes = true } label: {
+                    HStack(spacing: 12) {
+                        Image(systemName: "note.text")
+                            .font(.title3)
+                            .frame(width: 30)
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("Scratchpad")
+                                .font(.system(size: 17, weight: .semibold))
+                                .foregroundStyle(.primary)
+                            Text("Edit your keyboard notes full-size, copy, or export")
+                                .font(.system(size: 12))
+                                .foregroundStyle(.secondary)
+                        }
+                        Spacer(minLength: 0)
+                        Image(systemName: "chevron.right")
+                            .foregroundStyle(.secondary)
+                    }
+                    .padding(14)
+                    .background(.primary.opacity(0.065), in: RoundedRectangle(cornerRadius: 13))
+                }
+                .buttonStyle(.plain)
+                .accessibilityIdentifier("open-key-scratch-notes")
+
                 VStack(alignment: .leading, spacing: 12) {
-                    Text("Room for\nbigger letters.")
+                    Text("Notes alongside\nyour keyboard.")
                         .font(.system(size: 43, weight: .medium, design: .rounded)).tracking(-2)
                         .lineSpacing(-5).fixedSize(horizontal: false, vertical: true)
-                    Text("Give the letters more space. Make everything else optional.")
+                    Text("Swipe naturally while keeping your notes visible beside the keyboard.")
                         .font(.system(size: 16)).foregroundStyle(.secondary).lineSpacing(4)
                 }
 
@@ -44,13 +95,13 @@ struct ContentView: View {
                     Text("·")
                     Text("No tracking")
                     Text("·")
-                    Text("Tap-only suggestions")
+                    Text("Local notes")
                 }
                 .font(.system(size: 11, weight: .medium)).foregroundStyle(accent)
 
                 VStack(alignment: .leading, spacing: 12) {
                     HStack {
-                        Text("YOUR TEST DRIVE").font(.system(size: 10, weight: .semibold, design: .monospaced)).tracking(2)
+                        Text("KEYBOARD PREVIEW").font(.system(size: 10, weight: .semibold, design: .monospaced)).tracking(2)
                         Spacer()
                         Button("Clear") { NotificationCenter.default.post(name: .clearKeyboardPreview, object: nil) }
                             .font(.system(size: 12, weight: .medium)).accessibilityIdentifier("clear-preview")
@@ -86,22 +137,22 @@ struct ContentView: View {
                 }
 
                 VStack(spacing: 0) {
-                    detailRow("01", title: "All the way to the edges.", subtitle: "No stagger or indents. Fewer keys in a row means wider letters.")
+                    detailRow("01", title: "Familiar keyboard geometry.", subtitle: "iPhone-like key positions with adjustable height and note width.")
                     Divider().padding(.vertical, 17)
-                    detailRow("02", title: "Make the space yours.", subtitle: "Size letters and controls separately. Choose which punctuation earns a key.")
+                    detailRow("02", title: "Your note, always visible.", subtitle: "Keep a reference in sight while composing text in another app.")
                     Divider().padding(.vertical, 17)
-                    detailRow("03", title: "Your words stay yours.", subtitle: "No network access, tracking, or Full Access. Your typing stays on your device.")
+                    detailRow("03", title: "Notes remain on-device.", subtitle: "Full Access enables the clipboard and the companion app's shared note.")
                 }
                 .padding(20).background(.primary.opacity(0.035), in: RoundedRectangle(cornerRadius: 14))
 
                 Button("Test the installed system keyboard") { showSystemTest = true }
                     .font(.system(size: 13, weight: .medium)).accessibilityIdentifier("system-test")
                 HStack(spacing: 20) {
-                    Link("Privacy policy", destination: URL(string: "https://github.com/IgorVaryvoda/Ortholinear/blob/main/PRIVACY.md")!)
-                    Link("Support", destination: URL(string: "https://github.com/IgorVaryvoda/Ortholinear/blob/main/SUPPORT.md")!)
+                    Link("Privacy policy", destination: URL(string: "https://github.com/udeudeude/Key-Scratch/blob/feature/scratchpad-first-pass/PRIVACY.md")!)
+                    Link("Source and feedback", destination: URL(string: "https://github.com/udeudeude/Key-Scratch/issues")!)
                 }
                 .font(.system(size: 13, weight: .medium))
-                Text("BUILT FOR YOUR HANDS.  /  V0.6.1")
+                Text("KEY SCRATCH / LOCAL NOTES")
                     .font(.system(size: 9, weight: .medium, design: .monospaced)).tracking(1.5)
                     .foregroundStyle(.tertiary).padding(.bottom, 20)
             }
@@ -112,6 +163,8 @@ struct ContentView: View {
         .sheet(isPresented: $showGeometry) { GeometrySettings(preferences: $preferences) }
         .sheet(isPresented: $showSetup) { SetupView() }
         .sheet(isPresented: $showSystemTest) { SystemKeyboardTest() }
+        .sheet(isPresented: $showKeyScratchLab) { KeyScratchExperimentLab(preferences: $preferences) }
+        .sheet(isPresented: $showFullNotes) { KeyScratchFullNotes() }
         .onChange(of: preferences) { _, value in
             do { try KeyboardPublisher.publish(value) }
             catch { saveError = "The preview was updated, but settings could not be shared with the extension. Check that both targets use the same App Group and signing team." }
@@ -149,7 +202,7 @@ private struct GestureChecklist: View {
 
     private var items: [(KeyboardGesture, String)] {
         var items: [(KeyboardGesture, String)] = [
-            (.alternative, preferences.validated.defaultLanguage == .ukrainian ? "Hold г, then release, for ґ" : "Hold a key with a small letter for more"),
+            (.alternative, "Hold a letter, then slide to choose an accent"),
             (.symbolSlide, "Hold 123, slide to a symbol, release"),
             (.spaceCursor, "Slide on Space to move the cursor")
         ]
@@ -174,18 +227,6 @@ private struct GestureChecklist: View {
                 .font(.system(size: 11)).foregroundStyle(.secondary).lineSpacing(3)
         }
         .animation(.easeOut(duration: 0.2), value: tried)
-    }
-}
-
-private struct GridMark: View {
-    var body: some View {
-        Grid(horizontalSpacing: 2, verticalSpacing: 2) {
-            ForEach(0..<3) { row in
-                GridRow { ForEach(0..<3) { column in
-                    RoundedRectangle(cornerRadius: 1).fill(row == 2 && column == 2 ? accent.opacity(0.35) : accent)
-                } }
-            }
-        }
     }
 }
 
@@ -312,15 +353,15 @@ struct GeometrySettings: View {
                 }.accessibilityIdentifier("layout-workshop")
             }
             if let proRows = ProHooks.settingsRows {
-                Section("Ortholinear Pro") { proRows($preferences) }
+                Section("Additional features") { proRows($preferences) }
             }
             Section("Appearance") {
                 Button { showAppearance = true } label: {
                     HStack(spacing: 12) {
                         Image(systemName: "paintpalette.fill").font(.title3)
                         VStack(alignment: .leading, spacing: 4) {
-                            Text("Theme and colors").font(.body.weight(.medium))
-                            Text("\(preferences.theme.title) · \(preferences.accent.title)").font(.caption).foregroundStyle(.secondary)
+                            Text("Appearance").font(.body.weight(.medium))
+                            Text(preferences.appleKeyAppearance ? "iPhone-style · automatic light/dark" : "\(preferences.theme.title) · \(preferences.accent.title)").font(.caption).foregroundStyle(.secondary)
                         }
                         Spacer()
                         Image(systemName: "chevron.right").font(.caption.weight(.semibold)).foregroundStyle(.secondary)
@@ -385,6 +426,8 @@ struct GeometrySettings: View {
                     }.pickerStyle(.segmented)
                 }
                 Toggle("Show header strip", isOn: $preferences.showHeader)
+                Toggle("iPhone key positions", isOn: $preferences.iphoneKeyPositions)
+                    .accessibilityIdentifier("iphone-key-positions")
                     .accessibilityIdentifier("show-header")
             } header: { Label("Layout · Controls", systemImage: "rectangle.bottomthird.inset.filled") } footer: {
                 Text("Hide the header to leave more room for letters.")
@@ -393,11 +436,18 @@ struct GeometrySettings: View {
                 Toggle("Dot, comma and question mark", isOn: $preferences.showPunctuation)
                     .accessibilityIdentifier("show-punctuation")
                 Toggle("English apostrophe", isOn: $preferences.showApostrophe)
+                    .disabled(preferences.iphoneKeyPositions)
                     .accessibilityIdentifier("show-apostrophe")
-                Toggle("ї on long-press і", isOn: $preferences.yiOnLongPress)
-                    .accessibilityIdentifier("yi-on-long-press")
+                if preferences.validated.languages.contains(.ukrainian) {
+                    Toggle("ї on long-press і", isOn: $preferences.yiOnLongPress)
+                        .accessibilityIdentifier("yi-on-long-press")
+                }
             } header: { Label("Letters · Optional keys", systemImage: "character.cursor.ibeam") } footer: {
-                Text("Fewer keys means wider letters. Punctuation stays available under 123. Moving ї to long-press і removes its separate key; hold І with Shift for Ї." + (preferences.customLayouts.isEmpty ? "" : " Languages arranged in the Layout Workshop keep the keys you gave them."))
+                Text("Punctuation remains available under 123." +
+                     (preferences.validated.languages.contains(.ukrainian)
+                         ? " Ukrainian: the ї option puts it on long-press і."
+                         : "") +
+                     (preferences.customLayouts.isEmpty ? "" : " Your custom layouts retain the keys you assigned."))
             }
             Section {
                 VStack(alignment: .leading, spacing: 10) {
@@ -420,12 +470,12 @@ struct GeometrySettings: View {
                 Toggle("Glide typing", isOn: $preferences.glideTyping)
                     .accessibilityIdentifier("glide-typing")
             } header: { Label("Typing", systemImage: "keyboard") } footer: {
-                Text("Capitals follow each text field, so email and web addresses stay lowercase. Automatic spacing adds a space after punctuation; apostrophes and numbers such as 3.14 stay together. Glide typing works in English and Ukrainian: slide across the letters of a word and lift, and other readings appear above the keys. Hold Delete to gradually delete faster.")
+                Text("Capitals follow each text field, so email and web addresses stay lowercase. Automatic spacing adds a space after punctuation; apostrophes and numbers such as 3.14 stay together. For swipe typing, slide across a word and lift; suggestions appear above the keys. Hold Delete to gradually delete faster.")
             }
             Section {
                 Button("Reset to defaults") { preferences = KeyboardPreferences() }
             } footer: {
-                Text("Settings save on this device. Dismiss and reopen the system keyboard to apply changes. The language key switches languages as you type.")
+                Text("Settings save on this device. Dismiss and reopen the system keyboard to apply changes. Hold the ★ key to switch between enabled languages.")
             }
         }
         .accessibilityIdentifier("geometry-controls")
@@ -480,10 +530,10 @@ struct SetupView: View {
                 Section {
                     Label("Open Settings → General → Keyboard", systemImage: "1.circle")
                     Label("Choose Keyboards → Add New Keyboard", systemImage: "2.circle")
-                    Label("Select Ortholinear", systemImage: "3.circle")
-                    Label("In any text field, use the globe to switch to Ortholinear", systemImage: "4.circle")
+                    Label("Select Key Scratch", systemImage: "3.circle")
+                    Label("In any text field, use the globe to switch to Key Scratch", systemImage: "4.circle")
                 } header: { Text("A one-time setup") } footer: {
-                    Text("Ortholinear does not request Full Access. Typing and geometry settings work without network access.")
+                    Text("For notes Copy/Paste and sharing the scratchpad with this app, select Key Scratch under Settings → General → Keyboard → Keyboards and enable Allow Full Access. No internet connection or account is needed.")
                 }
                 Section {
                     Button("Open Settings") {
@@ -529,7 +579,7 @@ struct SystemKeyboardTest: View {
                         }
                     }
                 }
-                Section("Use the globe to choose Ortholinear") {
+                Section("Use the globe to choose Key Scratch") {
                     TextEditor(text: $text).frame(minHeight: 150).accessibilityIdentifier("system-editor")
                 }
                 Section("Email input") {
@@ -545,5 +595,308 @@ struct SystemKeyboardTest: View {
     private func field(_ index: Int, _ title: String, _ type: UIKeyboardType) -> some View {
         TextField(title, text: $fields[index]).keyboardType(type).textInputAutocapitalization(.never)
             .autocorrectionDisabled().focused($focused, equals: index).accessibilityIdentifier("field-\(index)")
+    }
+}
+
+
+/// One everyday split keyboard, not the old color-coded A/B experiment.
+private struct KeyScratchExperimentLab: View {
+    @Binding var preferences: KeyboardPreferences
+    @State private var draft: KeyboardPreferences
+    @State private var testText = ""
+    @State private var symbolsText: String
+    @State private var status = "Adjust settings, then Apply and test."
+    @FocusState private var testing: Bool
+    @Environment(\.dismiss) private var dismiss
+
+    init(preferences: Binding<KeyboardPreferences>) {
+        _preferences = preferences
+        _draft = State(initialValue: PreferenceStore.normalized(preferences.wrappedValue))
+        _symbolsText = State(initialValue: preferences.wrappedValue.validated.favoriteSymbols.joined(separator: " "))
+    }
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section {
+                    HStack {
+                        Text("Notes width in portrait")
+                        Spacer()
+                        Text("\(Int(draft.keyScratchNoteWidth * 100))%")
+                            .monospacedDigit().foregroundStyle(.secondary)
+                    }
+                    Slider(value: $draft.keyScratchNoteWidth, in: 0.18...0.42, step: 0.02)
+                        .accessibilityLabel("Portrait notes width")
+                    HStack {
+                        Text("Note text size")
+                        Spacer()
+                        Text("\(Int(draft.keyScratchNoteFontSize)) pt")
+                            .monospacedDigit().foregroundStyle(.secondary)
+                    }
+                    Slider(value: $draft.keyScratchNoteFontSize, in: 9...16, step: 1)
+                    Picker("Note typeface", selection: $draft.keyScratchNoteFont) {
+                        ForEach(KeyScratchNoteFont.allCases) { font in
+                            Text(font.title).tag(font)
+                        }
+                    }
+                    Toggle("Left-handed layout", isOn: $draft.leftHandedLayout)
+                        .accessibilityIdentifier("left-handed-keyboard-layout")
+                    Picker("Scratchpad appearance", selection: $draft.scratchpadVisualStyle) {
+                        ForEach(ScratchpadVisualStyle.allCases) { style in
+                            Text(style.title).tag(style)
+                        }
+                    }
+                    .accessibilityIdentifier("scratchpad-visual-style")
+                    if draft.scratchpadVisualStyle != .standard {
+                        Text("KEY SCRATCH / FIELD NOTES\nThe universe is still there. ✓")
+                            .font(.custom("CourierNewPSMT", size: 12))
+                            .foregroundStyle(terminalInk)
+                            .frame(maxWidth: .infinity, minHeight: 74, alignment: .leading)
+                            .padding(.horizontal, 12)
+                            .background(terminalGlass, in: RoundedRectangle(cornerRadius: 7))
+                            .overlay {
+                                RoundedRectangle(cornerRadius: 7)
+                                    .strokeBorder(terminalInk.opacity(0.32), lineWidth: 0.7)
+                            }
+                            .accessibilityLabel("Preview of terminal scratchpad appearance")
+                    }
+                } header: {
+                    Text("Scratchpad")
+                } footer: {
+                    Text("Standard: notes left, keys right. Left-handed: keys left, notes right, in portrait and landscape. Terminal styles adapt the green, amber and composite-television visuals of Temporarily Leave the Universe without running a web browser.")
+                }
+
+                Section {
+                    adjustment("Letter row", value: $draft.keyHeight, bounds: 36...88)
+                    adjustment("Control row", value: $draft.controlHeight, bounds: 36...72)
+                    adjustment("Row spacing", value: $draft.rowSpacing, bounds: 0...12)
+                    adjustment("Column spacing", value: $draft.columnSpacing, bounds: 0...8)
+                } header: {
+                    Text("Keyboard size")
+                } footer: {
+                    Text("Landscape uses shorter keys and tighter gaps automatically. The entire area between visible keys remains tappable while Fill Gaps is enabled.")
+                }
+
+                Section("Layout") {
+                    Toggle("iPhone key positions", isOn: $draft.iphoneKeyPositions)
+                    Toggle("Fill invisible key gaps", isOn: $draft.fillGaps)
+                    Toggle("Show tiny key hints", isOn: $draft.showLongPressHints)
+                }
+
+                Section {
+                    Text("Tap ★ on the keyboard for these favorites. Recently used symbols appear first.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    TextEditor(text: $symbolsText)
+                        .font(.system(size: 19))
+                        .frame(minHeight: 78)
+                        .accessibilityIdentifier("favorite-symbols-editor")
+                        .onChange(of: symbolsText) { _, edited in
+                            draft.favoriteSymbols = Array(edited.split(whereSeparator: \.isWhitespace)
+                                .map(String.init).prefix(48))
+                        }
+                    Button("Restore standard favorites") {
+                        draft.favoriteSymbols = KeyboardPreferences().favoriteSymbols
+                        symbolsText = draft.favoriteSymbols.joined(separator: " ")
+                    }
+                } header: {
+                    Text("Favorite emoji & symbols")
+                } footer: {
+                    Text("Enter emoji or Unicode symbols separated by spaces (up to 48). Tap Apply and test to update the keyboard. Recent usage is remembered on this iPhone.")
+                }
+
+                Section("Clipboard access") {
+                    Text("Allow Full Access enables Copy and Paste in the keyboard and lets the containing app share your local scratchpad. Key Scratch does not transmit your text.")
+                        .font(.caption).foregroundStyle(.secondary)
+                    Button {
+                        if let url = URL(string: UIApplication.openSettingsURLString) {
+                            UIApplication.shared.open(url)
+                        }
+                    } label: {
+                        Label("Open iOS Settings", systemImage: "gear")
+                    }
+                    Text("General → Keyboard → Keyboards → Key Scratch → Allow Full Access")
+                        .font(.caption).foregroundStyle(.secondary)
+                }
+
+                Section("Try it immediately") {
+                    Button {
+                        let next = PreferenceStore.normalized(draft)
+                        do {
+                            try KeyboardPublisher.publish(next)
+                            preferences = next
+                            status = "Applied. Switch away from Key Scratch and back with the globe to reload."
+                            testing = true
+                        } catch {
+                            status = "Settings could not be shared. Check App Group signing."
+                        }
+                    } label: {
+                        Label("Apply and test", systemImage: "checkmark.circle")
+                            .fontWeight(.semibold)
+                            .frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .accessibilityIdentifier("apply-key-scratch-layout")
+
+                    Button {
+                        let setup = PreferenceStore.normalized(draft)
+                        UIPasteboard.general.string = [
+                            "Key Scratch layout",
+                            "Portrait notes: \(Int(setup.keyScratchNoteWidth * 100))%",
+                            "Landscape: compact keyboard right, notes fill remainder",
+                            "Note: \(setup.keyScratchNoteFont.title), \(Int(setup.keyScratchNoteFontSize)) pt",
+                            "Left-handed: \(setup.leftHandedLayout)",
+                            "Scratchpad appearance: \(setup.scratchpadVisualStyle.title)",
+                            "Letters: \(Int(setup.keyHeight)) pt; controls: \(Int(setup.controlHeight)) pt",
+                            "Gaps: \(Int(setup.rowSpacing)) pt rows, \(Int(setup.columnSpacing)) pt columns",
+                            "Fill gaps: \(setup.fillGaps); hints: \(setup.showLongPressHints)"
+                        ].joined(separator: "\n")
+                        status = "Settings copied."
+                    } label: {
+                        Label("Copy settings", systemImage: "doc.on.doc")
+                    }
+                    Text(status).font(.caption).foregroundStyle(.secondary)
+                    TextEditor(text: $testText)
+                        .focused($testing)
+                        .frame(height: 100)
+                        .accessibilityIdentifier("layout-test-text-editor")
+                    Text("This uses the installed keyboard, not a mockup.")
+                        .font(.caption).foregroundStyle(.secondary)
+                }
+            }
+            .navigationTitle("Scratchpad & layout")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Close") { dismiss() }
+                }
+            }
+        }
+        .tint(accent)
+    }
+
+    private var terminalInk: Color {
+        switch draft.scratchpadVisualStyle {
+        case .standard: .primary
+        case .phosphorGreen: Color(red: 0.47, green: 0.94, blue: 0.44)
+        case .amber: Color(red: 1, green: 0.73, blue: 0.22)
+        case .composite: Color(white: 0.95)
+        }
+    }
+
+    private var terminalGlass: Color {
+        switch draft.scratchpadVisualStyle {
+        case .standard: .clear
+        case .phosphorGreen: Color(red: 0.004, green: 0.016, blue: 0.004)
+        case .amber: Color(red: 0.016, green: 0.008, blue: 0)
+        case .composite: Color(red: 0.008, green: 0.008, blue: 0.016)
+        }
+    }
+
+    private func adjustment(_ title: String, value: Binding<Double>,
+                            bounds: ClosedRange<Double>) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            HStack {
+                Text(title)
+                Spacer()
+                Text("\(Int(value.wrappedValue)) pt")
+                    .monospacedDigit().foregroundStyle(.secondary)
+            }
+            Slider(value: value, in: bounds, step: 1)
+                .accessibilityLabel(title)
+        }
+    }
+}
+
+
+/// Full-size companion editor for the very same local note shown in the keyboard.
+/// The keyboard extension is short-lived; the App Group note is shared locally
+/// without accounts, synchronization services, or network access.
+private struct KeyScratchFullNotes: View {
+    @Environment(\.dismiss) private var dismiss
+    @State private var note = ""
+    @State private var loaded = false
+    @State private var showClearConfirmation = false
+    @State private var notice: String?
+    @FocusState private var focused: Bool
+
+    var body: some View {
+        NavigationStack {
+            VStack(alignment: .leading, spacing: 12) {
+                Text("The note shown beside your keyboard, with room to edit it.")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                TextEditor(text: $note)
+                    .focused($focused)
+                    .font(.system(size: 16))
+                    .scrollContentBackground(.hidden)
+                    .padding(7)
+                    .background(.secondary.opacity(0.08), in: RoundedRectangle(cornerRadius: 12))
+                    .accessibilityIdentifier("full-scratchpad-editor")
+                    .disabled(!loaded)
+                if let notice {
+                    Text(notice).font(.caption).foregroundStyle(.secondary)
+                }
+                HStack(spacing: 12) {
+                    Button {
+                        UIPasteboard.general.string = note
+                        notice = "Copied all note text"
+                    } label: {
+                        Label("Copy all", systemImage: "doc.on.doc")
+                    }
+                    .disabled(note.isEmpty)
+                    ShareLink(item: note) {
+                        Label("Share / export", systemImage: "square.and.arrow.up")
+                    }
+                    .disabled(note.isEmpty)
+                    Spacer()
+                    Button(role: .destructive) {
+                        showClearConfirmation = true
+                    } label: {
+                        Image(systemName: "trash")
+                    }
+                    .disabled(note.isEmpty)
+                    .accessibilityLabel("Clear entire note")
+                }
+                .buttonStyle(.bordered)
+                Text("For normal selection, Cut, Copy, Paste, and Select All, touch and hold inside the editor. Changes save on this iPhone and appear in the keyboard when it opens again.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            .padding()
+            .navigationTitle("Scratchpad")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Done") { dismiss() }
+                }
+            }
+        }
+        .onAppear {
+            // Do not write an empty new note over an older extension-only note.
+            // The extension imports that old note the first time it starts.
+            if let shared = ScratchpadStore.load() {
+                note = shared
+                loaded = true
+            } else {
+                loaded = false
+                notice = "Open the updated Key Scratch keyboard once to import your existing note, then reopen this editor."
+            }
+        }
+        .onChange(of: note) { _, value in
+            guard loaded else { return }
+            if !ScratchpadStore.save(value) {
+                notice = "Shared note storage is unavailable. Check App Group signing before closing."
+            } else {
+                notice = nil
+            }
+        }
+        .confirmationDialog("Erase the entire scratchpad?", isPresented: $showClearConfirmation,
+                            titleVisibility: .visible) {
+            Button("Erase note", role: .destructive) { note = "" }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("This cannot be undone. Use Share / export if you want a backup first.")
+        }
     }
 }

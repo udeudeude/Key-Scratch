@@ -269,7 +269,8 @@ final class CustomLayoutTests: XCTestCase {
         let rows = KeyboardLayout.rows(state: state, needsGlobe: false, preferences: preferences)
         XCTAssertEqual(rows[0].first?.action, .text("me@example.com"))
         XCTAssertEqual(rows[0].first?.label, "email")
-        XCTAssertEqual(rows[3].map(\.action), [.page, .shift, .language, .space, .enter, .backspace])
+        XCTAssertEqual(rows[3].map(\.action), [.page, .favorites, .space, .enter],
+                       "The new stable Delete key lives on the third row and Notes/App toggles focus")
 
         state.page = .layer(math.id)
         state.shift = .once

@@ -164,11 +164,11 @@ enum DigitAccess: String, Codable, CaseIterable, Sendable {
 enum ShiftMode: Sendable { case off, once, locked }
 enum ShiftPlacement: String, Codable, CaseIterable, Sendable {
     case beforeLastRow, controlRow
-    var title: String { self == .beforeLastRow ? "Before Я / Z" : "Control row" }
+    var title: String { self == .beforeLastRow ? "Third row (left)" : "Control row" }
 }
 
 struct InputState: Sendable {
-    var language: KeyboardLanguage = .ukrainian
+    var language: KeyboardLanguage = .english
     var page: KeyboardPage = .letters
     var shift: ShiftMode = .off
     private var lastShiftTap: TimeInterval?
@@ -181,6 +181,15 @@ struct InputState: Sendable {
         } else {
             shift = shift == .off ? .once : .off
             lastShiftTap = time
+        }
+    }
+
+    /// iOS returns from its numeric and symbols pages after a Space.
+    /// Custom key layers remain open because they are user-defined palettes.
+    mutating func returnToLettersAfterSpace() {
+        switch page {
+        case .numbers, .symbols: page = .letters
+        case .letters, .layer: break
         }
     }
 
@@ -202,7 +211,7 @@ extension String {
 }
 
 enum KeyAction: Hashable, Sendable {
-    case text(String), shift, backspace, space, enter, language, page, globe, dismiss
+    case text(String), shift, backspace, space, enter, language, favorites, page, globe, dismiss
     /// Opens the first of the person's layers from the letter page.
     case layers
     /// Moves the cursor or deletes, from a navigation layer.
@@ -247,14 +256,16 @@ enum KeyboardLayout {
         var result: [[Key]]
         switch state.page {
         case .letters: result = letterKeys(state.language, preferences: preferences)
-        case .numbers: result = numberKeys(state.language)
+        case .numbers: result = numberKeys(state.language, iphone: preferences.iphoneKeyPositions)
         case .symbols:
-            result = textKeys(["[]{}#%^*+=", "_\\|~<>€£¥•", ".,?!'`:;₴…"])
+            result = preferences.iphoneKeyPositions
+                ? textKeys(["[]{}#%^*+=", "_\\|~<>€£¥•", ".,?!'"])
+                : textKeys(["[]{}#%^*+=", "_\\|~<>€£¥•", ".,?!'`:;₴…"])
         case .layer(let id):
             // A layer deleted while it was open shows the numbers instead.
             if let layer = preferences.shownLayers.first(where: { $0.id == id }) {
                 result = layer.rows.map { row in row.map(\.layerKey) }
-            } else { result = numberKeys(state.language) }
+            } else { result = numberKeys(state.language, iphone: preferences.iphoneKeyPositions) }
         }
         let digits = "1234567890".map(String.init)
         if state.page == .letters && preferences.digitAccess == .flick {
@@ -265,7 +276,10 @@ enum KeyboardLayout {
         }
         // Delete follows the last letter, ahead of any optional punctuation. A custom
         // last row of punctuation alone still gets Delete, at its end.
-        if state.page == .letters {
+        if preferences.iphoneKeyPositions {
+            result[2].insert(Key(action: .shift, weight: 1.45), at: 0)
+            result[2].append(Key(action: .backspace, weight: 1.45))
+        } else if state.page == .letters {
             let lastLetter = result[2].lastIndex { key in
                 guard case .text(let value) = key.action else { return false }
                 return value == "'" || value.first?.isLetter == true
@@ -277,20 +291,20 @@ enum KeyboardLayout {
         if state.page == .letters && preferences.showLayerKey && firstLayerPage(preferences) != nil {
             controls.append(Key(action: .layers, weight: 1.25))
         }
-        if state.page == .letters && preferences.shiftPlacement == .beforeLastRow {
-            result[2].insert(Key(action: .shift, weight: 0.8), at: 0)
-        } else {
-            controls.append(Key(action: .shift, weight: 1.25))
+        if !preferences.iphoneKeyPositions {
+            if state.page == .letters && preferences.shiftPlacement == .beforeLastRow {
+                result[2].insert(Key(action: .shift, weight: 0.8), at: 0)
+            } else {
+                controls.append(Key(action: .shift, weight: 1.25))
+            }
         }
         if needsGlobe { controls.append(Key(action: .globe)) }
-        // With a single language there is nothing to switch to, unless a URL or
-        // email field put the keyboard in English and it needs a way back.
-        if preferences.language(after: state.language) != state.language {
-            controls.append(Key(action: .language, weight: 1.25))
-        }
+        // Tap the star for personal frequent symbols; hold it to switch
+        // enabled languages. Notes are focused by touching the note itself.
+        controls.append(Key(action: .favorites, weight: 1.4))
         controls += [Key(action: .space, weight: 3.8),
                      Key(action: .enter, weight: preferences.validated.actionKeyWidth)]
-        if state.page != .letters {
+        if state.page != .letters && !preferences.iphoneKeyPositions {
             controls.append(Key(action: .backspace, weight: preferences.validated.actionKeyWidth))
         }
         result.append(controls)
@@ -309,7 +323,13 @@ enum KeyboardLayout {
                               flicks: preferences.extrasEnabled ? $0.usableFlicks : [:]) }
             }
         }
-        return letterRows(language, preferences: preferences).map { row in
+        let baseRows: [String]
+        if preferences.iphoneKeyPositions && language == .english && preferences.englishLayout == .qwerty {
+            baseRows = ["qwertyuiop", "asdfghjkl", "zxcvbnm"]
+        } else {
+            baseRows = letterRows(language, preferences: preferences)
+        }
+        return baseRows.map { row in
             row.map { character in
                 Key(action: .text(String(character)),
                     letterAlternatives: letterAlternatives(character, language: language, preferences: preferences))
@@ -317,8 +337,8 @@ enum KeyboardLayout {
         }
     }
 
-    private static func numberKeys(_ language: KeyboardLanguage) -> [[Key]] {
-        textKeys(["1234567890", "-/:;()$&@\"", (language == .ukrainian ? ".,?!ʼ" : ".,?!'") + "[]=+%"])
+    private static func numberKeys(_ language: KeyboardLanguage, iphone: Bool = false) -> [[Key]] {
+        textKeys(["1234567890", "-/:;()$&@\"", (language == .ukrainian ? ".,?!ʼ" : ".,?!'") + (iphone ? "" : "[]=+%")])
     }
 
     /// The pages the #+= / 123 key steps through: numbers, symbols, then each usable layer.
@@ -399,6 +419,19 @@ enum KeyboardLayout {
     static func letterAlternatives(_ character: Character, language: KeyboardLanguage,
                                    preferences: KeyboardPreferences) -> [String] {
         switch (language, character) {
+        // English uses the same iOS-style long-press diacritics as other languages.
+        case (.english, "a"): ["à", "á", "â", "ä", "æ", "ã", "å", "ā", "ą"]
+        case (.english, "e"): ["è", "é", "ê", "ë", "ē", "ė", "ę"]
+        case (.english, "i"): ["ì", "í", "î", "ï", "ī", "į"]
+        case (.english, "o"): ["ò", "ó", "ô", "ö", "œ", "ø", "ō", "õ"]
+        case (.english, "u"): ["ù", "ú", "û", "ü", "ū"]
+        case (.english, "c"): ["ç", "ć", "č"]
+        case (.english, "n"): ["ñ", "ń"]
+        case (.english, "s"): ["ß", "ś", "š"]
+        case (.english, "y"): ["ÿ", "ý"]
+        case (.english, "z"): ["ž", "ź", "ż"]
+        case (.english, "d"): ["ð"]
+        case (.english, "t"): ["þ"]
         // Only Ukrainian has ґ; Russian and Serbian г must not offer it.
         case (.ukrainian, "г"): ["ґ"]
         case (.ukrainian, "і"): preferences.yiOnLongPress ? ["ї"] : []
@@ -466,15 +499,96 @@ enum KeyboardLayout {
     }
 }
 
+/// Configurations for controlled Key Scratch experiments. Colors are identifiers,
+/// not a new keyboard theme. The mode is persisted with ordinary keyboard settings.
+enum KeyScratchMode: String, Codable, CaseIterable, Identifiable, Sendable {
+    case reference, legacy, split, quiet, narrow
+    var id: String { rawValue }
+    var colorName: String {
+        switch self {
+        case .reference: "Blue"
+        case .legacy: "Red"
+        case .split: "Green"
+        case .quiet: "Amber"
+        case .narrow: "Purple"
+        }
+    }
+    var shortName: String {
+        switch self {
+        case .reference: "Full width"
+        case .legacy: "Shared split"
+        case .split: "Split"
+        case .quiet: "Quiet"
+        case .narrow: "Narrow notes"
+        }
+    }
+    var title: String { colorName + " · " + shortName }
+    var purpose: String {
+        switch self {
+        case .reference: "No notes panel; original shared swipe worker. Full-width reference."
+        case .legacy: "Same notes width as Green, but original swipe worker; isolates worker latency."
+        case .split: "Notes on the left; swipe processing has its own priority worker."
+        case .quiet: "Same split as Green but pauses live word suggestions to test contention."
+        case .narrow: "Smaller notes panel than Green, leaving more room for swipe gestures."
+        }
+    }
+    var colorHex: UInt32 {
+        switch self {
+        case .reference: 0x2869BA
+        case .legacy: 0xB13E49
+        case .split: 0x23765A
+        case .quiet: 0xB57917
+        case .narrow: 0x8056AD
+        }
+    }
+    func noteFraction(userWidth: Double) -> Double {
+        switch self {
+        case .reference: 0
+        case .legacy, .split, .quiet: userWidth
+        case .narrow: max(0.16, userWidth - 0.10)
+        }
+    }
+    var usesDedicatedGlide: Bool { self != .reference && self != .legacy }
+    var hasLiveSuggestions: Bool { self != .quiet }
+}
+
+enum KeyScratchNoteFont: String, Codable, CaseIterable, Identifiable, Sendable {
+    case text, rounded, serif, monospaced
+    var id: String { rawValue }
+    var title: String {
+        switch self {
+        case .text: "SF Text"
+        case .rounded: "Rounded"
+        case .serif: "Serif"
+        case .monospaced: "Monospaced"
+        }
+    }
+}
+
+/// Native, low-overhead visual interpretations of the terminal display in
+/// Temporarily Leave the Universe. The editor remains a normal UITextView.
+enum ScratchpadVisualStyle: String, Codable, CaseIterable, Identifiable, Sendable {
+    case standard, phosphorGreen, amber, composite
+    var id: String { rawValue }
+    var title: String {
+        switch self {
+        case .standard: "Standard"
+        case .phosphorGreen: "Terminal · green"
+        case .amber: "Terminal · amber"
+        case .composite: "Terminal · composite TV"
+        }
+    }
+}
+
 struct KeyboardPreferences: Codable, Equatable, Sendable {
-    let schemaVersion = 4
-    var keyHeight: Double = 72
-    var columnSpacing: Double = 2
-    var rowSpacing: Double = 3
+    let schemaVersion = 8
+    var keyHeight: Double = 62
+    var columnSpacing: Double = 3
+    var rowSpacing: Double = 8
     var fillGaps: Bool = true
-    var defaultLanguage: KeyboardLanguage = .ukrainian
-    var controlHeight: Double = 56
-    var letterSize: Double = 28
+    var defaultLanguage: KeyboardLanguage = .english
+    var controlHeight: Double = 48
+    var letterSize: Double = 24
     var actionKeyWidth: Double = 2.4
     var shiftPlacement: ShiftPlacement = .beforeLastRow
     var showPunctuation: Bool = false
@@ -484,18 +598,33 @@ struct KeyboardPreferences: Codable, Equatable, Sendable {
     var yiOnLongPress: Bool = false
     var theme: KeyboardTheme = .system
     var accent: KeyboardAccent = .theme
-    var showLongPressHints: Bool = true
+    var showLongPressHints: Bool = false
     var autoCapitalize: Bool = true
     var doubleSpacePeriod: Bool = true
     var digitAccess: DigitAccess = .flick
     var glideTyping: Bool = true
+    var iphoneKeyPositions: Bool = true
+    var appleKeyAppearance: Bool = true
+    var keyScratchMode: KeyScratchMode = .split
+    var keyScratchNoteWidth: Double = 0.30
+    var keyScratchNoteFontSize: Double = 11
+    var keyScratchNoteFont: KeyScratchNoteFont = .text
+    var leftHandedLayout: Bool = false
+    var scratchpadVisualStyle: ScratchpadVisualStyle = .standard
+    /// User-editable one-tap Unicode/emoji choices for the keyboard star key.
+    var favoriteSymbols: [String] = [
+        "😀", "😂", "🙂", "🙃", "🤔", "👍", "❤️", "✨",
+        "✓", "☑", "☐", "★", "•", "…", "–", "—",
+        "°", "±", "×", "÷", "≠", "≤", "≥", "∞",
+        "→", "←", "↔", "©", "®", "™", "☕", "🎉"
+    ]
 
     var suggestionsEnabled: Bool = true
     var nextWordSuggestions: Bool = true
     var contextualSuggestions: Bool = true
 
     /// The languages the language key cycles through, in `allCases` order.
-    var languages: [KeyboardLanguage] = [.ukrainian, .english]
+    var languages: [KeyboardLanguage] = [.english]
     var englishLayout: EnglishLayout = .qwerty
     var rememberLanguage: Bool = true
     /// Bumped to make the keyboard forget remembered languages; see LanguageMemory.
@@ -520,6 +649,9 @@ struct KeyboardPreferences: Codable, Equatable, Sendable {
         case schemaVersion, keyHeight, columnSpacing, rowSpacing, fillGaps, defaultLanguage
         case controlHeight, letterSize, actionKeyWidth, shiftPlacement, showPunctuation, showApostrophe, showHeader, autoSpacePunctuation
         case yiOnLongPress, autoCapitalize, doubleSpacePeriod, digitAccess, glideTyping
+        case keyScratchMode, keyScratchNoteWidth, keyScratchNoteFontSize, keyScratchNoteFont, favoriteSymbols
+        case leftHandedLayout, scratchpadVisualStyle
+        case iphoneKeyPositions, appleKeyAppearance
         case theme, accent, showLongPressHints
         case suggestionsEnabled, nextWordSuggestions, contextualSuggestions
         case languages, englishLayout, rememberLanguage, languageMemoryGeneration, invasionAnswer
@@ -528,13 +660,26 @@ struct KeyboardPreferences: Codable, Equatable, Sendable {
 
     var validated: Self {
         var result = self
-        result.keyHeight = keyHeight.isFinite ? min(88, max(36, keyHeight)) : 72
-        result.controlHeight = controlHeight.isFinite ? min(72, max(36, controlHeight)) : 56
-        result.letterSize = letterSize.isFinite ? min(36, max(18, letterSize)) : 28
+        // Keep stable order and avoid empty/oversized labels from old files.
+        var symbolsSeen = Set<String>()
+        result.favoriteSymbols = favoriteSymbols.filter {
+            !$0.isEmpty && $0.count <= 8 && symbolsSeen.insert($0).inserted
+        }.prefix(48).map { $0 }
+        result.keyHeight = keyHeight.isFinite ? min(88, max(32, keyHeight)) : 62
+        result.controlHeight = controlHeight.isFinite ? min(72, max(30, controlHeight)) : 48
+        result.letterSize = letterSize.isFinite ? min(36, max(18, letterSize)) : 24
         result.actionKeyWidth = actionKeyWidth.isFinite ? min(3.5, max(1.25, actionKeyWidth)) : 2.4
-        result.columnSpacing = columnSpacing.isFinite ? min(8, max(0, columnSpacing)) : 2
-        result.rowSpacing = rowSpacing.isFinite ? min(12, max(0, rowSpacing)) : 3
-        let enabled = KeyboardLanguage.allCases.filter { languages.contains($0) && ($0 != .russian || invasionAnswer == .opposes) }
+        result.columnSpacing = columnSpacing.isFinite ? min(8, max(0, columnSpacing)) : 3
+        result.rowSpacing = rowSpacing.isFinite ? min(12, max(0, rowSpacing)) : 8
+        result.keyScratchNoteWidth = keyScratchNoteWidth.isFinite ? min(0.42, max(0.18, keyScratchNoteWidth)) : 0.30
+        result.keyScratchNoteFontSize = keyScratchNoteFontSize.isFinite ? min(16, max(9, keyScratchNoteFontSize)) : 11
+        // Preserve the user's preferred language order. Older Ortholinear
+        // always reordered entries by allCases, which put Ukrainian first.
+        var seen = Set<KeyboardLanguage>()
+        let enabled = languages.filter {
+            KeyboardLanguage.allCases.contains($0)
+            && seen.insert($0).inserted
+        }
         result.languages = enabled.isEmpty ? Self().languages : enabled
         if !result.languages.contains(defaultLanguage) { result.defaultLanguage = result.languages[0] }
         return result
@@ -552,7 +697,13 @@ struct KeyboardPreferences: Codable, Equatable, Sendable {
     /// The colorway the keyboard draws, when extras are enabled.
     var shownKeycaps: KeycapStyle? { extrasEnabled ? keycaps : nil }
     var shownExpansions: [TextExpansion] { extrasEnabled ? expansions.filter(\.isUsable) : [] }
-    var suggestionHeight: Double { suggestionsEnabled ? 44 : 0 }
+    var suggestionHeight: Double {
+        guard suggestionsEnabled else { return 0 }
+        // Only the compact landscape geometry reaches 34 pt rows. Retain
+        // familiar suggestion heights in portrait and other layouts.
+        if validated.keyHeight <= 34 { return 30 }
+        return validated.keyHeight <= 62 ? 36 : 44
+    }
     var headerHeight: Double { suggestionHeight + (showHeader ? KeyboardGeometry.ribbonHeight : 0) }
     /// A shorter row: it costs about 45 pt at the default key height.
     var numberRowHeight: Double {
@@ -566,16 +717,18 @@ struct KeyboardPreferences: Codable, Equatable, Sendable {
 
     mutating func apply(_ preset: KeyboardPreset) {
         let language = (defaultLanguage, languages, englishLayout, rememberLanguage, languageMemoryGeneration, invasionAnswer)
-        let appearance = (theme, accent, showLongPressHints)
+        let appearance = (theme, accent, showLongPressHints, appleKeyAppearance)
         let suggestions = (suggestionsEnabled, nextWordSuggestions, contextualSuggestions)
-        let typing = (autoCapitalize, doubleSpacePeriod, digitAccess, glideTyping)
+        let typing = (autoCapitalize, doubleSpacePeriod, digitAccess, glideTyping, iphoneKeyPositions)
         let custom = (customLayouts, layers, showLayerKey, keycaps, expansions, extrasEnabled)
+        let scratch = (keyScratchMode, keyScratchNoteWidth, keyScratchNoteFontSize, keyScratchNoteFont, favoriteSymbols, leftHandedLayout, scratchpadVisualStyle)
         self = preset.preferences
         (customLayouts, layers, showLayerKey, keycaps, expansions, extrasEnabled) = custom
+        (keyScratchMode, keyScratchNoteWidth, keyScratchNoteFontSize, keyScratchNoteFont, favoriteSymbols, leftHandedLayout, scratchpadVisualStyle) = scratch
         (defaultLanguage, languages, englishLayout, rememberLanguage, languageMemoryGeneration, invasionAnswer) = language
-        (theme, accent, showLongPressHints) = appearance
+        (theme, accent, showLongPressHints, appleKeyAppearance) = appearance
         (suggestionsEnabled, nextWordSuggestions, contextualSuggestions) = suggestions
-        (autoCapitalize, doubleSpacePeriod, digitAccess, glideTyping) = typing
+        (autoCapitalize, doubleSpacePeriod, digitAccess, glideTyping, iphoneKeyPositions) = typing
     }
 }
 
@@ -602,6 +755,15 @@ extension KeyboardPreferences {
         doubleSpacePeriod = try c.decodeIfPresent(Bool.self, forKey: .doubleSpacePeriod) ?? doubleSpacePeriod
         digitAccess = (try? c.decodeIfPresent(DigitAccess.self, forKey: .digitAccess)) ?? digitAccess
         glideTyping = try c.decodeIfPresent(Bool.self, forKey: .glideTyping) ?? glideTyping
+        iphoneKeyPositions = try c.decodeIfPresent(Bool.self, forKey: .iphoneKeyPositions) ?? iphoneKeyPositions
+        appleKeyAppearance = try c.decodeIfPresent(Bool.self, forKey: .appleKeyAppearance) ?? appleKeyAppearance
+        keyScratchMode = (try? c.decodeIfPresent(KeyScratchMode.self, forKey: .keyScratchMode)) ?? keyScratchMode
+        keyScratchNoteWidth = try c.decodeIfPresent(Double.self, forKey: .keyScratchNoteWidth) ?? keyScratchNoteWidth
+        keyScratchNoteFontSize = try c.decodeIfPresent(Double.self, forKey: .keyScratchNoteFontSize) ?? keyScratchNoteFontSize
+        keyScratchNoteFont = (try? c.decodeIfPresent(KeyScratchNoteFont.self, forKey: .keyScratchNoteFont)) ?? keyScratchNoteFont
+        leftHandedLayout = (try? c.decodeIfPresent(Bool.self, forKey: .leftHandedLayout)) ?? leftHandedLayout
+        scratchpadVisualStyle = (try? c.decodeIfPresent(ScratchpadVisualStyle.self, forKey: .scratchpadVisualStyle)) ?? scratchpadVisualStyle
+        favoriteSymbols = (try? c.decodeIfPresent([String].self, forKey: .favoriteSymbols)) ?? favoriteSymbols
         theme = try c.decodeIfPresent(KeyboardTheme.self, forKey: .theme) ?? theme
         accent = try c.decodeIfPresent(KeyboardAccent.self, forKey: .accent) ?? accent
         showLongPressHints = try c.decodeIfPresent(Bool.self, forKey: .showLongPressHints) ?? showLongPressHints
@@ -630,8 +792,32 @@ extension KeyboardPreferences {
             expansions = Array(saved.compactMap(\.value).prefix(TextExpansion.maximumCount))
         }
         extrasEnabled = try c.decodeIfPresent(Bool.self, forKey: .extrasEnabled) ?? extrasEnabled
-        // Upgrade the old default height; keep heights the user actually customized.
+        // Legacy Ortholinear configurations using untouched factory geometry migrate
+        // to Key Scratch's more compact defaults. Deliberately customized sizes survive.
         if !c.contains(.schemaVersion), keyHeight == 48 { keyHeight = 72 }
+        // Migrate only the untouched upstream UA+EN default. Explicitly
+        // chosen Ukrainian or other enabled-language combinations are preserved.
+        let previousSchema = (try? c.decodeIfPresent(Int.self, forKey: .schemaVersion)) ?? 0
+        if previousSchema < 7, defaultLanguage == .ukrainian,
+           Set(languages) == Set([KeyboardLanguage.ukrainian, .english]),
+           languages.count == 2 {
+            defaultLanguage = .english
+            languages = [.english, .ukrainian]
+            languageMemoryGeneration += 1
+        }
+        if keyHeight == 72 && controlHeight == 56 && rowSpacing == 3 && letterSize == 28 {
+            keyHeight = 62
+            controlHeight = 48
+            rowSpacing = 8
+            letterSize = 24
+        }
+        // v8 adopts a quieter, roomier iPhone-like layout on old installs.
+        // Preserve values that differ from the previous untouched defaults.
+        if previousSchema < 8 {
+            if rowSpacing == 2 { rowSpacing = 8 }
+            if columnSpacing == 2 { columnSpacing = 3 }
+            showLongPressHints = false
+        }
         self = validated
     }
 }
@@ -648,19 +834,46 @@ enum KeyboardPreset: String, CaseIterable, Identifiable {
     }
     var detail: String {
         switch self {
-        case .bigLetters: "72 pt letters · wide Return and Delete · Shift before Я / Z"
+        case .bigLetters: "72 pt letters · large Return and Delete"
         case .balanced: "60 pt letters · a little more space for your text"
         case .original: "The original 48 pt grid, with punctuation and header"
         }
     }
     var preferences: KeyboardPreferences {
         switch self {
-        case .bigLetters: KeyboardPreferences()
+        case .bigLetters: KeyboardPreferences(keyHeight: 72, rowSpacing: 3,
+                                                     controlHeight: 56, letterSize: 28)
         case .balanced: KeyboardPreferences(keyHeight: 60, columnSpacing: 3, rowSpacing: 4, controlHeight: 48, letterSize: 24, actionKeyWidth: 2)
         case .original: KeyboardPreferences(keyHeight: 48, columnSpacing: 3, rowSpacing: 5, controlHeight: 48,
                                             letterSize: 21, actionKeyWidth: 1.4, shiftPlacement: .controlRow,
                                             showPunctuation: true, showHeader: true)
         }
+    }
+}
+
+/// Adaptive geometry for the compact iPhone landscape keyboard. The right-hand
+/// keyboard stays a useful swipe width; the entire remaining extension area
+/// belongs to notes. Portrait respects the user's ordinary split width.
+enum KeyScratchAdaptiveLayout {
+    static func keyboardWidth(availableWidth: Double, landscape: Bool,
+                              portraitNoteFraction: Double) -> Double {
+        guard availableWidth > 0 else { return 0 }
+        if landscape {
+            return min(availableWidth, min(430, max(390, availableWidth * 0.60)))
+        }
+        return availableWidth * (1 - min(0.80, max(0, portraitNoteFraction)))
+    }
+
+    static func appearance(_ base: KeyboardPreferences, landscape: Bool) -> KeyboardPreferences {
+        guard landscape else { return base }
+        var compact = base
+        compact.keyHeight = min(compact.keyHeight, 34)
+        compact.controlHeight = min(compact.controlHeight, 32)
+        compact.rowSpacing = min(compact.rowSpacing, 2)
+        compact.letterSize = min(compact.letterSize, 19)
+        compact.showHeader = false
+        if compact.digitAccess == .numberRow { compact.digitAccess = .flick }
+        return compact.validated
     }
 }
 
@@ -683,20 +896,38 @@ enum KeyboardGeometry {
             : p.keyHeight + (p.numberRowHeight + p.rowSpacing) / 3
         var rowY = p.headerHeight
         return rows.enumerated().flatMap { row, keys in
-            let unit = width / keys.reduce(0) { $0 + $1.weight }
+            // Center the nine-key middle alphabet row, with half a key of inset.
+            let middleRow = rows.count == 5 ? 2 : 1
+            let middleInset: Double = p.iphoneKeyPositions && state.page == .letters
+                && state.language == .english && p.englishLayout == .qwerty
+                && row == middleRow ? width / 20 : 0
+            let unit = (width - 2 * middleInset) / keys.reduce(0) { $0 + $1.weight }
             let keyHeight = row == rows.count - 1 ? p.controlHeight : (rows.count == 5 && row == 0 ? p.numberRowHeight : letterHeight)
             let rowHeight = keyHeight + p.rowSpacing
             defer { rowY += rowHeight }
-            var x = 0.0
+            var x = middleInset
             return keys.enumerated().map { column, key in
-                let right = column == keys.count - 1 ? width : x + unit * key.weight
+                let right = column == keys.count - 1 ? width - middleInset : x + unit * key.weight
                 let frame = CGRect(x: x, y: rowY, width: right - x, height: rowHeight)
                 x = right
                 let leftGap = column == 0 ? 0 : p.columnSpacing / 2
                 let rightGap = column == keys.count - 1 ? 0 : p.columnSpacing / 2
                 let visual = CGRect(x: frame.minX + leftGap, y: frame.minY + p.rowSpacing / 2,
                                     width: frame.width - leftGap - rightGap, height: keyHeight)
-                return KeyCell(key: key, hitFrame: p.fillGaps ? frame : visual, visualFrame: visual)
+                // The stagger is visual. Edge touches must still reach a
+                // key, just as they do on the built-in iPhone keyboard.
+                // Otherwise the first/last middle-row key cannot be tapped
+                // near the sides in a narrow split keyboard.
+                let hit: CGRect
+                if p.fillGaps {
+                    let left = column == 0 ? 0 : frame.minX
+                    let rightEdge = column == keys.count - 1 ? width : frame.maxX
+                    hit = CGRect(x: left, y: frame.minY, width: rightEdge - left,
+                                 height: frame.height)
+                } else {
+                    hit = visual
+                }
+                return KeyCell(key: key, hitFrame: hit, visualFrame: visual)
             }
         }
     }

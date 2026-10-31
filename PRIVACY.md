@@ -1,5 +1,7 @@
 # Privacy policy
 
+> Key Scratch is a modified fork of Ortholinear. The following additional rules describe the fork's local scratchpad and optional clipboard access.
+
 Effective October 6, 2026.
 
 Ortholinear is an on-device Ukrainian and English keyboard for iPhone and iPad, with optional layouts for other European languages, maintained by Igor Varyvoda.
@@ -24,9 +26,13 @@ Layout and setup files are created only when you choose to share one, and go whe
 
 Ortholinear Pro is a one-time in-app purchase handled by Apple. When you buy or restore it, the app talks to the App Store through Apple's StoreKit; Apple processes the payment under its own privacy policy. The developer does not receive your name, Apple Account or payment details. The app keeps only whether Pro is unlocked, on your device.
 
-## No tracking or Full Access
+## Key Scratch notes and clipboard access
 
-The app and keyboard include no analytics, advertising, accounts, or tracking SDKs. The keyboard does not request Full Access and makes no network requests. The app's only network use is the App Store for purchases, as described above.
+Key Scratch stores the scratchpad locally on this iPhone. With **Allow Full Access** enabled, the keyboard can save the note in its local App Group container shared with the companion app. The companion app offers full-size editing and an explicit Share/Export action. The initial upgrade migrates the earlier extension-only note into that shared local container. The keyboard also retains a local copy as a fallback. These notes are not transmitted to a server and are not a log of what you type into other apps. Deleting the app may remove the note, so exporting important text is recommended.
+
+Key Scratch requests eligibility for Apple's optional **Allow Full Access** permission for clipboard actions and writing the shared App Group note. Without that permission the keyboard continues to type and its extension-local notes still work, but clipboard operations and reliable note sharing with the companion app are unavailable. When permission is enabled, the keyboard can read the system clipboard only when you choose Paste and writes the clipboard only when you choose Copy or Cut in the note's edit menu. The companion app's native editor also offers text selection, Copy All, and Share/Export. Key Scratch does not upload clipboard contents or keystrokes and the keyboard extension has no network transmission code.
+
+The app and keyboard include no added analytics, advertising, accounts, or tracking SDKs. The underlying Ortholinear app retains its original optional in-app purchase and Apple StoreKit behavior.
 
 ## External links and support
 

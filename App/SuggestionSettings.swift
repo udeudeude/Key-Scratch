@@ -18,10 +18,13 @@ struct SuggestionSettings: View {
                 Text("Suggestions use nearby keys, word frequency, and optional short sentence context. Names and unfamiliar words always remain as typed unless you choose a replacement.")
                     .foregroundStyle(.secondary)
             }
-            Section("Wrong layout") {
-                Label("Typed “ghvdsb” in English? Tap “привіт ⇄” to fix the word and switch to Ukrainian.", systemImage: "arrow.left.arrow.right")
-                Text("Offered when both English and Ukrainian are on and the word only makes sense in the other layout.")
-                    .foregroundStyle(.secondary)
+            if preferences.validated.languages.contains(.english)
+                && preferences.validated.languages.contains(.ukrainian) {
+                Section("Wrong language layout") {
+                    Label("Words typed with the wrong layout can be recognized and corrected.", systemImage: "arrow.left.arrow.right")
+                    Text("When English and Ukrainian are enabled, Key Scratch can offer a correction that also switches to the intended language.")
+                        .foregroundStyle(.secondary)
+                }
             }
             Section("Teach it your words") {
                 Label("Type a word, then tap ⋯ in the suggestion row and choose Teach.", systemImage: "plus.circle")

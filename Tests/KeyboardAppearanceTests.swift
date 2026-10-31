@@ -48,7 +48,7 @@ final class KeyboardAppearanceTests: XCTestCase {
         let legacy = try JSONDecoder().decode(KeyboardPreferences.self, from: Data(#"{"schemaVersion":2,"yiOnLongPress":true,"keyHeight":65}"#.utf8))
         XCTAssertEqual(legacy.theme, .system)
         XCTAssertEqual(legacy.accent, .theme)
-        XCTAssertTrue(legacy.showLongPressHints)
+        XCTAssertFalse(legacy.showLongPressHints)
         XCTAssertTrue(legacy.yiOnLongPress)
         XCTAssertEqual(legacy.keyHeight, 65)
     }

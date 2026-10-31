@@ -66,6 +66,11 @@ final class SuggestionTests: XCTestCase {
         XCTAssertEqual(edit.moveRight, 0)
         XCTAssertEqual(edit.left, "hello")
         XCTAssertEqual(edit.text, "help")
+        let withAutoSpace = snapshot("the hello ")
+        let replacement = try XCTUnwrap(SuggestionEdit.replacingGlide(
+            correction, inserted: "hello", offered: withAutoSpace, current: withAutoSpace))
+        XCTAssertEqual(replacement.left, "hello ")
+        XCTAssertEqual(replacement.text, "help ")
         XCTAssertNil(SuggestionEdit.replacingGlide(correction, inserted: "world", offered: s, current: s))
         let selected = snapshot("the hello", after: "cat", selected: "word")
         XCTAssertNil(SuggestionEdit.replacingGlide(correction, inserted: "hello", offered: selected, current: selected))
@@ -113,10 +118,11 @@ final class SuggestionTests: XCTestCase {
         var preferences = try JSONDecoder().decode(KeyboardPreferences.self, from: Data("{}".utf8))
         XCTAssertTrue(preferences.suggestionsEnabled)
         let height = preferences.keyboardHeight
+        let suggestionHeight = preferences.suggestionHeight
         preferences.suggestionsEnabled = false
         preferences.nextWordSuggestions = false
         preferences.contextualSuggestions = false
-        XCTAssertEqual(height - preferences.keyboardHeight, 44)
+        XCTAssertEqual(height - preferences.keyboardHeight, suggestionHeight)
         preferences.apply(.balanced)
         XCTAssertFalse(preferences.suggestionsEnabled)
         XCTAssertFalse(preferences.nextWordSuggestions)
@@ -171,7 +177,10 @@ final class SuggestionTests: XCTestCase {
 
     func testDocumentedWrongLayoutExampleRecovers() throws {
         let ukrainian = try SuggestionResources.engine(language: .ukrainian)
-        let preferences = KeyboardPreferences()
+        // The documented physical-key typo assumes the original matrix
+        // arrangement, not Key Scratch's new iPhone-positioned English row.
+        var preferences = KeyboardPreferences()
+        preferences.iphoneKeyPositions = false
         for width in [375.0, 393.0, 430.0, 820.0] {
             let en = SuggestionGeometry(language: .english, preferences: preferences, width: width)
             let uk = SuggestionGeometry(language: .ukrainian, preferences: preferences, width: width)
