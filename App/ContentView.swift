@@ -18,7 +18,12 @@ struct ContentView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 26) {
                 HStack(spacing: 10) {
-                    KeyScratchMark().frame(width: 32, height: 32)
+                    Image("KeyScratchIcon")
+                        .resizable()
+                        .interpolation(.high)
+                        .frame(width: 36, height: 36)
+                        .clipShape(RoundedRectangle(cornerRadius: 9))
+                        .accessibilityLabel("Key Scratch car-key icon")
                     Text("Key Scratch").font(.system(size: 23, weight: .bold))
                     Spacer()
                     Text(languageBadge).font(.system(size: 10, weight: .semibold, design: .monospaced))
@@ -222,31 +227,6 @@ private struct GestureChecklist: View {
                 .font(.system(size: 11)).foregroundStyle(.secondary).lineSpacing(3)
         }
         .animation(.easeOut(duration: 0.2), value: tried)
-    }
-}
-
-private struct KeyScratchMark: View {
-    var body: some View {
-        ZStack {
-            RoundedRectangle(cornerRadius: 8).fill(accent)
-            HStack(spacing: 3) {
-                RoundedRectangle(cornerRadius: 2)
-                    .fill(.white.opacity(0.95))
-                    .frame(width: 9, height: 20)
-                VStack(spacing: 3) {
-                    ForEach(0..<3) { _ in
-                        HStack(spacing: 3) {
-                            ForEach(0..<2) { _ in
-                                RoundedRectangle(cornerRadius: 1.2)
-                                    .fill(.white.opacity(0.95))
-                                    .frame(width: 6.5, height: 5)
-                            }
-                        }
-                    }
-                }
-            }
-        }
-        .accessibilityLabel("Key Scratch")
     }
 }
 
@@ -618,6 +598,7 @@ private struct KeyScratchExperimentLab: View {
     @Binding var preferences: KeyboardPreferences
     @State private var draft: KeyboardPreferences
     @State private var testText = ""
+    @State private var symbolsText: String
     @State private var status = "Adjust settings, then Apply and test."
     @FocusState private var testing: Bool
     @Environment(\.dismiss) private var dismiss
@@ -625,6 +606,7 @@ private struct KeyScratchExperimentLab: View {
     init(preferences: Binding<KeyboardPreferences>) {
         _preferences = preferences
         _draft = State(initialValue: PreferenceStore.normalized(preferences.wrappedValue))
+        _symbolsText = State(initialValue: preferences.wrappedValue.validated.favoriteSymbols.joined(separator: " "))
     }
 
     var body: some View {
@@ -672,6 +654,28 @@ private struct KeyScratchExperimentLab: View {
                     Toggle("iPhone key positions", isOn: $draft.iphoneKeyPositions)
                     Toggle("Fill invisible key gaps", isOn: $draft.fillGaps)
                     Toggle("Show tiny key hints", isOn: $draft.showLongPressHints)
+                }
+
+                Section {
+                    Text("Tap ★ on the keyboard for these favorites. Recently used symbols appear first.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    TextEditor(text: $symbolsText)
+                        .font(.system(size: 19))
+                        .frame(minHeight: 78)
+                        .accessibilityIdentifier("favorite-symbols-editor")
+                        .onChange(of: symbolsText) { _, edited in
+                            draft.favoriteSymbols = Array(edited.split(whereSeparator: \.isWhitespace)
+                                .map(String.init).prefix(48))
+                        }
+                    Button("Restore standard favorites") {
+                        draft.favoriteSymbols = KeyboardPreferences().favoriteSymbols
+                        symbolsText = draft.favoriteSymbols.joined(separator: " ")
+                    }
+                } header: {
+                    Text("Favorite emoji & symbols")
+                } footer: {
+                    Text("Enter emoji or Unicode symbols separated by spaces (up to 48). Tap Apply and test to update the keyboard. Recent usage is remembered on this iPhone.")
                 }
 
                 Section("Clipboard access") {
