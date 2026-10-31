@@ -1,4 +1,6 @@
 import SwiftUI
+import PhotosUI
+import ImageIO
 
 private let accent = Color(uiColor: .systemBlue)
 private let paper = Color(uiColor: .systemGroupedBackground)
@@ -819,6 +821,9 @@ private struct KeyScratchFullNotes: View {
     @State private var loaded = false
     @State private var showClearConfirmation = false
     @State private var showDeleteConfirmation = false
+    @State private var pickedPhotos: [PhotosPickerItem] = []
+    @State private var photoPreview: ScratchpadImage?
+    @State private var importingPhotos = false
     @State private var notice: String?
     @FocusState private var focused: Bool
 
@@ -847,6 +852,7 @@ private struct KeyScratchFullNotes: View {
                             ForEach(notebook.pages.indices, id: \.self) { index in
                                 let page = notebook.pages[index]
                                 Button("Page \(index + 1)") { switchPage(to: page.id) }
+                                    .disabled(importingPhotos)
                                     .font(.system(size: 13, weight: notebook.selectedID == page.id ? .semibold : .regular))
                                     .padding(.horizontal, 12)
                                     .padding(.vertical, 7)
@@ -858,10 +864,72 @@ private struct KeyScratchFullNotes: View {
                         }
                     }
                     Button { addPage() } label: { Image(systemName: "plus.circle.fill") }
-                        .disabled(!loaded || notebook.pages.count >= ScratchpadNotebook.maximumPages)
+                        .disabled(!loaded || importingPhotos || notebook.pages.count >= ScratchpadNotebook.maximumPages)
                         .accessibilityLabel("Add scratchpad page")
                 }
                 .buttonStyle(.plain)
+
+                HStack(alignment: .center) {
+                    PhotosPicker(selection: $pickedPhotos, maxSelectionCount: 8, matching: .images) {
+                        Label("Add images", systemImage: "photo.on.rectangle.angled")
+                    }
+                    .disabled(!loaded || importingPhotos ||
+                              notebook.selectedPage.images.count >= ScratchpadNotebook.maximumImagesPerPage)
+                    .accessibilityIdentifier("add-scratchpad-images")
+                    Spacer()
+                    if importingPhotos {
+                        ProgressView()
+                            .controlSize(.small)
+                        Text("Importing…")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    } else {
+                        Text("\(notebook.selectedPage.images.count)/\(ScratchpadNotebook.maximumImagesPerPage) images")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                .buttonStyle(.bordered)
+
+                if !notebook.selectedPage.images.isEmpty {
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(alignment: .center, spacing: 10) {
+                            ForEach(notebook.selectedPage.images) { photo in
+                                Button {
+                                    photoPreview = photo
+                                } label: {
+                                    Group {
+                                        if let url = ScratchpadImageStore.imageURL(
+                                            id: photo.id, thumbnail: true),
+                                           let image = UIImage(contentsOfFile: url.path) {
+                                            Image(uiImage: image).resizable().scaledToFill()
+                                        } else {
+                                            Image(systemName: "photo").resizable().scaledToFit()
+                                                .padding(14)
+                                        }
+                                    }
+                                    .frame(width: 69, height: 69)
+                                    .clipShape(RoundedRectangle(cornerRadius: 8))
+                                    .overlay(RoundedRectangle(cornerRadius: 8)
+                                        .strokeBorder(Color.secondary.opacity(0.3), lineWidth: 0.5))
+                                }
+                                .buttonStyle(.plain)
+                                .accessibilityLabel("Preview scratchpad image")
+                                .contextMenu {
+                                    Button("Copy image", systemImage: "doc.on.doc") {
+                                        copyImage(photo)
+                                    }
+                                    Button("Remove from page", systemImage: "trash", role: .destructive) {
+                                        removeImage(photo)
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    Text("Tap an image to preview or copy it. Hold an image to remove it.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
 
                 TextEditor(text: editableNote)
                     .focused($focused)
@@ -914,6 +982,40 @@ private struct KeyScratchFullNotes: View {
                 ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() } }
             }
         }
+        .onChange(of: pickedPhotos) { _, selection in
+            guard !selection.isEmpty else { return }
+            Task { @MainActor in await importPhotos(selection) }
+        }
+        .sheet(item: $photoPreview) { photo in
+            NavigationStack {
+                Group {
+                    if let url = ScratchpadImageStore.imageURL(id: photo.id),
+                       let image = UIImage(contentsOfFile: url.path) {
+                        Image(uiImage: image)
+                            .resizable()
+                            .scaledToFit()
+                            .padding()
+                    } else {
+                        ContentUnavailableView("Image unavailable", systemImage: "photo")
+                    }
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .background(.black.opacity(0.94))
+                .navigationTitle("Scratchpad image")
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar {
+                    ToolbarItem(placement: .topBarLeading) {
+                        Button("Done") { photoPreview = nil }
+                    }
+                    ToolbarItem(placement: .topBarTrailing) {
+                        Button("Copy", systemImage: "doc.on.doc") {
+                            copyImage(photo)
+                            photoPreview = nil
+                        }
+                    }
+                }
+            }
+        }
         .onAppear {
             // Preserve any extension-only legacy note until the keyboard has
             // migrated it. An empty editor must never overwrite old content.
@@ -951,6 +1053,79 @@ private struct KeyScratchFullNotes: View {
         } message: {
             Text("The entire current page will be deleted. Other pages remain.")
         }
+    }
+
+    /// Resize through ImageIO without ever decoding the original full-sized
+    /// photo into a UIImage. This matters on older iPhones and large HEICs.
+    private static func makeJPEGs(from data: Data) -> (full: Data, thumb: Data)? {
+        guard let source = CGImageSourceCreateWithData(data as CFData, nil) else { return nil }
+        func downsized(_ size: Int, quality: CGFloat) -> Data? {
+            let options: [CFString: Any] = [
+                kCGImageSourceCreateThumbnailFromImageAlways: true,
+                kCGImageSourceCreateThumbnailWithTransform: true,
+                kCGImageSourceThumbnailMaxPixelSize: size
+            ]
+            guard let raster = CGImageSourceCreateThumbnailAtIndex(source, 0, options as CFDictionary)
+            else { return nil }
+            return UIImage(cgImage: raster).jpegData(compressionQuality: quality)
+        }
+        guard let full = downsized(1200, quality: 0.76),
+              let thumb = downsized(180, quality: 0.66) else { return nil }
+        return (full, thumb)
+    }
+
+    @MainActor
+    private func importPhotos(_ items: [PhotosPickerItem]) async {
+        guard loaded, !importingPhotos else { return }
+        let targetPage = notebook.selectedID
+        importingPhotos = true
+        defer {
+            importingPhotos = false
+            pickedPhotos = []
+        }
+        var imported = 0
+        var lastIssue: String?
+        for item in items {
+            do {
+                guard let data = try await item.loadTransferable(type: Data.self),
+                      let jpeg = Self.makeJPEGs(from: data) else {
+                    lastIssue = "One image could not be decoded."
+                    continue
+                }
+                _ = try ScratchpadImageStore.addImage(
+                    pageID: targetPage, jpeg: jpeg.full, thumbnail: jpeg.thumb)
+                imported += 1
+            } catch {
+                lastIssue = error.localizedDescription
+                break
+            }
+        }
+        if let updated = ScratchpadStore.loadNotebook() {
+            notebook = updated
+        }
+        notice = lastIssue == nil
+            ? "Added \(imported) image\(imported == 1 ? "" : "s") to this page."
+            : "Added \(imported). \(lastIssue!)"
+    }
+
+    private func copyImage(_ photo: ScratchpadImage) {
+        guard let url = ScratchpadImageStore.imageURL(id: photo.id),
+              let image = UIImage(contentsOfFile: url.path) else {
+            notice = "This image could not be opened."
+            return
+        }
+        UIPasteboard.general.image = image
+        notice = "Image copied. Paste into an app that accepts pictures."
+    }
+
+    private func removeImage(_ photo: ScratchpadImage) {
+        guard let updated = ScratchpadImageStore.removeImage(
+            pageID: notebook.selectedID, id: photo.id) else {
+            notice = "Could not remove this image."
+            return
+        }
+        notebook = updated
+        notice = "Image removed from this page."
     }
 
     private func switchPage(to id: String) {
