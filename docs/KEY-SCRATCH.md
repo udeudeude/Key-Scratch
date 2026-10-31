@@ -20,9 +20,19 @@ On first use of the new notebook, the previous one-page note is preserved verbat
 
 The small **arrow at the upper corner** is now an insertion action: insert the selected text into the host app, or the entire active note page when no text is selected. It has a larger 36 pt touch target and an explicit accessibility label. The button no longer merely deactivates note editing. The existing custom menu **Insert in App** calls the same transfer function.
 
-### Image support (not implemented yet)
+### Page image shelf
 
-The custom keyboard uses `UITextDocumentProxy.insertText`, which sends plain text and cannot directly insert an image in the host app. A safe next iteration would let the containing app import photographs with PhotosPicker, store scaled images under the App Group's files directory, and associate asset IDs with individual scratchpad pages. Keyboard extension views would display lightweight thumbnails, optionally with a preview. Selecting an image would copy it to `UIPasteboard` so the person can paste into a host app that supports image pasting. In-place mixed text and images would require a richer document model, attachment rendering, migration, and more careful memory/cache management. Prefer per-page image attachments before considering inline rich text.
+Each scratchpad page now has an optional image shelf, separate from its editable text.
+
+1. In the companion app, open **Scratchpad**, select a page, and tap **Add images**. Apple's Photos picker lets you select up to eight at a time.
+2. The app imports each picture through ImageIO at a maximum dimension of **1,200 px** and generates a separate **180 px** JPEG thumbnail. Both live in the private App Group's `ScratchpadImages/` folder, never in the text preference record. Each page supports up to **12 images**. The originals in Photos remain untouched.
+3. Tap a thumbnail in the **companion app** for a full preview and Copy; long-press to Copy or Remove.
+4. In the **keyboard's scratchpad**, a horizontally scrolling image shelf appears above the numbered page tabs. Tap a thumbnail to **copy it to the iOS clipboard** (requires Full Access), then paste it in a host app that accepts image pasting. Hold a thumbnail to view it enlarged without leaving the keyboard.
+5. Deleting an image or a page removes its corresponding local files only after the notebook changes have saved successfully. Existing notebooks without images decode with an empty image shelf, retaining all their text and page selections.
+
+This is intentionally **not inline rich text**, and the custom keyboard cannot directly insert images using `UITextDocumentProxy.insertText`. That API inserts text only. Embedded images among letters would require a different document model and substantially more editing complexity.
+
+The image shelf remains hidden when a page has no images. The keyboard only decodes the **small thumbnails** during ordinary display; a full image is opened only for a user-requested Copy or preview. There is no image synchronization, upload or background image processing in the keyboard extension.
 
 ## Handedness and optional native terminal appearance
 
