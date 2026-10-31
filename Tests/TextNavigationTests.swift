@@ -265,4 +265,34 @@ final class TextNavigationTests: XCTestCase {
         XCTAssertEqual(preferences.favoriteSymbols.count, 32)
     }
 
+    func testSplitHandednessAndTerminalThemesPersistWithoutChangingKeyboardHeight() throws {
+        let ordinary = KeyboardPreferences()
+        XCTAssertFalse(ordinary.leftHandedLayout)
+        XCTAssertEqual(ordinary.scratchpadVisualStyle, .standard)
+        let height = ordinary.keyboardHeight
+        for style in ScratchpadVisualStyle.allCases {
+            var configured = ordinary
+            configured.leftHandedLayout = true
+            configured.scratchpadVisualStyle = style
+            let stored = try JSONEncoder().encode(configured)
+            let restored = try JSONDecoder().decode(KeyboardPreferences.self, from: stored)
+            XCTAssertTrue(restored.leftHandedLayout)
+            XCTAssertEqual(restored.scratchpadVisualStyle, style)
+            XCTAssertEqual(restored.keyboardHeight, height)
+            let compact = KeyScratchAdaptiveLayout.appearance(restored, landscape: true)
+            XCTAssertEqual(compact.scratchpadVisualStyle, style)
+            XCTAssertTrue(compact.leftHandedLayout)
+            XCTAssertEqual(compact.keyboardHeight, 172, accuracy: 0.001)
+        }
+    }
+
+    func testOlderSavedPreferencesReceiveStandardStyleAndRightHandedSplit() throws {
+        let legacy = Data(#"{"schemaVersion":8,"keyHeight":55,"rowSpacing":6}"#.utf8)
+        let restored = try JSONDecoder().decode(KeyboardPreferences.self, from: legacy)
+        XCTAssertFalse(restored.leftHandedLayout)
+        XCTAssertEqual(restored.scratchpadVisualStyle, .standard)
+        XCTAssertEqual(restored.rowSpacing, 6)
+        XCTAssertEqual(restored.keyHeight, 55)
+    }
+
 }
