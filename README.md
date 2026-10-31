@@ -4,10 +4,11 @@ A custom iPhone keyboard with an always-visible, editable scratchpad. Built from
 
 ## Features
 
-- A compact iOS-style typing area beside a **persistent local note**.
+- A compact iOS-style typing area beside **persistent, independent scratchpad pages** (three to start, up to eight). Tabs along the bottom switch pages; the companion app offers full-size page editing and page management. Original single-page notes migrate intact to Page 1.
 - Tap the **scratchpad** to type into it, or a text field in the host app to type there. The former Notes/App key is now **★ Favorites**: it opens personal one-tap emoji and Unicode symbols, with recent characters first. Edit favorites in the companion app's **Scratchpad & layout** screen. Hold ★ to cycle enabled languages. The system globe still switches among installed keyboards, including Apple's Emoji keyboard.
 - Swipe typing, suggested corrections, long-press accents, optional digit flicks, stable Delete/Return positions, smart punctuation and spacing.
 - Double-tap word selection, triple-tap paragraph selection, and a floating edit menu in the compact scratchpad. Selection is visibly highlighted.
+- The scratchpad's upper arrow **inserts selected note text into the host app**, or the entire page when nothing is selected. A large touch target and the menu's Insert in App action provide two ways to do it.
 - **Full Access**, when the user enables it, permits Copy/Paste and local note sharing with the containing app. The companion app has a full-size note editor and Share/Export. No text is uploaded.
 - Portrait: adjustable split (30% notes by default). **Landscape: a 172 pt compact keyboard at the far right**, with the notes filling all remaining extension space to the left. iOS-owned globe, microphone and home-indicator areas are outside the extension's layout.
 - **Left-handed layout** reverses keyboard and scratchpad in both orientations, with the same adjustable proportions.
