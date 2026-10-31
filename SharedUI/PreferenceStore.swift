@@ -95,9 +95,12 @@ enum ScratchpadStore {
     static func removePage(id: String) -> ScratchpadNotebook? {
         guard var notebook = loadNotebook(), notebook.pages.count > 1,
               let index = notebook.pages.firstIndex(where: { $0.id == id }) else { return nil }
-        notebook.pages.remove(at: index)
+        let removed = notebook.pages.remove(at: index)
         if notebook.selectedID == id { notebook.selectedID = notebook.pages[min(index, notebook.pages.count - 1)].id }
-        return saveNotebook(notebook) ? notebook : nil
+        guard saveNotebook(notebook) else { return nil }
+        // Delete orphaned images only *after* the notebook commit succeeds.
+        removed.images.forEach { ScratchpadImageStore.deleteFiles(for: $0.id) }
+        return notebook
     }
 
     // Compatibility with the old one-note consumers while they migrate.
@@ -114,5 +117,89 @@ enum ScratchpadStore {
 
     static func migrate(legacy: String?) -> String {
         migrateNotebook(legacy: legacy).selectedPage.text
+    }
+}
+
+
+/// Photo files stay outside the lightweight notebook metadata record.
+/// Both image sizes are local JPEGs: full image is bounded to 1200 px when
+/// imported by the containing app, thumbnails to 180 px for the extension.
+enum ScratchpadImageStore {
+    enum Failure: Error, LocalizedError {
+        case unavailable, noPage, pageFull, oversized, writeFailed
+
+        var errorDescription: String? {
+            switch self {
+            case .unavailable: "Shared image storage is unavailable. Check App Group signing."
+            case .noPage: "This scratchpad page is no longer available."
+            case .pageFull: "This page already has twelve images."
+            case .oversized: "The selected image is too large to keep in the keyboard."
+            case .writeFailed: "The image could not be saved. Your existing photos were not changed."
+            }
+        }
+    }
+
+    private static var folder: URL? {
+        guard let group = Bundle.main.object(forInfoDictionaryKey: "OrtholinearAppGroup") as? String,
+              let root = FileManager.default.containerURL(
+                forSecurityApplicationGroupIdentifier: group) else { return nil }
+        return root.appendingPathComponent("ScratchpadImages", isDirectory: true)
+    }
+
+    static func imageURL(id: String, thumbnail: Bool = false) -> URL? {
+        // Stored metadata never becomes an arbitrary path.
+        guard UUID(uuidString: id) != nil, let folder else { return nil }
+        return folder.appendingPathComponent((thumbnail ? "thumb-" : "") + id + ".jpg")
+    }
+
+    /// Import fully processed JPEG bytes supplied by the containing app.
+    /// Write thumbnail and full image atomically, then update one page's
+    /// metadata. Failed writes roll back without modifying the notebook.
+    static func addImage(pageID: String, jpeg: Data, thumbnail: Data) throws -> ScratchpadNotebook {
+        guard !jpeg.isEmpty, jpeg.count <= 2_000_000,
+              !thumbnail.isEmpty, thumbnail.count <= 160_000 else {
+            throw Failure.oversized
+        }
+        guard var notebook = ScratchpadStore.loadNotebook(),
+              let index = notebook.pages.firstIndex(where: { $0.id == pageID }) else {
+            throw Failure.noPage
+        }
+        guard notebook.pages[index].images.count < ScratchpadNotebook.maximumImagesPerPage
+        else { throw Failure.pageFull }
+        guard let folder else { throw Failure.unavailable }
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        let image = ScratchpadImage()
+        guard let fullURL = imageURL(id: image.id),
+              let smallURL = imageURL(id: image.id, thumbnail: true) else { throw Failure.unavailable }
+        do {
+            try jpeg.write(to: fullURL, options: .atomic)
+            try thumbnail.write(to: smallURL, options: .atomic)
+            notebook.pages[index].images.append(image)
+            guard ScratchpadStore.saveNotebook(notebook) else { throw Failure.writeFailed }
+            return notebook
+        } catch {
+            try? FileManager.default.removeItem(at: fullURL)
+            try? FileManager.default.removeItem(at: smallURL)
+            throw error
+        }
+    }
+
+    @discardableResult
+    static func removeImage(pageID: String, id: String) -> ScratchpadNotebook? {
+        guard var book = ScratchpadStore.loadNotebook(),
+              let index = book.pages.firstIndex(where: { $0.id == pageID }),
+              book.pages[index].images.contains(where: { $0.id == id }) else { return nil }
+        book.pages[index].images.removeAll { $0.id == id }
+        guard ScratchpadStore.saveNotebook(book) else { return nil }
+        deleteFiles(for: id)
+        return book
+    }
+
+    static func deleteFiles(for id: String) {
+        for thumbnail in [true, false] {
+            if let url = imageURL(id: id, thumbnail: thumbnail) {
+                try? FileManager.default.removeItem(at: url)
+            }
+        }
     }
 }
