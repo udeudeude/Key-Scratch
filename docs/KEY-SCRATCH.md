@@ -12,6 +12,16 @@ The temporary five-color mode comparison is complete and **the colored modes and
 
 The scratchpad now has a thin neutral border and 6 pt rounded corners matching the keycaps, with a subtle blue active-focus border. The new app icon refers to a **metal key scratching dark car paint**, rather than a computer keyboard key.
 
+## Handedness and optional native terminal appearance
+
+The **Scratchpad & layout** settings screen includes **Left-handed layout** (off by default). When enabled, the letter keyboard takes the left side and the scratchpad occupies the right. The split reverses in both portrait and landscape, while existing width and height settings remain unchanged.
+
+The scratchpad's rounded outline now traces **only its top and two side edges**, using the *exact background color behind the keys* from the active keyboard theme, including its dark appearance. There is no bottom outline.
+
+The **Scratchpad appearance** picker has four choices: Standard, Terminal · green, Terminal · amber and Terminal · composite TV. The three terminal palettes adapt the display from the user's [Temporarily Leave the Universe](https://github.com/udeudeude/Temporarily-Leave-the-Universe) project: near-black glass, Courier-style monospaced phosphor text, low-contrast 4 pt scanlines and static, softly illuminated corners. The underlying editor remains the **same selectable and locally saved UITextView**. The terminal does **not** import that project's game, JavaScript, network-served font, or WebView. These are native UIKit rendering choices with fixed overlays and no animation timers. Terminal style remains opt-in to minimize unnecessary rendering cost.
+
+The source repo's interface license is AGPL-3.0-or-later for independently authored interface work, with distinct reservations for third-party game content. This is a native adaptation of its visual vocabulary; no Eamon game text or graphic artwork is copied.
+
 ## iPhone-style controls and language switching
 
 Tap the compact note panel to type there. Tap a host-app text field to return typing to the app. The bottom-row key is now **★**, opening a scrollable favorites panel containing both emoji and Unicode symbols. Choosing one inserts it into the currently active text destination and remembers it among the eight most recent symbols. Edit the favorites (up to 48) in **Scratchpad & layout** in the companion app; hold ★ to cycle enabled languages. It does not invoke Apple's native emoji picker.
