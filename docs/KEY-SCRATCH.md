@@ -12,6 +12,18 @@ The temporary five-color mode comparison is complete and **the colored modes and
 
 The scratchpad now has a thin neutral border and 6 pt rounded corners matching the keycaps, with a subtle blue active-focus border. The new app icon refers to a **metal key scratching dark car paint**, rather than a computer keyboard key.
 
+## Multiple note pages and send-to-app
+
+The scratchpad has **three numbered pages** initially, with tabs along the bottom and a **+** for adding pages, up to eight. Each tab has independent text, selection and scroll position when reopened. The companion app's **Scratchpad** editor has corresponding page tabs, add, clear-current-page and delete-page controls.
+
+On first use of the new notebook, the previous one-page note is preserved verbatim as **page 1**. The original note remains in legacy storage as a fallback rather than being destructively migrated. The new notebook is saved to the existing private App Group, with each edit updating only its own page so notes in other pages are not overwritten.
+
+The small **arrow at the upper corner** is now an insertion action: insert the selected text into the host app, or the entire active note page when no text is selected. It has a larger 36 pt touch target and an explicit accessibility label. The button no longer merely deactivates note editing. The existing custom menu **Insert in App** calls the same transfer function.
+
+### Image support (not implemented yet)
+
+The custom keyboard uses `UITextDocumentProxy.insertText`, which sends plain text and cannot directly insert an image in the host app. A safe next iteration would let the containing app import photographs with PhotosPicker, store scaled images under the App Group's files directory, and associate asset IDs with individual scratchpad pages. Keyboard extension views would display lightweight thumbnails, optionally with a preview. Selecting an image would copy it to `UIPasteboard` so the person can paste into a host app that supports image pasting. In-place mixed text and images would require a richer document model, attachment rendering, migration, and more careful memory/cache management. Prefer per-page image attachments before considering inline rich text.
+
 ## Handedness and optional native terminal appearance
 
 The **Scratchpad & layout** settings screen includes **Left-handed layout** (off by default). When enabled, the letter keyboard takes the left side and the scratchpad occupies the right. The split reverses in both portrait and landscape, while existing width and height settings remain unchanged.
