@@ -211,7 +211,7 @@ extension String {
 }
 
 enum KeyAction: Hashable, Sendable {
-    case text(String), shift, backspace, space, enter, language, noteFocus, page, globe, dismiss
+    case text(String), shift, backspace, space, enter, language, favorites, page, globe, dismiss
     /// Opens the first of the person's layers from the letter page.
     case layers
     /// Moves the cursor or deletes, from a navigation layer.
@@ -299,16 +299,9 @@ enum KeyboardLayout {
             }
         }
         if needsGlobe { controls.append(Key(action: .globe)) }
-        // The Blue full-width reference has no notes, so it cannot offer a
-        // Notes/App toggle. Otherwise that one-tap destination control is always
-        // in the same spot, with language cycling on a long press.
-        if preferences.keyScratchMode == .reference {
-            if preferences.language(after: state.language) != state.language {
-                controls.append(Key(action: .language, weight: 1.2))
-            }
-        } else {
-            controls.append(Key(action: .noteFocus, weight: 1.4))
-        }
+        // Tap the star for personal frequent symbols; hold it to switch
+        // enabled languages. Notes are focused by touching the note itself.
+        controls.append(Key(action: .favorites, weight: 1.4))
         controls += [Key(action: .space, weight: 3.8),
                      Key(action: .enter, weight: preferences.validated.actionKeyWidth)]
         if state.page != .letters && !preferences.iphoneKeyPositions {
@@ -601,6 +594,13 @@ struct KeyboardPreferences: Codable, Equatable, Sendable {
     var keyScratchNoteWidth: Double = 0.30
     var keyScratchNoteFontSize: Double = 11
     var keyScratchNoteFont: KeyScratchNoteFont = .text
+    /// User-editable one-tap Unicode/emoji choices for the keyboard star key.
+    var favoriteSymbols: [String] = [
+        "😀", "😂", "🙂", "🙃", "🤔", "👍", "❤️", "✨",
+        "✓", "☑", "☐", "★", "•", "…", "–", "—",
+        "°", "±", "×", "÷", "≠", "≤", "≥", "∞",
+        "→", "←", "↔", "©", "®", "™", "☕", "🎉"
+    ]
 
     var suggestionsEnabled: Bool = true
     var nextWordSuggestions: Bool = true
@@ -632,7 +632,7 @@ struct KeyboardPreferences: Codable, Equatable, Sendable {
         case schemaVersion, keyHeight, columnSpacing, rowSpacing, fillGaps, defaultLanguage
         case controlHeight, letterSize, actionKeyWidth, shiftPlacement, showPunctuation, showApostrophe, showHeader, autoSpacePunctuation
         case yiOnLongPress, autoCapitalize, doubleSpacePeriod, digitAccess, glideTyping
-        case keyScratchMode, keyScratchNoteWidth, keyScratchNoteFontSize, keyScratchNoteFont
+        case keyScratchMode, keyScratchNoteWidth, keyScratchNoteFontSize, keyScratchNoteFont, favoriteSymbols
         case iphoneKeyPositions, appleKeyAppearance
         case theme, accent, showLongPressHints
         case suggestionsEnabled, nextWordSuggestions, contextualSuggestions
@@ -642,6 +642,11 @@ struct KeyboardPreferences: Codable, Equatable, Sendable {
 
     var validated: Self {
         var result = self
+        // Keep stable order and avoid empty/oversized labels from old files.
+        var symbolsSeen = Set<String>()
+        result.favoriteSymbols = favoriteSymbols.filter {
+            !$0.isEmpty && $0.count <= 8 && symbolsSeen.insert($0).inserted
+        }.prefix(48).map { $0 }
         result.keyHeight = keyHeight.isFinite ? min(88, max(32, keyHeight)) : 62
         result.controlHeight = controlHeight.isFinite ? min(72, max(30, controlHeight)) : 48
         result.letterSize = letterSize.isFinite ? min(36, max(18, letterSize)) : 24
@@ -698,10 +703,10 @@ struct KeyboardPreferences: Codable, Equatable, Sendable {
         let suggestions = (suggestionsEnabled, nextWordSuggestions, contextualSuggestions)
         let typing = (autoCapitalize, doubleSpacePeriod, digitAccess, glideTyping, iphoneKeyPositions)
         let custom = (customLayouts, layers, showLayerKey, keycaps, expansions, extrasEnabled)
-        let scratch = (keyScratchMode, keyScratchNoteWidth, keyScratchNoteFontSize, keyScratchNoteFont)
+        let scratch = (keyScratchMode, keyScratchNoteWidth, keyScratchNoteFontSize, keyScratchNoteFont, favoriteSymbols)
         self = preset.preferences
         (customLayouts, layers, showLayerKey, keycaps, expansions, extrasEnabled) = custom
-        (keyScratchMode, keyScratchNoteWidth, keyScratchNoteFontSize, keyScratchNoteFont) = scratch
+        (keyScratchMode, keyScratchNoteWidth, keyScratchNoteFontSize, keyScratchNoteFont, favoriteSymbols) = scratch
         (defaultLanguage, languages, englishLayout, rememberLanguage, languageMemoryGeneration, invasionAnswer) = language
         (theme, accent, showLongPressHints, appleKeyAppearance) = appearance
         (suggestionsEnabled, nextWordSuggestions, contextualSuggestions) = suggestions
@@ -738,6 +743,7 @@ extension KeyboardPreferences {
         keyScratchNoteWidth = try c.decodeIfPresent(Double.self, forKey: .keyScratchNoteWidth) ?? keyScratchNoteWidth
         keyScratchNoteFontSize = try c.decodeIfPresent(Double.self, forKey: .keyScratchNoteFontSize) ?? keyScratchNoteFontSize
         keyScratchNoteFont = (try? c.decodeIfPresent(KeyScratchNoteFont.self, forKey: .keyScratchNoteFont)) ?? keyScratchNoteFont
+        favoriteSymbols = (try? c.decodeIfPresent([String].self, forKey: .favoriteSymbols)) ?? favoriteSymbols
         theme = try c.decodeIfPresent(KeyboardTheme.self, forKey: .theme) ?? theme
         accent = try c.decodeIfPresent(KeyboardAccent.self, forKey: .accent) ?? accent
         showLongPressHints = try c.decodeIfPresent(Bool.self, forKey: .showLongPressHints) ?? showLongPressHints
