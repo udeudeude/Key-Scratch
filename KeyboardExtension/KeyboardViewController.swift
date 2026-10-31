@@ -3,6 +3,7 @@ import UIKit
 final class KeyboardViewController: UIInputViewController {
     private let keyboard = KeyboardView()
     private let scratchpad = ScratchpadView()
+    private let favoritePad = FavoriteSymbolsPanel()
     private let scratchpadDocumentID = UUID()
     private var scratchpadWidth: NSLayoutConstraint?
     private var heightConstraint: NSLayoutConstraint?
@@ -38,6 +39,19 @@ final class KeyboardViewController: UIInputViewController {
         keyboard.accessibilityIdentifier = "system-keyboard-surface"
         keyboard.translatesAutoresizingMaskIntoConstraints = false
         view.addSubview(keyboard)
+        // Overlay remains inside the keyboard extension, so symbols work in
+        // every app that supports custom keyboards. It never steals note focus.
+        favoritePad.translatesAutoresizingMaskIntoConstraints = false
+        favoritePad.isHidden = true
+        keyboard.addSubview(favoritePad)
+        NSLayoutConstraint.activate([
+            favoritePad.leadingAnchor.constraint(equalTo: keyboard.leadingAnchor),
+            favoritePad.trailingAnchor.constraint(equalTo: keyboard.trailingAnchor),
+            favoritePad.topAnchor.constraint(equalTo: keyboard.topAnchor),
+            favoritePad.bottomAnchor.constraint(equalTo: keyboard.bottomAnchor)
+        ])
+        favoritePad.onClose = { [weak self] in self?.favoritePad.isHidden = true }
+        favoritePad.onPick = { [weak self] character in self?.insertFavorite(character) }
         scratchpad.translatesAutoresizingMaskIntoConstraints = false
         view.addSubview(scratchpad)
         scratchpadWidth = scratchpad.widthAnchor.constraint(equalToConstant: 0)
@@ -166,6 +180,7 @@ final class KeyboardViewController: UIInputViewController {
         scratchpad.isHidden = false
         scratchpad.configure(font: preferences.keyScratchNoteFont,
                              size: preferences.keyScratchNoteFontSize)
+        favoritePad.isHidden = true
         keyboard.preferences = preferences
         view.setNeedsLayout()
         heightConstraint?.constant = keyboard.layoutHeight
@@ -412,6 +427,25 @@ final class KeyboardViewController: UIInputViewController {
         return edit.text
     }
 
+    private func insertFavorite(_ symbol: String) {
+        guard !symbol.isEmpty else { return }
+        favoritePad.isHidden = true
+        FavoriteSymbolsHistory.record(symbol)
+        suggestions.cancelGlide()
+        pendingGlide = nil
+        expander.forget()
+        punctuationSpacing.reset()
+        noteSpacing.reset()
+        if scratchpad.isEditingNote {
+            scratchpad.type(symbol)
+        } else {
+            textDocumentProxy.insertText(symbol)
+        }
+        updateAutoShift()
+        keyboard.inputState = inputState
+        suggestions.refresh(force: true)
+    }
+
     private func switchLanguage(to language: KeyboardLanguage) {
         guard keyboard.preferences.validated.languages.contains(language) else { return }
         inputState.language = language
@@ -635,12 +669,12 @@ final class KeyboardViewController: UIInputViewController {
                 autoShifted = false
                 manualShiftContext = textDocumentProxy.documentContextBeforeInput ?? ""
             } else { inputState.page = KeyboardLayout.page(after: inputState.page, preferences: keyboard.preferences) }
-        case .noteFocus:
-            if scratchpad.isEditingNote {
-                scratchpad.deactivate()
-            } else if keyboard.preferences.keyScratchMode != .reference {
-                scratchpad.activate()
-            }
+        case .favorites:
+            // Tapping the scratchpad and a host field already selects the
+            // text destination, so this control now opens one-tap characters.
+            favoritePad.configure(symbols: FavoriteSymbolsHistory.display(
+                favorites: keyboard.preferences.favoriteSymbols))
+            favoritePad.isHidden.toggle()
         case .language:
             inputState.language = keyboard.preferences.language(after: inputState.language)
             inputState.page = .letters
@@ -737,4 +771,127 @@ private enum LanguageMemoryStore {
 /// handed to MainActor without concurrent access to its UIKit-isolated entries.
 private struct KeyScratchLexiconTransfer: @unchecked Sendable {
     let value: UILexicon
+}
+
+
+/// User-picked favorites, most recently used first, stored only on-device.
+/// The list in preferences is editable in the containing app.
+private enum FavoriteSymbolsHistory {
+    private static let key = "key-scratch.recent-symbols.v1"
+
+    private static var defaults: UserDefaults {
+        if let group = Bundle.main.object(forInfoDictionaryKey: "OrtholinearAppGroup") as? String,
+           let shared = UserDefaults(suiteName: group) { return shared }
+        return .standard
+    }
+
+    static func display(favorites: [String]) -> [String] {
+        var seen = Set<String>()
+        return ((defaults.stringArray(forKey: key) ?? []) + favorites)
+            .filter { !$0.isEmpty && seen.insert($0).inserted }
+            .prefix(48).map { $0 }
+    }
+
+    static func record(_ symbol: String) {
+        let old = defaults.stringArray(forKey: key) ?? []
+        defaults.set(Array(([symbol] + old.filter { $0 != symbol }).prefix(8)), forKey: key)
+    }
+}
+
+/// In-keyboard favorites surface: not an attempt to invoke Apple's emoji UI.
+/// The header stays visible in the 172 pt compact landscape keyboard.
+private final class FavoriteSymbolsPanel: UIView {
+    var onPick: ((String) -> Void)?
+    var onClose: (() -> Void)?
+
+    private let titleLabel = UILabel()
+    private let closeButton = UIButton(type: .system)
+    private let scroller = UIScrollView()
+    private let grid = UIStackView()
+
+    override init(frame: CGRect) {
+        super.init(frame: frame)
+        backgroundColor = .systemGray5
+        layer.borderWidth = 0.5
+        layer.borderColor = UIColor.separator.cgColor
+        isAccessibilityElement = false
+
+        titleLabel.text = "★  Favorites · recent first"
+        titleLabel.font = .systemFont(ofSize: 12, weight: .semibold)
+        titleLabel.textColor = .secondaryLabel
+        titleLabel.translatesAutoresizingMaskIntoConstraints = false
+        addSubview(titleLabel)
+
+        closeButton.setTitle("Done", for: .normal)
+        closeButton.titleLabel?.font = .systemFont(ofSize: 13, weight: .semibold)
+        closeButton.accessibilityLabel = "Close favorite symbols"
+        closeButton.addAction(UIAction { [weak self] _ in self?.onClose?() }, for: .touchUpInside)
+        closeButton.translatesAutoresizingMaskIntoConstraints = false
+        addSubview(closeButton)
+
+        scroller.translatesAutoresizingMaskIntoConstraints = false
+        scroller.showsVerticalScrollIndicator = true
+        scroller.alwaysBounceVertical = false
+        addSubview(scroller)
+        grid.axis = .vertical
+        grid.spacing = 3
+        grid.distribution = .fill
+        grid.translatesAutoresizingMaskIntoConstraints = false
+        scroller.addSubview(grid)
+
+        NSLayoutConstraint.activate([
+            titleLabel.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 9),
+            titleLabel.topAnchor.constraint(equalTo: topAnchor, constant: 3),
+            titleLabel.heightAnchor.constraint(equalToConstant: 26),
+            closeButton.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -6),
+            closeButton.topAnchor.constraint(equalTo: topAnchor),
+            closeButton.widthAnchor.constraint(greaterThanOrEqualToConstant: 48),
+            closeButton.heightAnchor.constraint(equalToConstant: 30),
+            scroller.topAnchor.constraint(equalTo: titleLabel.bottomAnchor, constant: 2),
+            scroller.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 4),
+            scroller.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -4),
+            scroller.bottomAnchor.constraint(equalTo: bottomAnchor, constant: -3),
+            grid.topAnchor.constraint(equalTo: scroller.contentLayoutGuide.topAnchor),
+            grid.leadingAnchor.constraint(equalTo: scroller.contentLayoutGuide.leadingAnchor),
+            grid.trailingAnchor.constraint(equalTo: scroller.contentLayoutGuide.trailingAnchor),
+            grid.bottomAnchor.constraint(equalTo: scroller.contentLayoutGuide.bottomAnchor),
+            grid.widthAnchor.constraint(equalTo: scroller.frameLayoutGuide.widthAnchor)
+        ])
+    }
+
+    required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
+
+    func configure(symbols: [String]) {
+        for row in grid.arrangedSubviews {
+            grid.removeArrangedSubview(row)
+            row.removeFromSuperview()
+        }
+        for offset in stride(from: 0, to: symbols.count, by: 8) {
+            let row = UIStackView()
+            row.axis = .horizontal
+            row.distribution = .fillEqually
+            row.spacing = 3
+            for column in 0..<8 {
+                let index = offset + column
+                let button = UIButton(type: .system)
+                if index < symbols.count {
+                    let symbol = symbols[index]
+                    button.setTitle(symbol, for: .normal)
+                    button.titleLabel?.font = .systemFont(ofSize: 22)
+                    button.accessibilityLabel = "Insert \(symbol)"
+                    button.backgroundColor = .secondarySystemGroupedBackground
+                    button.layer.cornerRadius = 6
+                    button.addAction(UIAction { [weak self] _ in
+                        self?.onPick?(symbol)
+                    }, for: .touchUpInside)
+                } else {
+                    button.isEnabled = false
+                }
+                row.addArrangedSubview(button)
+            }
+            row.heightAnchor.constraint(equalToConstant: 38).isActive = true
+            grid.addArrangedSubview(row)
+        }
+        scroller.setContentOffset(.zero, animated: false)
+    }
 }
