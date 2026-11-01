@@ -1,4 +1,5 @@
 import Foundation
+import UIKit
 
 enum PreferenceStore {
     // Only the containing app writes. The extension reads this file without Full Access.
@@ -182,6 +183,49 @@ enum ScratchpadImageStore {
             try? FileManager.default.removeItem(at: smallURL)
             throw error
         }
+    }
+
+    /// Accept a picture the user explicitly copied in Photos, Safari,
+    /// Files, etc. Keep it separate from note text, just like imports.
+    /// The clipboard-provided UIImage is scaled to bounded JPEG bytes before
+    /// any persistent write; originals on the clipboard are not modified.
+    @MainActor
+    static func addImage(pageID: String, from image: UIImage) throws -> ScratchpadNotebook {
+        guard let full = makeJPEG(image, maxDimension: 1200, quality: 0.76),
+              let thumbnail = makeJPEG(image, maxDimension: 180, quality: 0.66)
+        else { throw Failure.writeFailed }
+
+        // JPEG compression ratios vary widely; keep both files under the
+        // same limits as PhotosPicker import without holding full-size files.
+        let bounded: Data
+        if full.count <= 2_000_000 {
+            bounded = full
+        } else if let fallback = makeJPEG(image, maxDimension: 960, quality: 0.60),
+                  fallback.count <= 2_000_000 {
+            bounded = fallback
+        } else { throw Failure.oversized }
+        guard thumbnail.count <= 160_000 else { throw Failure.oversized }
+        return try addImage(pageID: pageID, jpeg: bounded, thumbnail: thumbnail)
+    }
+
+    @MainActor
+    private static func makeJPEG(_ image: UIImage, maxDimension: CGFloat,
+                                 quality: CGFloat) -> Data? {
+        let size = image.size
+        guard size.width.isFinite, size.height.isFinite,
+              size.width > 0, size.height > 0 else { return nil }
+        let ratio = min(1, maxDimension / max(size.width, size.height))
+        let bounds = CGSize(width: max(1, (size.width * ratio).rounded()),
+                            height: max(1, (size.height * ratio).rounded()))
+        let format = UIGraphicsImageRendererFormat()
+        format.scale = 1 // never accidentally render at 2×/3× screen scale
+        format.opaque = true
+        let rendered = UIGraphicsImageRenderer(size: bounds, format: format).image { context in
+            UIColor.white.setFill()
+            context.fill(CGRect(origin: .zero, size: bounds))
+            image.draw(in: CGRect(origin: .zero, size: bounds))
+        }
+        return rendered.jpegData(compressionQuality: quality)
     }
 
     @discardableResult
