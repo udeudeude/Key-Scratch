@@ -298,8 +298,8 @@ final class ScratchpadView: UIView, UITextViewDelegate, UIEditMenuInteractionDel
         layer.addSublayer(perimeter)
         updateBorderAppearance()
 
-        // Most of the panel is now text, not a toolbar. An unobtrusive
-        // icon remains as an optional fallback if a host tap emits no focus event.
+        // The send-to-app action belongs in the bottom tab toolbar, not
+        // over the editable text. It never obscures the first line of notes.
         returnToApp.setImage(UIImage(systemName: "arrow.up.forward.square.fill"), for: .normal)
         returnToApp.tintColor = .secondaryLabel
         returnToApp.backgroundColor = .tertiarySystemBackground
@@ -309,13 +309,8 @@ final class ScratchpadView: UIView, UITextViewDelegate, UIEditMenuInteractionDel
         returnToApp.addTarget(self, action: #selector(returnToAppTapped), for: .touchUpInside)
         returnToApp.isHidden = false
         returnToApp.translatesAutoresizingMaskIntoConstraints = false
-        addSubview(returnToApp)
-        NSLayoutConstraint.activate([
-            returnToApp.topAnchor.constraint(equalTo: topAnchor, constant: 1),
-            returnToApp.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -1),
-            returnToApp.widthAnchor.constraint(equalToConstant: 36),
-            returnToApp.heightAnchor.constraint(equalToConstant: 36)
-        ])
+        returnToApp.widthAnchor.constraint(equalToConstant: 36).isActive = true
+        returnToApp.accessibilityHint = "At the bottom of the scratchpad; sends selected text or the entire current page to the app."
 
         // San Francisco's text cut is optically tuned for tiny point sizes,
         // with less wasted width than the previous monospaced face.
@@ -390,7 +385,6 @@ final class ScratchpadView: UIView, UITextViewDelegate, UIEditMenuInteractionDel
         scanlineFilm.isUserInteractionEnabled = false
         scanlineFilm.alpha = 0
         addSubview(scanlineFilm)
-        bringSubviewToFront(returnToApp)
         layer.addSublayer(perimeter)
     }
 
@@ -619,7 +613,9 @@ final class ScratchpadView: UIView, UITextViewDelegate, UIEditMenuInteractionDel
         tabsPanel.axis = .horizontal
         tabsPanel.alignment = .fill
         tabsPanel.spacing = 2
-        tabsPanel.heightAnchor.constraint(equalToConstant: 28).isActive = true
+        // Fixed toolbar immediately below the image shelf, so neither
+        // the send arrow nor the page buttons can overlap editable notes.
+        tabsPanel.heightAnchor.constraint(equalToConstant: 36).isActive = true
         tabsScroller.showsHorizontalScrollIndicator = false
         tabsScroller.alwaysBounceHorizontal = true
         tabsScroller.translatesAutoresizingMaskIntoConstraints = false
@@ -651,6 +647,9 @@ final class ScratchpadView: UIView, UITextViewDelegate, UIEditMenuInteractionDel
         pasteImageButton.heightAnchor.constraint(equalToConstant: 26).isActive = true
         tabsPanel.addArrangedSubview(tabsScroller)
         tabsPanel.addArrangedSubview(addTab)
+        // Send-to-app is bottom-right, after the numbered page tabs and +.
+        // The tabs scroll horizontally instead of being covered by the arrow.
+        tabsPanel.addArrangedSubview(returnToApp)
         renderTabs()
     }
 
