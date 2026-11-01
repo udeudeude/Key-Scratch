@@ -876,6 +876,14 @@ private struct KeyScratchFullNotes: View {
                     .disabled(!loaded || importingPhotos ||
                               notebook.selectedPage.images.count >= ScratchpadNotebook.maximumImagesPerPage)
                     .accessibilityIdentifier("add-scratchpad-images")
+                    Button {
+                        pasteClipboardImage()
+                    } label: {
+                        Label("Paste image", systemImage: "doc.on.clipboard")
+                    }
+                    .disabled(!loaded || importingPhotos ||
+                              notebook.selectedPage.images.count >= ScratchpadNotebook.maximumImagesPerPage)
+                    .accessibilityIdentifier("paste-image-in-companion-scratchpad")
                     Spacer()
                     if importingPhotos {
                         ProgressView()
@@ -930,6 +938,10 @@ private struct KeyScratchFullNotes: View {
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
+
+                Text("To paste a picture here: copy it in Photos, then tap Paste image. The picture is saved separately from this page's text.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
 
                 TextEditor(text: editableNote)
                     .focused($focused)
@@ -1106,6 +1118,26 @@ private struct KeyScratchFullNotes: View {
         notice = lastIssue == nil
             ? "Added \(imported) image\(imported == 1 ? "" : "s") to this page."
             : "Added \(imported). \(lastIssue!)"
+    }
+
+    /// Unlike TextEditor, the explicitly labeled paste control accepts
+    /// an image from Photos, Files, a screenshot, or another source. The image
+    /// becomes a separate shelf attachment on the selected page.
+    @MainActor
+    private func pasteClipboardImage() {
+        guard loaded, !importingPhotos else { return }
+        guard let image = UIPasteboard.general.image else {
+            notice = "Copy a picture in Photos or another app, then tap Paste image."
+            return
+        }
+        do {
+            let updated = try ScratchpadImageStore.addImage(
+                pageID: notebook.selectedID, from: image)
+            notebook = updated
+            notice = "Image pasted onto Page \(updated.selectedIndex + 1)."
+        } catch {
+            notice = "Couldn't paste image: \(error.localizedDescription)"
+        }
     }
 
     private func copyImage(_ photo: ScratchpadImage) {
