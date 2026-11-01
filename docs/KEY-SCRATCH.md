@@ -20,19 +20,20 @@ On first use of the new notebook, the previous one-page note is preserved verbat
 
 The small **arrow at the upper corner** is now an insertion action: insert the selected text into the host app, or the entire active note page when no text is selected. It has a larger 36 pt touch target and an explicit accessibility label. The button no longer merely deactivates note editing. The existing custom menu **Insert in App** calls the same transfer function.
 
-### Page image shelf
+### Page image shelf and direct image pasting
 
-Each scratchpad page now has an optional image shelf, separate from its editable text.
+Every scratchpad page has an image shelf, separate from editable text.
 
-1. In the companion app, open **Scratchpad**, select a page, and tap **Add images**. Apple's Photos picker lets you select up to eight at a time.
-2. The app imports each picture through ImageIO at a maximum dimension of **1,200 px** and generates a separate **180 px** JPEG thumbnail. Both live in the private App Group's `ScratchpadImages/` folder, never in the text preference record. Each page supports up to **12 images**. The originals in Photos remain untouched.
-3. Tap a thumbnail in the **companion app** for a full preview and Copy; long-press to Copy or Remove.
-4. In the **keyboard's scratchpad**, a horizontally scrolling image shelf appears above the numbered page tabs. Tap a thumbnail to **copy it to the iOS clipboard** (requires Full Access), then paste it in a host app that accepts image pasting. Hold a thumbnail to view it enlarged without leaving the keyboard.
-5. Deleting an image or a page removes its corresponding local files only after the notebook changes have saved successfully. Existing notebooks without images decode with an empty image shelf, retaining all their text and page selections.
+1. **Paste copied pictures directly:** Copy a photo or picture in Photos, Safari, Files, or another app. In the compact Key Scratch keyboard, tap **Paste** at the beginning of the image shelf just above the page tabs, even when the shelf is empty. Alternatively choose **Paste** in the scratchpad's text-selection menu. In the full-size companion **Scratchpad**, tap **Paste image** beside **Add images**. The picture is saved on the current page as an attachment, not inserted among the words.
+2. **Import from Photos:** In the companion app, use **Add images** to select up to eight at a time through the system Photos picker. This button is in the full-size companion editor, not the keyboard extension.
+3. Images from both paths are downscaled to a maximum dimension of **1,200 px** with separate **180 px** thumbnails. Both JPEG files live in the private App Group `ScratchpadImages/` folder. Each page has a limit of **12 images**. The copied/selected originals are left untouched.
+4. In the compact keyboard, tap a thumbnail to **copy it back to the iOS clipboard** for pasting into a host app that accepts images. Hold a thumbnail to preview. In the companion app, tap to preview and copy, or long-press to remove.
+5. **Allow Full Access** is needed to paste or copy clipboard images through the keyboard extension. The companion app can paste directly without that keyboard permission. If the clipboard contains text, ordinary **Paste** in the scratchpad menu still pastes text; the explicit shelf button only accepts pictures.
+6. Deleting an image or its page removes the associated local image copies once the updated notebook is saved. Earlier notebooks without image metadata retain their text and page selections.
 
-This is intentionally **not inline rich text**, and the custom keyboard cannot directly insert images using `UITextDocumentProxy.insertText`. That API inserts text only. Embedded images among letters would require a different document model and substantially more editing complexity.
+The shelf occupies only **28 pt** with a visible Paste button on empty pages, expanding to **45 pt** for the thumbnails. The keyboard normally decodes only small thumbnails, opening the full image on deliberate preview or Copy. No network uploads, background image processing in the keyboard extension or rich-text conversion.
 
-The image shelf remains hidden when a page has no images. The keyboard only decodes the **small thumbnails** during ordinary display; a full image is opened only for a user-requested Copy or preview. There is no image synchronization, upload or background image processing in the keyboard extension.
+Images **cannot be inserted directly into another app** via `UITextDocumentProxy.insertText`; that Apple API accepts text. Sending a saved image outward uses explicit Copy followed by Paste in the receiving app.
 
 ## Handedness and optional native terminal appearance
 
