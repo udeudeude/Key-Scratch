@@ -470,7 +470,13 @@ final class KeyboardView: UIControl {
             drawSymbol("delete.left", in: frame, size: 23, color: color)
         case .enter:
             if returnTitle == "return" {
-                drawSymbol("return", in: frame, size: 23, color: color)
+                // Match the default iOS keyboard's visible word, rather than
+                // an SF Symbol return-arrow. Fit the text on narrow layouts.
+                let width = max(0, frame.width - 4)
+                let size = min(13, max(9, width / 3.8))
+                drawText("return", in: frame.insetBy(dx: 2, dy: 0),
+                         font: palette.legend(ofSize: size, weight: .medium),
+                         color: color)
             } else {
                 let name = returnTitle == "search" ? "magnifyingglass" : (returnTitle == "send" ? "paperplane" : (returnTitle == "done" ? "checkmark" : "arrow.right"))
                 drawSymbol(name, in: frame.offsetBy(dx: 0, dy: -7), size: 17, color: color)
