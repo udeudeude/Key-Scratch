@@ -30,6 +30,7 @@ final class ScratchpadView: UIView, UITextViewDelegate, UIEditMenuInteractionDel
     private let tabsScroller = UIScrollView()
     private let tabsRow = UIStackView()
     private let addTab = UIButton(type: .system)
+    private let pasteImageButton = UIButton(type: .system)
     private let imageShelf = UIScrollView()
     private let imageRow = UIStackView()
     private var activeImagePreview: UIView?
@@ -638,8 +639,17 @@ final class ScratchpadView: UIView, UITextViewDelegate, UIEditMenuInteractionDel
         addTab.accessibilityIdentifier = "add-scratchpad-page"
         addTab.addTarget(self, action: #selector(addPageTapped), for: .touchUpInside)
         addTab.widthAnchor.constraint(equalToConstant: 25).isActive = true
+        pasteImageButton.setTitle("Paste", for: .normal)
+        pasteImageButton.titleLabel?.font = .systemFont(ofSize: 11, weight: .semibold)
+        pasteImageButton.accessibilityLabel = "Paste clipboard image onto scratchpad page"
+        pasteImageButton.accessibilityHint = "Paste a picture copied from Photos or another app."
+        pasteImageButton.accessibilityIdentifier = "paste-image-in-keyboard-scratchpad"
+        pasteImageButton.setContentHuggingPriority(.required, for: .horizontal)
+        pasteImageButton.addTarget(self, action: #selector(pasteImageTapped), for: .touchUpInside)
+        pasteImageButton.widthAnchor.constraint(equalToConstant: 44).isActive = true
         tabsPanel.addArrangedSubview(tabsScroller)
         tabsPanel.addArrangedSubview(addTab)
+        tabsPanel.addArrangedSubview(pasteImageButton)
         renderTabs()
     }
 
@@ -665,6 +675,7 @@ final class ScratchpadView: UIView, UITextViewDelegate, UIEditMenuInteractionDel
         }
         addTab.isHidden = notebook.pages.count >= ScratchpadNotebook.maximumPages
         addTab.tintColor = visualStyle == .standard ? .systemBlue : editor.textColor
+        pasteImageButton.tintColor = visualStyle == .standard ? .systemBlue : editor.textColor
     }
 
     private func displaySelectedPage() {
@@ -839,18 +850,49 @@ final class ScratchpadView: UIView, UITextViewDelegate, UIEditMenuInteractionDel
         message.isHidden = false
     }
 
+    /// Paste uses the normal note edit menu as well as the bottom Paste
+    /// control. An image goes to the shelf; text still edits the text view.
     @objc private func pasteClipboard() {
-        activate()
         guard canUseClipboard else {
             inform("Enable Full Access to paste")
             return
         }
-        guard let value = UIPasteboard.general.string, !value.isEmpty else {
-            inform("Clipboard has no text")
+        if let image = UIPasteboard.general.image {
+            savePastedImage(image)
             return
         }
+        guard let value = UIPasteboard.general.string, !value.isEmpty else {
+            inform("Clipboard has no text or image")
+            return
+        }
+        activate()
         message.isHidden = true
         type(value)
+    }
+
+    @objc private func pasteImageTapped() {
+        guard canUseClipboard else {
+            inform("Allow Full Access to paste copied photos")
+            return
+        }
+        guard let image = UIPasteboard.general.image else {
+            inform("Copy an image in Photos, then tap Paste")
+            return
+        }
+        savePastedImage(image)
+    }
+
+    private func savePastedImage(_ image: UIImage) {
+        do {
+            // App Group writes can fail when Full Access isn't granted.
+            let updated = try ScratchpadImageStore.addImage(
+                pageID: notebook.selectedID, from: image)
+            notebook = updated
+            renderImages()
+            inform("Image added to page \(updated.selectedIndex + 1)")
+        } catch {
+            inform(error.localizedDescription)
+        }
     }
 
     @objc private func copyNote() {
