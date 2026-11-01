@@ -32,6 +32,7 @@ final class ScratchpadView: UIView, UITextViewDelegate, UIEditMenuInteractionDel
     private let addTab = UIButton(type: .system)
     private let pasteImageButton = UIButton(type: .system)
     private let imageShelf = UIScrollView()
+    private var imageShelfHeight: NSLayoutConstraint?
     private let imageRow = UIStackView()
     private var activeImagePreview: UIView?
     private var notebook = ScratchpadNotebook.initial(legacy: "")
@@ -646,10 +647,10 @@ final class ScratchpadView: UIView, UITextViewDelegate, UIEditMenuInteractionDel
         pasteImageButton.accessibilityIdentifier = "paste-image-in-keyboard-scratchpad"
         pasteImageButton.setContentHuggingPriority(.required, for: .horizontal)
         pasteImageButton.addTarget(self, action: #selector(pasteImageTapped), for: .touchUpInside)
-        pasteImageButton.widthAnchor.constraint(equalToConstant: 44).isActive = true
+        pasteImageButton.widthAnchor.constraint(equalToConstant: 46).isActive = true
+        pasteImageButton.heightAnchor.constraint(equalToConstant: 26).isActive = true
         tabsPanel.addArrangedSubview(tabsScroller)
         tabsPanel.addArrangedSubview(addTab)
-        tabsPanel.addArrangedSubview(pasteImageButton)
         renderTabs()
     }
 
@@ -716,8 +717,11 @@ final class ScratchpadView: UIView, UITextViewDelegate, UIEditMenuInteractionDel
         imageShelf.showsHorizontalScrollIndicator = false
         imageShelf.alwaysBounceHorizontal = true
         imageShelf.translatesAutoresizingMaskIntoConstraints = false
-        imageShelf.isHidden = true
-        let height = imageShelf.heightAnchor.constraint(equalToConstant: 45)
+        // Even with no pictures, show Paste above the numbered page tabs.
+        // The empty shelf is only 28 pt tall; with pictures it grows to 45.
+        imageShelf.isHidden = false
+        let height = imageShelf.heightAnchor.constraint(equalToConstant: 28)
+        imageShelfHeight = height
         // UIStackView collapses this arranged view entirely when no images
         // exist. A non-required height avoids an Auto Layout conflict.
         height.priority = .defaultHigh
@@ -744,7 +748,10 @@ final class ScratchpadView: UIView, UITextViewDelegate, UIEditMenuInteractionDel
             child.removeFromSuperview()
         }
         let images = notebook.selectedPage.images
-        imageShelf.isHidden = images.isEmpty
+        imageShelfHeight?.constant = images.isEmpty ? 28 : 45
+        pasteImageButton.setTitleColor(visualStyle == .standard ? .systemBlue : editor.textColor,
+                                       for: .normal)
+        imageRow.addArrangedSubview(pasteImageButton)
         for (index, image) in images.enumerated() {
             let button = UIButton(type: .custom)
             button.tag = index
