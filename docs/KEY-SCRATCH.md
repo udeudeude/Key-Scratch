@@ -18,7 +18,7 @@ The scratchpad has **three numbered pages** initially, with tabs along the botto
 
 On first use of the new notebook, the previous one-page note is preserved verbatim as **page 1**. The original note remains in legacy storage as a fallback rather than being destructively migrated. The new notebook is saved to the existing private App Group, with each edit updating only its own page so notes in other pages are not overwritten.
 
-The small **arrow at the upper corner** is now an insertion action: insert the selected text into the host app, or the entire active note page when no text is selected. It has a larger 36 pt touch target and an explicit accessibility label. The button no longer merely deactivates note editing. The existing custom menu **Insert in App** calls the same transfer function.
+The **arrow in the bottom-right scratchpad toolbar**, after the page tabs and + button, is an insertion action: insert the selected text into the host app, or the entire active note page when no text is selected. It has a larger 36 pt touch target and an explicit accessibility label. The button no longer merely deactivates note editing. The existing custom menu **Insert in App** calls the same transfer function.
 
 ### Page image shelf and direct image pasting
 
@@ -70,7 +70,7 @@ Hyphens and similar joining punctuation now attach directly to the preceding gli
 - Tap text in the narrow notes area to direct Ortholinear typing and swipe recognition to that area. Keyboard suggestions and text replacements also apply to notes.
 - Tap twice to select a word, or three times to select a paragraph. Gesture handling gives higher tap counts priority, but requires another physical-device test. Long-press a word for a floating edit menu. Triple-tap selects the paragraph directly, so the redundant **Select Paragraph** menu entry is removed.
 - Long-press the note for **Copy, Cut, Paste, Select All, Select Paragraph, Insert in App**, or a guarded **Clear…** submenu. These are actions on the scratchpad, not the app above the keyboard. Copy/Cut/Paste require Allow Full Access.
-- Changing focus to a host app is automatic when iOS informs the extension about a text-field or selection change. An unchanged-caret tap into the already-selected host field may not generate a notification. A small upper-right arrow in the notes area is the reliable fallback.
+- Changing focus to a host app is automatic when iOS informs the extension about a text-field or selection change. An unchanged-caret tap into the already-selected host field may not generate a notification. The send-to-app arrow at the bottom-right of the scratchpad, alongside the page tabs, is the reliable fallback.
 - Notes are stored locally. Older extension-only notes are migrated to the local App Group on the first launch of the updated keyboard. The extension also keeps a local fallback copy.
 
 ### Full-size note editor
