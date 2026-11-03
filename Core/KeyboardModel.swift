@@ -246,6 +246,19 @@ struct Key: Sendable {
         case "-": return ["-", "–", "—", "_"]
         case "\"": return ["\"", "«", "»", "“", "”"]
         case "?": return ["?", "!", "¿"]
+        // Built-in Unicode numeric holds are shared by the 123 page and the
+        // optional permanent number row. Fractions live under their denominator.
+        // The denominator 10 (⅒) is placed on 0.
+        case "0": return ["°", "⅒", "⁰", "₀"]
+        case "1": return ["¹", "₁"]
+        case "2": return ["½", "²", "₂"]
+        case "3": return ["⅓", "⅔", "³", "₃"]
+        case "4": return ["¼", "¾", "⁴", "₄"]
+        case "5": return ["⅕", "⅖", "⅗", "⅘", "⁵", "₅"]
+        case "6": return ["⅙", "⅚", "⁶", "₆"]
+        case "7": return ["⅐", "⁷", "₇"]
+        case "8": return ["⅛", "⅜", "⅝", "⅞", "⁸", "₈"]
+        case "9": return ["⅑", "⁹", "₉"]
         default: return []
         }
     }

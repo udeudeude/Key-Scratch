@@ -444,6 +444,46 @@ final class KeyboardCoreTests: XCTestCase {
         XCTAssertEqual(keys.first { $0.action == .text("ь") }?.alternatives, ["ъ"])
     }
 
+    func testNumberHoldsExposeDegreesFractionsSuperscriptsAndSubscripts() {
+        let expected: [String: [String]] = [
+            "0": ["°", "⅒", "⁰", "₀"],
+            "1": ["¹", "₁"],
+            "2": ["½", "²", "₂"],
+            "3": ["⅓", "⅔", "³", "₃"],
+            "4": ["¼", "¾", "⁴", "₄"],
+            "5": ["⅕", "⅖", "⅗", "⅘", "⁵", "₅"],
+            "6": ["⅙", "⅚", "⁶", "₆"],
+            "7": ["⅐", "⁷", "₇"],
+            "8": ["⅛", "⅜", "⅝", "⅞", "⁸", "₈"],
+            "9": ["⅑", "⁹", "₉"]
+        ]
+
+        for language in KeyboardLanguage.allCases {
+            for iphone in [true, false] {
+                var preferences = KeyboardPreferences()
+                preferences.iphoneKeyPositions = iphone
+                let state = InputState(language: language, page: .numbers)
+                let keys = KeyboardLayout.rows(state: state, needsGlobe: true, preferences: preferences).flatMap { $0 }
+                for (digit, holds) in expected {
+                    XCTAssertEqual(keys.first { $0.action == .text(digit) }?.alternatives, holds,
+                                   "123 page: \(language), iPhone positions: \(iphone), digit \(digit)")
+                }
+            }
+        }
+
+        var preferences = KeyboardPreferences()
+        preferences.digitAccess = .numberRow
+        let rows = KeyboardLayout.rows(state: InputState(), needsGlobe: false, preferences: preferences)
+        for (digit, holds) in expected {
+            XCTAssertEqual(rows[0].first { $0.action == .text(digit) }?.alternatives, holds,
+                           "Permanent number row: digit \(digit)")
+        }
+        XCTAssertEqual(Set(expected.values.flatMap { $0 }.filter { $0.first?.isNumber == true }).count, 0,
+                       "Raised and lowered digits are separate Unicode characters from ordinary digits")
+        XCTAssertEqual(Key(action: .text("3"), letterAlternatives: ["⅔"]).alternatives, ["⅔"],
+                       "Explicit custom alternatives still override built-in numeric holds")
+    }
+
     func testDigitsFlickFromTheTopRowOrSitInANumberRow() throws {
         var ukrainianState = InputState(); ukrainianState.language = .ukrainian
         let ukrainian = KeyboardLayout.rows(state: ukrainianState, needsGlobe: false)
