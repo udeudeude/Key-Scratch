@@ -699,8 +699,8 @@ private struct KeyScratchExperimentLab: View {
                     } else {
                         ScrollView(.horizontal, showsIndicators: false) {
                             HStack(spacing: 7) {
-                                ForEach(Array(draft.favoriteSymbols.enumerated()), id: \.offset) { _, symbol in
-                                    Text(symbol)
+                                ForEach(draft.favoriteSymbols.indices, id: \.self) { index in
+                                    Text(draft.favoriteSymbols[index])
                                         .font(.system(size: 22))
                                         .frame(minWidth: 38, minHeight: 38)
                                         .background(Color.secondary.opacity(0.10),
@@ -1206,7 +1206,7 @@ private struct KeyScratchFullNotes: View {
 /// A curated, local browse library; not a network emoji service.
 /// The edit field uses the native iPhone keyboard, including Apple's Emoji
 /// keyboard, so users can choose anything that isn't in the catalog.
-private struct SymbolCatalogItem: Identifiable {
+private struct SymbolCatalogItem: Identifiable, Sendable {
     let symbol: String
     let group: String
     let names: String
@@ -1214,7 +1214,7 @@ private struct SymbolCatalogItem: Identifiable {
 }
 
 private enum SymbolCatalog {
-    struct Group {
+    struct Group: Sendable {
         let name: String
         let glyphs: String
     }
