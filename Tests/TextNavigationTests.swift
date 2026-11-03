@@ -380,7 +380,7 @@ final class TextNavigationTests: XCTestCase {
                                       contextualPunctuation: ["/", "."])
         XCTAssertEqual(web[3].suffix(3).map(\.action),
                        [.text("/"), .text("."), .enter])
-        XCTAssertEqual(web[3][web[3].count - 2].alternatives.prefix(2), [".com", ".org"])
+        XCTAssertEqual(Array(web[3][web[3].count - 2].alternatives.prefix(2)), [".com", ".org"])
 
         let email = KeyboardLayout.rows(state: state, needsGlobe: false, preferences: prefs,
                                         contextualPunctuation: ["@", "."])
