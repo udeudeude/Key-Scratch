@@ -992,7 +992,7 @@ private struct KeyScratchFullNotes: View {
                     }
                     .disabled(note.isEmpty)
                     .accessibilityLabel("Clear current page")
-                    if notebook.pages.count > 1 {
+                    if notebook.pages.count > 3 {
                         Button(role: .destructive) { showDeleteConfirmation = true } label: {
                             Image(systemName: "trash")
                         }
