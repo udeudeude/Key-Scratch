@@ -606,7 +606,7 @@ private struct KeyScratchExperimentLab: View {
     @Binding var preferences: KeyboardPreferences
     @State private var draft: KeyboardPreferences
     @State private var testText = ""
-    @State private var symbolsText: String
+    @State private var showSymbolPicker = false
     @State private var status = "Adjust settings, then Apply and test."
     @FocusState private var testing: Bool
     @Environment(\.dismiss) private var dismiss
@@ -614,7 +614,6 @@ private struct KeyScratchExperimentLab: View {
     init(preferences: Binding<KeyboardPreferences>) {
         _preferences = preferences
         _draft = State(initialValue: PreferenceStore.normalized(preferences.wrappedValue))
-        _symbolsText = State(initialValue: preferences.wrappedValue.validated.favoriteSymbols.joined(separator: " "))
     }
 
     var body: some View {
@@ -686,25 +685,41 @@ private struct KeyScratchExperimentLab: View {
                 }
 
                 Section {
-                    Text("Tap ★ on the keyboard for these favorites. Recently used symbols appear first.")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                    TextEditor(text: $symbolsText)
-                        .font(.system(size: 19))
-                        .frame(minHeight: 78)
-                        .accessibilityIdentifier("favorite-symbols-editor")
-                        .onChange(of: symbolsText) { _, edited in
-                            draft.favoriteSymbols = Array(edited.split(whereSeparator: \.isWhitespace)
-                                .map(String.init).prefix(48))
-                        }
-                    Button("Restore standard favorites") {
-                        draft.favoriteSymbols = KeyboardPreferences().favoriteSymbols
-                        symbolsText = draft.favoriteSymbols.joined(separator: " ")
+                    HStack {
+                        Text("Your favorites")
+                        Spacer()
+                        Text("\(draft.favoriteSymbols.count)/48")
+                            .monospacedDigit()
+                            .foregroundStyle(.secondary)
                     }
+                    if draft.favoriteSymbols.isEmpty {
+                        Text("No favorites yet. Add them from the symbol browser or iPhone's emoji keyboard.")
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                    } else {
+                        ScrollView(.horizontal, showsIndicators: false) {
+                            HStack(spacing: 7) {
+                                ForEach(Array(draft.favoriteSymbols.enumerated()), id: \.offset) { _, symbol in
+                                    Text(symbol)
+                                        .font(.system(size: 22))
+                                        .frame(minWidth: 38, minHeight: 38)
+                                        .background(Color.secondary.opacity(0.10),
+                                                    in: RoundedRectangle(cornerRadius: 7))
+                                }
+                            }
+                        }
+                    }
+                    Button {
+                        showSymbolPicker = true
+                    } label: {
+                        Label("Browse & manage favorites", systemImage: "square.grid.3x3")
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                    .accessibilityIdentifier("browse-favorite-symbols")
                 } header: {
-                    Text("Favorite emoji & symbols")
+                    Text("Favorite emoji & Unicode")
                 } footer: {
-                    Text("Enter emoji or Unicode symbols separated by spaces (up to 48). Tap Apply and test to update the keyboard. Recent usage is remembered on this iPhone.")
+                    Text("Browse hundreds of emoji and Unicode characters, search by name, or enter characters with the standard iPhone emoji keyboard. Tap Apply and test afterward.")
                 }
 
                 Section("Clipboard access") {
@@ -775,6 +790,9 @@ private struct KeyScratchExperimentLab: View {
             }
         }
         .tint(accent)
+        .sheet(isPresented: $showSymbolPicker) {
+            FavoriteSymbolPicker(favorites: $draft.favoriteSymbols)
+        }
     }
 
     private var terminalInk: Color {
@@ -1179,5 +1197,278 @@ private struct KeyScratchFullNotes: View {
         } else {
             notice = "Could not add a page. Maximum: \(ScratchpadNotebook.maximumPages)."
         }
+    }
+}
+
+
+// MARK: - Searchable Unicode and Emoji Favorites
+
+/// A curated, local browse library; not a network emoji service.
+/// The edit field uses the native iPhone keyboard, including Apple's Emoji
+/// keyboard, so users can choose anything that isn't in the catalog.
+private struct SymbolCatalogItem: Identifiable {
+    let symbol: String
+    let group: String
+    let names: String
+    var id: String { group + ":" + symbol }
+}
+
+private enum SymbolCatalog {
+    struct Group {
+        let name: String
+        let glyphs: String
+    }
+    static let groups: [Group] = [
+        .init(name: "Faces & gestures",
+              glyphs: "😀 😃 😄 😁 😆 😅 😂 🤣 😊 🙂 🙃 😉 😌 😍 🥰 😘 😋 😎 🤓 🧐 🤔 🤨 😐 😑 😶 🙄 😏 😒 😔 😕 🥺 😢 😭 😤 😡 🤯 🫠 🫢 🤫 😴 😵 🥴 😈 👻 💀 🤖 👍 👎 👌 🤌 🤏 ✌️ 🤞 🫰 🤟 🤘 🤙 👏 🙌 👐 🫶 🤲 🙏 💪 👋"),
+        .init(name: "Hearts & everyday",
+              glyphs: "❤️ 🩷 🧡 💛 💚 💙 🩵 💜 🤎 🖤 🩶 🤍 💔 ❣️ 💕 💞 💓 💗 💖 💘 💝 💟 ✨ ⭐ 🌟 💫 🎉 🎊 🎁 🔥 🌈 ☀️ 🌙 ☁️ ❄️ 🌸 🌹 🌻 🌲 🍀 🍎 🍋 🍓 🍕 🍜 ☕ 🍵 🎂 🎈 🐈 🐕 🦋 🐦 🐝"),
+        .init(name: "Arrows",
+              glyphs: "← ↑ → ↓ ↔ ↕ ↖ ↗ ↘ ↙ ↞ ↠ ↟ ↡ ↢ ↣ ↤ ↦ ↩ ↪ ↫ ↬ ↭ ↮ ↯ ↰ ↱ ↲ ↳ ↴ ↶ ↷ ↺ ↻ ⇐ ⇑ ⇒ ⇓ ⇔ ⇕ ⇖ ⇗ ⇘ ⇙ ⇠ ⇢ ⇤ ⇥ ⇦ ⇧ ⇨ ⇩ ⇪ ⇫ ⇬ ⇭ ⇮ ⇯ ➔ ➜ ➝ ➞ ➡ ➤ ⟵ ⟶ ⟷ ⟸ ⟹ ⟺"),
+        .init(name: "Math & logic",
+              glyphs: "± ∓ × ÷ ≠ ≈ ≅ ≡ ≤ ≥ ≪ ≫ ∞ ∝ ∂ ∇ ∑ ∏ ∐ ∫ ∬ ∮ ∯ ∰ √ ∛ ∜ ∴ ∵ ∀ ∃ ∄ ∅ ∈ ∉ ∋ ∌ ∩ ∪ ⊂ ⊃ ⊆ ⊇ ⊄ ⊅ ∧ ∨ ¬ ⊕ ⊗ ⊥ ∥ ∠ ∡ ∢ ∟ ∧ ∨ ∼ ∽ ∘ ∙ ⋅ ⊢ ⊣ ⊨ ⊩ ⊤ ⊥"),
+        .init(name: "Typography",
+              glyphs: "• ◦ ‣ ⁃ … ‥ — – ‒ ― ‐ ‑ ‧ · ′ ″ ‴ ‘ ’ “ ” ‚ „ ‹ › « » ※ ⁂ § ¶ † ‡ ⁄ ‰ ‱ № ⸮ ¿ ¡ ‽ ⁎ ⁑ ⁒ ⁓ ⁕ ⁰ ¹ ² ³ ⁴ ⁵ ⁶ ⁷ ⁸ ⁹ ₀ ₁ ₂ ₃ ₄ ₅ ₆ ₇ ₈ ₉"),
+        .init(name: "Checkmarks & shapes",
+              glyphs: "✓ ✔ ☑ ☐ ✅ ❌ ✕ ✖ ✗ ❎ ⚠️ ⛔ ⭕ ◯ ○ ● ◉ ◎ ◌ ◍ ◐ ◑ ◒ ◓ ◔ ◕ ◖ ◗ ◘ ◙ ◚ ◛ ◜ ◝ ◞ ◟ □ ■ ▣ ▢ ▪ ▫ ▰ ▱ ▲ △ ▼ ▽ ▶ ▷ ◀ ◁ ◆ ◇ ◈ ◊ ★ ☆ ✦ ✧ ✩ ✪ ✫ ✬ ✭ ✮ ✯ ✰"),
+        .init(name: "Science & technical",
+              glyphs: "° ℃ ℉ K Å µ μ Ω ℧ π τ φ λ Δ Σ α β γ δ ε θ κ ρ σ ω ħ ℏ ℎ ℓ ℘ ℜ ℑ ℵ ℶ ℷ ℸ ∿ ⌁ ⌂ ⌃ ⌄ ⌅ ⌆ ⌇ ⌘ ⌥ ⌦ ⌫ ⌧ ⌨ ⏎ ⎋ ⏏ ⏻ ⏼ ⏽ ⭘ ⚙️ ⚛️ 🧪 🧬 🔬 🔭"),
+        .init(name: "Currency & legal",
+              glyphs: "$ ¢ £ € ¥ ₹ ₩ ₽ ₺ ₴ ₦ ₱ ฿ ₪ ₫ ₲ ₵ ₡ ₢ ₣ ₤ ₥ ₧ ₨ ₭ ₮ ₯ ₰ ₳ ₸ ₼ ₿ © ® ™ ℠ ℗ ℞ ℡ ℅ №"),
+        .init(name: "Music, games & symbols",
+              glyphs: "♩ ♪ ♫ ♬ ♭ ♮ ♯ 𝄞 𝄢 ♠ ♣ ♥ ♦ ♤ ♧ ♡ ♢ ♔ ♕ ♖ ♗ ♘ ♙ ♚ ♛ ♜ ♝ ♞ ♟ ⚀ ⚁ ⚂ ⚃ ⚄ ⚅ ☀ ☁ ☂ ☃ ☄ ☉ ☊ ☋ ☌ ☍ ☎ ☏ ☒ ☓ ☠ ☮ ☯ ☸ ☹ ☺ ☻ ☼ ♀ ♂ ⚢ ⚣ ⚤ ⚥ ⚦ ⚧")
+    ]
+    static let names: [String: String] = [
+        "❤️":"red heart love", "🩷":"pink heart love", "😀":"grinning smile happy",
+        "😂":"laughing tears joy", "🤣":"rolling laughing", "🤔":"thinking face",
+        "🙃":"upside down", "👍":"thumbs up yes", "👎":"thumbs down no",
+        "🙏":"prayer thanks", "🫶":"heart hands", "💀":"skull", "☕":"coffee cup",
+        "🎉":"party celebration", "🔥":"fire hot", "✨":"sparkles stars",
+        "←":"left arrow", "↑":"up arrow", "→":"right arrow", "↓":"down arrow",
+        "↔":"left right arrow", "↩":"return arrow", "↪":"forward arrow",
+        "↗":"northeast arrow", "⇔":"equivalence arrow", "⇒":"implies arrow",
+        "✓":"check mark tick", "✔":"check mark tick", "☑":"checked box",
+        "☐":"empty box unchecked", "❌":"cross red no",
+        "★":"filled star", "☆":"outline star", "•":"bullet point",
+        "…":"ellipsis dots", "—":"em dash", "–":"en dash",
+        "‘":"single opening quotation", "’":"single closing apostrophe",
+        "“":"double opening quotation", "”":"double closing quotation",
+        "©":"copyright", "®":"registered trademark", "™":"trademark",
+        "°":"degree", "℃":"celsius", "℉":"fahrenheit", "µ":"micro",
+        "π":"pi", "Ω":"omega ohm", "λ":"lambda", "Δ":"delta",
+        "≠":"not equal", "≈":"approximately", "≤":"less than equal",
+        "≥":"greater than equal", "∞":"infinity", "±":"plus minus",
+        "×":"multiply", "÷":"divide", "√":"square root",
+        "∑":"sum sigma", "∫":"integral", "∈":"element of",
+        "∅":"empty set", "∴":"therefore", "∵":"because",
+        "€":"euro", "£":"pound sterling", "¥":"yen yuan", "₿":"bitcoin",
+        "♩":"quarter note music", "♪":"eighth note music", "♭":"flat music",
+        "♯":"sharp music", "♠":"spade card", "♣":"club card",
+        "♥":"heart card", "♦":"diamond card", "⌘":"command mac keyboard",
+        "⌥":"option alt mac keyboard", "⌫":"delete backspace",
+        "⏎":"return enter", "⚛️":"atom", "🧬":"dna", "🔭":"telescope"
+    ]
+    static let items: [SymbolCatalogItem] = groups.flatMap { group in
+        group.glyphs.split(whereSeparator: \.isWhitespace).map { glyph in
+            let text = String(glyph)
+            return SymbolCatalogItem(symbol: text, group: group.name,
+                                     names: names[text] ?? "")
+        }
+    }
+}
+
+/// A small local symbol library with a normal iPhone text field for accessing
+/// the full system emoji keyboard. Saves to the existing favorites preference.
+private struct FavoriteSymbolPicker: View {
+    @Environment(\.dismiss) private var dismiss
+    @Binding var favorites: [String]
+    @State private var group = "All"
+    @State private var query = ""
+    @State private var manual = ""
+    @State private var message = ""
+    @State private var confirmClear = false
+    private let columns = Array(repeating: GridItem(.flexible(), spacing: 7), count: 6)
+
+    private var visible: [SymbolCatalogItem] {
+        SymbolCatalog.items.filter { candidate in
+            let matchingGroup = group == "All" || candidate.group == group
+            let matchingSearch = query.isEmpty ||
+                candidate.symbol.localizedCaseInsensitiveContains(query) ||
+                candidate.names.localizedCaseInsensitiveContains(query) ||
+                candidate.group.localizedCaseInsensitiveContains(query)
+            return matchingGroup && matchingSearch
+        }
+    }
+
+    var body: some View {
+        NavigationStack {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 15) {
+                    HStack {
+                        Text("Selected")
+                            .font(.headline)
+                        Spacer()
+                        Text("\(favorites.count)/48")
+                            .monospacedDigit()
+                            .foregroundStyle(.secondary)
+                        Button("Reset") {
+                            favorites = KeyboardPreferences().favoriteSymbols
+                        }
+                        Button("Clear", role: .destructive) { confirmClear = true }
+                    }
+                    if favorites.isEmpty {
+                        Text("Choose characters below or type them with Apple's emoji keyboard.")
+                            .foregroundStyle(.secondary)
+                    } else {
+                        ScrollView(.horizontal, showsIndicators: false) {
+                            HStack(spacing: 7) {
+                                ForEach(favorites, id: \.self) { symbol in
+                                    Button { remove(symbol) } label: {
+                                        HStack(spacing: 2) {
+                                            Text(symbol).font(.system(size: 22))
+                                            Image(systemName: "xmark.circle.fill")
+                                                .font(.system(size: 11))
+                                                .foregroundStyle(.secondary)
+                                        }
+                                        .padding(.horizontal, 8)
+                                        .frame(height: 42)
+                                        .background(Color.secondary.opacity(0.10),
+                                                    in: RoundedRectangle(cornerRadius: 8))
+                                    }
+                                    .buttonStyle(.plain)
+                                    .accessibilityLabel("Remove \(symbol) from favorites")
+                                }
+                            }
+                        }
+                    }
+
+                    VStack(alignment: .leading, spacing: 7) {
+                        Text("Enter any emoji or Unicode character")
+                            .font(.subheadline.weight(.medium))
+                        HStack {
+                            TextField("Type or paste a symbol", text: $manual)
+                                .textInputAutocapitalization(.never)
+                                .autocorrectionDisabled()
+                                .font(.system(size: 20))
+                                .submitLabel(.done)
+                                .onSubmit(addEntered)
+                                .accessibilityIdentifier("unicode-favorite-entry")
+                            Button("Add", action: addEntered)
+                                .buttonStyle(.borderedProminent)
+                                .disabled(manual.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                        }
+                        Text("Use the globe key to switch to Apple's Emoji keyboard. Separate several symbols with spaces.")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        Button {
+                            if let value = UIPasteboard.general.string {
+                                manual = value
+                                addEntered()
+                            } else {
+                                message = "Clipboard contains no text symbols."
+                            }
+                        } label: {
+                            Label("Add symbols from clipboard", systemImage: "doc.on.clipboard")
+                        }
+                        .font(.subheadline)
+                    }
+                    Divider()
+                    TextField("Search symbols (heart, arrow, check…)", text: $query)
+                        .textInputAutocapitalization(.never)
+                        .autocorrectionDisabled()
+                        .accessibilityIdentifier("search-unicode-catalog")
+                    Picker("Category", selection: $group) {
+                        Text("All categories").tag("All")
+                        ForEach(SymbolCatalog.groups, id: \.name) { category in
+                            Text(category.name).tag(category.name)
+                        }
+                    }
+                    .pickerStyle(.menu)
+                    HStack {
+                        Text(group == "All" ? "Browse characters" : group)
+                            .font(.headline)
+                        Spacer()
+                        Text("\(visible.count) available")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                    LazyVGrid(columns: columns, spacing: 7) {
+                        ForEach(visible) { candidate in
+                            let chosen = favorites.contains(candidate.symbol)
+                            Button {
+                                toggle(candidate.symbol)
+                            } label: {
+                                ZStack(alignment: .topTrailing) {
+                                    Text(candidate.symbol)
+                                        .font(.system(size: 24))
+                                        .frame(maxWidth: .infinity, minHeight: 43)
+                                    if chosen {
+                                        Image(systemName: "checkmark.circle.fill")
+                                            .font(.system(size: 10))
+                                            .offset(x: -1, y: 1)
+                                    }
+                                }
+                                .background(chosen ? Color.accentColor.opacity(0.19)
+                                                   : Color.secondary.opacity(0.09),
+                                            in: RoundedRectangle(cornerRadius: 7))
+                            }
+                            .buttonStyle(.plain)
+                            .accessibilityLabel("\(candidate.names.isEmpty ? candidate.group : candidate.names): \(candidate.symbol), \(chosen ? "remove" : "add")")
+                        }
+                    }
+                    if visible.isEmpty {
+                        ContentUnavailableView.search(text: query)
+                    }
+                    if !message.isEmpty {
+                        Text(message)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                .padding()
+            }
+            .navigationTitle("Emoji & Unicode")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Done") { dismiss() }
+                }
+            }
+            .confirmationDialog("Clear all favorite symbols?", isPresented: $confirmClear) {
+                Button("Clear favorites", role: .destructive) { favorites = [] }
+            } message: {
+                Text("You can add them again from the catalog.")
+            }
+        }
+    }
+
+    private func addEntered() {
+        let tokens = manual.split(whereSeparator: \.isWhitespace).map(String.init)
+        guard !tokens.isEmpty else { return }
+        var added = 0
+        for symbol in tokens where symbol.count <= 8 {
+            guard !favorites.contains(symbol), favorites.count < 48 else { continue }
+            favorites.append(symbol)
+            added += 1
+        }
+        message = added > 0 ? "Added \(added) item\(added == 1 ? "" : "s")."
+            : "No new symbols added. Check for duplicates, the 48-item limit or symbols longer than 8 characters."
+        manual = ""
+    }
+
+    private func toggle(_ symbol: String) {
+        if favorites.contains(symbol) {
+            remove(symbol)
+        } else if favorites.count < 48 {
+            favorites.append(symbol)
+            message = ""
+        } else {
+            message = "48 favorites is the maximum. Remove an item first."
+        }
+    }
+
+    private func remove(_ symbol: String) {
+        favorites.removeAll { $0 == symbol }
+        message = ""
     }
 }
