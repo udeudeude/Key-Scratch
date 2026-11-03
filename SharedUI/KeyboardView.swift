@@ -35,6 +35,13 @@ final class KeyboardView: UIControl {
         didSet { if oldValue != needsGlobe { cancelTouches(); setNeedsLayout() } }
     }
     var returnTitle = "return" { didSet { if oldValue != returnTitle { refresh() } } }
+    /// Exposed by the host's keyboard type: ".", "/." or "@." on the
+    /// control row, immediately before the Go/Search/Return key.
+    var contextualPunctuation: [String] = [] {
+        didSet {
+            if oldValue != contextualPunctuation { cancelTouches(); refresh() }
+        }
+    }
     var returnEnabled = true { didSet { if oldValue != returnEnabled { refresh() } } }
     var editingScratchpad = false { didSet { if oldValue != editingScratchpad { refresh() } } }
     /// Layout only: the portrait user preferences are never overwritten.
@@ -145,7 +152,8 @@ final class KeyboardView: UIControl {
         if layoutSize != bounds.size { cancelTouches(); layoutSize = bounds.size }
         let sized = sizedPreferences
         cells = KeyboardGeometry.cells(width: bounds.width, state: displayState,
-                                       preferences: sized, needsGlobe: needsGlobe)
+                                       preferences: sized, needsGlobe: needsGlobe,
+                                       contextualPunctuation: contextualPunctuation)
         globeButton.isHidden = !needsGlobe
         globeButton.frame = cells.first(where: { $0.key.action == .globe })?.hitFrame ?? .zero
         suggestionBar.frame = CGRect(x: 0, y: sized.showHeader ? 38 : 0, width: bounds.width, height: sized.suggestionHeight)
@@ -217,7 +225,7 @@ final class KeyboardView: UIControl {
         case .shift: return displayState.page == .letters ? "Shift" : KeyboardLayout.pageName(nextPage, preferences: preferences)
         case .backspace: return "Delete"
         case .space: return "Space"
-        case .enter: return "Return"
+        case .enter: return returnTitle.capitalized
         case .language: return "Switch to \(nextLanguage.title)"
         case .favorites: return "Favorite emoji and Unicode symbols. Hold for next language."
         case .page: return displayState.page == .letters ? "Numbers" : "Letters"
@@ -364,7 +372,11 @@ final class KeyboardView: UIControl {
             let radius = min(palette.iosAppearance ? 5 : 8, frame.width / 4)
             let accentKey = !palette.iosAppearance && action == .enter
                 ? palette.colors.accentKey.map(UIColor.init(keyboardHex:)) : nil
-            let fill = accentKey ?? (isText ? palette.key : palette.control)
+            let primaryReturn = action == .enter && returnTitle != "return"
+            // iOS gives contextual Go/Search/Send/Done keys blue faces
+            // with white text, including when a custom keyboard is active.
+            let fill = primaryReturn ? UIColor.systemBlue
+                : (accentKey ?? (isText ? palette.key : palette.control))
             if palette.iosAppearance {
                 let drop = UIBezierPath(roundedRect: frame.offsetBy(dx: 0, dy: 1.4),
                                         cornerRadius: radius)
@@ -391,7 +403,9 @@ final class KeyboardView: UIControl {
 
             let legend = accentKey != nil ? UIColor(keyboardHex: palette.colors.accentKeyText ?? palette.colors.text)
                 : (isText ? palette.text : palette.controlText)
-            let color = action == .enter && !returnEnabled ? legend.withAlphaComponent(0.5) : legend
+            let buttonInk: UIColor = primaryReturn ? .white : legend
+            let color = action == .enter && !returnEnabled
+                ? buttonInk.withAlphaComponent(0.48) : buttonInk
             if drawControl(action, in: face, color: color) { continue }
             let flicked = sessions.values.first { $0.startCell == index && $0.flick != nil }?.flick
             let label = flicked ?? cell.key.label ?? (action == .space && sessions.values.contains(where: \.cursorMode) ? "↔" : title(action))
@@ -469,20 +483,14 @@ final class KeyboardView: UIControl {
         case .backspace:
             drawSymbol("delete.left", in: frame, size: 23, color: color)
         case .enter:
-            if returnTitle == "return" {
-                // Match the default iOS keyboard's visible word, rather than
-                // an SF Symbol return-arrow. Fit the text on narrow layouts.
-                let width = max(0, frame.width - 4)
-                let size = min(13, max(9, width / 3.8))
-                drawText("return", in: frame.insetBy(dx: 2, dy: 0),
-                         font: palette.legend(ofSize: size, weight: .medium),
-                         color: color)
-            } else {
-                let name = returnTitle == "search" ? "magnifyingglass" : (returnTitle == "send" ? "paperplane" : (returnTitle == "done" ? "checkmark" : "arrow.right"))
-                drawSymbol(name, in: frame.offsetBy(dx: 0, dy: -7), size: 17, color: color)
-                drawText(returnTitle, in: CGRect(x: frame.minX + 2, y: frame.midY + 5, width: frame.width - 4, height: 13),
-                         font: .systemFont(ofSize: 11, weight: .medium), color: color)
-            }
+            // Default iOS key uses the word "return". In URL/search/email
+            // fields iOS likewise uses a word-only Go/Search/Send action:
+            // no arrow glyph above the text.
+            let text = returnTitle
+            let available = max(1, frame.width - 6)
+            let size = min(15, max(9, available / max(3.5, CGFloat(text.count) * 0.62)))
+            drawText(text, in: frame.insetBy(dx: 3, dy: 0),
+                     font: palette.legend(ofSize: size, weight: .medium), color: color)
         case .language:
             drawSymbol("arrow.left.arrow.right", in: frame.offsetBy(dx: 0, dy: -8), size: 16, color: color)
             drawText(nextLanguage.badge,
