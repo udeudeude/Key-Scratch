@@ -14,11 +14,11 @@ The scratchpad now has a thin neutral border and 6 pt rounded corners matching t
 
 ## Multiple note pages and send-to-app
 
-The scratchpad has **three numbered pages** initially, with tabs along the bottom and a **+** for adding pages, up to eight. Each tab has independent text, selection and scroll position when reopened. The companion app's **Scratchpad** editor has corresponding page tabs, add, clear-current-page and delete-page controls.
+The scratchpad now has **three permanent, compact numbered tabs** at the bottom without a +. Pages 4–8, if previously created or added in the full-size companion app, remain accessible through an overflow ⋯ menu. No existing pages are removed; old notebooks with fewer than three pages are padded with empty pages. Each tab has independent text, selection and scroll position when reopened. The companion app's **Scratchpad** editor has corresponding page tabs, add, clear-current-page and delete-page controls.
 
 On first use of the new notebook, the previous one-page note is preserved verbatim as **page 1**. The original note remains in legacy storage as a fallback rather than being destructively migrated. The new notebook is saved to the existing private App Group, with each edit updating only its own page so notes in other pages are not overwritten.
 
-The **arrow in the bottom-right scratchpad toolbar**, after the page tabs and + button, is an insertion action: insert the selected text into the host app, or the entire active note page when no text is selected. It has a larger 36 pt touch target and an explicit accessibility label. The button no longer merely deactivates note editing. The existing custom menu **Insert in App** calls the same transfer function.
+The **arrow in the bottom-right scratchpad toolbar**, after the three tabs (and optional overflow), is an insertion action: insert the selected text into the host app, or the entire active note page when no text is selected. It has a larger 36 pt touch target and an explicit accessibility label. The button no longer merely deactivates note editing. The existing custom menu **Insert in App** calls the same transfer function.
 
 ### Page image shelf and direct image pasting
 
@@ -47,7 +47,7 @@ The source repo's interface license is AGPL-3.0-or-later for independently autho
 
 ## iPhone-style controls and language switching
 
-Tap the compact note panel to type there. Tap a host-app text field to return typing to the app. The bottom-row key is now **★**, opening a scrollable favorites panel containing both emoji and Unicode symbols. Choosing one inserts it into the currently active text destination and remembers it among the eight most recent symbols. Edit the favorites (up to 48) in **Scratchpad & layout** in the companion app; hold ★ to cycle enabled languages. It does not invoke Apple's native emoji picker.
+Tap the compact note panel to type there. Tap a host-app text field to return typing to the app. The bottom-row **★** opens the favorites panel and inserts into the active destination. The eight most recent characters surface first. To populate favorites, use **Scratchpad & layout → Browse & manage favorites**: browse categories of symbols and emoji, search by name, tap to add/remove, or type/paste arbitrary characters with Apple's standard Emoji keyboard. Up to 48 favorites are stored locally. Hold ★ to cycle enabled languages. Apple's native emoji keyboard is available in the companion app's entry field but cannot be embedded into the custom keyboard extension.
 
 The space bar reads **space**. The system globe still opens the next enabled iOS keyboard or a keyboard chooser on hold. To use Apple's Emoji keyboard, enable that keyboard in iOS Settings and switch to it with the globe. Key Scratch cannot open Apple's Emoji keyboard directly, and does not pretend otherwise.
 
