@@ -94,7 +94,7 @@ enum ScratchpadStore {
     }
 
     static func removePage(id: String) -> ScratchpadNotebook? {
-        guard var notebook = loadNotebook(), notebook.pages.count > 1,
+        guard var notebook = loadNotebook(), notebook.pages.count > 3,
               let index = notebook.pages.firstIndex(where: { $0.id == id }) else { return nil }
         let removed = notebook.pages.remove(at: index)
         if notebook.selectedID == id { notebook.selectedID = notebook.pages[min(index, notebook.pages.count - 1)].id }
