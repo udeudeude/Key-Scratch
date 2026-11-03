@@ -462,7 +462,9 @@ final class KeyboardCoreTests: XCTestCase {
             for iphone in [true, false] {
                 var preferences = KeyboardPreferences()
                 preferences.iphoneKeyPositions = iphone
-                let state = InputState(language: language, page: .numbers)
+                var state = InputState()
+                state.language = language
+                state.page = .numbers
                 let keys = KeyboardLayout.rows(state: state, needsGlobe: true, preferences: preferences).flatMap { $0 }
                 for (digit, holds) in expected {
                     XCTAssertEqual(keys.first { $0.action == .text(digit) }?.alternatives, holds,
