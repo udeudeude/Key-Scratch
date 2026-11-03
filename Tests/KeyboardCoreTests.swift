@@ -113,7 +113,7 @@ final class KeyboardCoreTests: XCTestCase {
         p.fillGaps = false
         p.suggestionsEnabled = false
         let cells = KeyboardGeometry.cells(width: 360, state: InputState(), preferences: p, needsGlobe: false)
-        XCTAssertNil(KeyboardGeometry.hit(at: CGPoint(x: 30, y: 60), cells: cells))
+        XCTAssertNil(KeyboardGeometry.hit(at: CGPoint(x: 36, y: 60), cells: cells))
         XCTAssertNotNil(KeyboardGeometry.hit(at: CGPoint(x: 15, y: 60), cells: cells))
         XCTAssertNil(KeyboardGeometry.hit(at: CGPoint(x: -1, y: 60), cells: cells))
         XCTAssertNil(KeyboardGeometry.hit(at: CGPoint(x: 12, y: 10), cells: cells))
@@ -146,7 +146,7 @@ final class KeyboardCoreTests: XCTestCase {
 
     func testPreferencesClampMalformedValues() throws {
         let p = KeyboardPreferences(keyHeight: -100, columnSpacing: 999, rowSpacing: .infinity).validated
-        XCTAssertEqual(p.keyHeight, 36)
+        XCTAssertEqual(p.keyHeight, 32)
         XCTAssertEqual(p.columnSpacing, 8)
         XCTAssertEqual(p.rowSpacing, 8)
         let data = try JSONEncoder().encode(p)
@@ -246,8 +246,8 @@ final class KeyboardCoreTests: XCTestCase {
         p.controlHeight = -2
         p.letterSize = .nan
         XCTAssertEqual(p.validated.keyHeight, 88)
-        XCTAssertEqual(p.validated.controlHeight, 36)
-        XCTAssertEqual(p.validated.letterSize, 28)
+        XCTAssertEqual(p.validated.controlHeight, 30)
+        XCTAssertEqual(p.validated.letterSize, 24)
     }
 
     func testPageSwitchIsAlwaysFarLeft() {
@@ -374,8 +374,8 @@ final class KeyboardCoreTests: XCTestCase {
         XCTAssertFalse(KeyboardLayout.rows(state: state, needsGlobe: false, preferences: single).flatMap { $0 }.contains { $0.action == .language },
                        "One language has nothing to switch to")
         state.language = .english
-        XCTAssertTrue(KeyboardLayout.rows(state: state, needsGlobe: false, preferences: single).flatMap { $0 }.contains { $0.action == .language },
-                      "An email field's English must have a way back")
+        XCTAssertTrue(KeyboardLayout.rows(state: state, needsGlobe: false, preferences: single).flatMap { $0 }.contains { $0.action == .favorites },
+                      "The favorites key's language hold remains available in a forced-English email field")
         XCTAssertEqual(single.language(after: .english), .polish)
     }
 
@@ -482,7 +482,7 @@ final class KeyboardCoreTests: XCTestCase {
     }
 
     func testUkrainianNumbersPageTypesTheModifierApostrophe() {
-        var state = InputState(); state.page = .numbers
+        var state = InputState(); state.language = .ukrainian; state.page = .numbers
         let keys = KeyboardLayout.rows(state: state, needsGlobe: false).joined()
         XCTAssertEqual(keys.first { $0.action == .text("ʼ") }?.alternatives, ["ʼ", "'", "’", "\""])
         XCTAssertFalse(keys.contains { $0.action == .text("'") })

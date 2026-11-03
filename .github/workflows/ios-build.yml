@@ -29,8 +29,8 @@ jobs:
             -destination 'generic/platform=iOS Simulator' \
             -derivedDataPath "$RUNNER_TEMP/KeyScratchBuild" \
             CODE_SIGNING_ALLOWED=NO build
-      - name: Test Swift core
-        run: swift test
+      - name: Test Swift core (optimized, representative performance)
+        run: swift test -c release
       - name: Package simulator app
         if: success()
         run: |

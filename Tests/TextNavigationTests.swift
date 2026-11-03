@@ -104,8 +104,8 @@ final class TextNavigationTests: XCTestCase {
         }(), preferences: preferences, needsGlobe: true)
         let a = geometry.first { $0.key.action == .text("a") }
         let q = geometry.first { $0.key.action == .text("q") }
-        XCTAssertGreaterThan(a?.hitFrame.minX ?? 0, q?.hitFrame.minX ?? 0,
-                             "The second row is inset by half a key")
+        XCTAssertGreaterThan(a?.visualFrame.minX ?? 0, q?.visualFrame.minX ?? 0,
+                             "The second row is visually inset; its invisible touch halo still reaches the edge")
     }
 
     func testEnglishAccentOptionsAreAvailableByHoldingLetters() {

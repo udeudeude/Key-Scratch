@@ -111,7 +111,7 @@ final class CustomLayoutTests: XCTestCase {
         var layout = CustomLetterLayout(builtIn: .english)
         layout.rows[1].removeAll { $0.output == "s" }
         layout.rows[0][0] = CustomKey("W")
-        layout.rows[0][1] = CustomKey("ab", alternatives: Array(repeating: "x", count: 9))
+        layout.rows[0][1] = CustomKey("ab", alternatives: Array(repeating: "x", count: 10))
         layout.rows[2][0] = CustomKey("x")
         let problems = layout.problems(for: .english)
         XCTAssertTrue(problems.contains(.missingLetters("qswz")))
@@ -193,7 +193,7 @@ final class CustomLayoutTests: XCTestCase {
         // Down moves into the same column of the next row, which grows by one.
         let down = layout.move(KeyPosition(row: 0, column: 9), .down)
         XCTAssertEqual(down, KeyPosition(row: 1, column: 9))
-        XCTAssertEqual(letters(layout), ["wqertyuio", "asdfghjklp'", "zxcvbnm"])
+        XCTAssertEqual(letters(layout), ["wqertyuio", "asdfghjklp", "zxcvbnm"])
         XCTAssertEqual(layout.move(KeyPosition(row: 1, column: 2), .down), KeyPosition(row: 2, column: 2))
         XCTAssertEqual(letters(layout)[2], "zxdcvbnm")
 

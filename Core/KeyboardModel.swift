@@ -751,7 +751,8 @@ extension KeyboardPreferences {
         rowSpacing = try c.decodeIfPresent(Double.self, forKey: .rowSpacing) ?? rowSpacing
         fillGaps = try c.decodeIfPresent(Bool.self, forKey: .fillGaps) ?? fillGaps
         // Tolerate languages this version doesn't know rather than dropping every setting.
-        defaultLanguage = (try? c.decodeIfPresent(KeyboardLanguage.self, forKey: .defaultLanguage)) ?? defaultLanguage
+        let savedDefaultLanguage = try? c.decodeIfPresent(KeyboardLanguage.self, forKey: .defaultLanguage)
+        defaultLanguage = savedDefaultLanguage ?? defaultLanguage
         controlHeight = try c.decodeIfPresent(Double.self, forKey: .controlHeight) ?? controlHeight
         letterSize = try c.decodeIfPresent(Double.self, forKey: .letterSize) ?? letterSize
         actionKeyWidth = try c.decodeIfPresent(Double.self, forKey: .actionKeyWidth) ?? actionKeyWidth
@@ -782,6 +783,12 @@ extension KeyboardPreferences {
         contextualSuggestions = try c.decodeIfPresent(Bool.self, forKey: .contextualSuggestions) ?? contextualSuggestions
         if let codes = try c.decodeIfPresent([String].self, forKey: .languages) {
             languages = codes.compactMap(KeyboardLanguage.init(rawValue:))
+        }
+        // An explicitly saved but unsupported default must not silently
+        // become English when the user selected other available languages.
+        if c.contains(.defaultLanguage), savedDefaultLanguage == nil,
+           let firstEnabled = languages.first {
+            defaultLanguage = firstEnabled
         }
         englishLayout = (try? c.decodeIfPresent(EnglishLayout.self, forKey: .englishLayout)) ?? englishLayout
         rememberLanguage = try c.decodeIfPresent(Bool.self, forKey: .rememberLanguage) ?? rememberLanguage

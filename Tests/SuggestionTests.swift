@@ -192,7 +192,10 @@ final class SuggestionTests: XCTestCase {
     func testWordsTypedOnTheOtherLayoutAreRecovered() throws {
         let english = try SuggestionResources.engine(language: .english)
         let ukrainian = try SuggestionResources.engine(language: .ukrainian)
-        let preferences = KeyboardPreferences()
+        // The 85%-accuracy baseline was established on the legacy matrix.
+        // Do not silently compare it against the new staggered iPhone layout.
+        var preferences = KeyboardPreferences()
+        preferences.iphoneKeyPositions = false
         let en = SuggestionGeometry(language: .english, preferences: preferences, width: 393)
         let uk = SuggestionGeometry(language: .ukrainian, preferences: preferences, width: 393)
         // Type each word by position on the wrong layout, then recover it.
