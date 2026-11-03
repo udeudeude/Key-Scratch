@@ -1020,7 +1020,9 @@ struct ScratchpadNotebook: Codable, Equatable, Sendable {
                 }.prefix(Self.maximumImagesPerPage).map { $0 }
                 return page
             }
-        if result.pages.isEmpty { result.pages = [ScratchpadPage()] }
+        // Three stable everyday tabs. Older notebooks with fewer pages are
+        // padded with new empty pages, never by overwriting existing text.
+        while result.pages.count < 3 { result.pages.append(ScratchpadPage()) }
         if !result.pages.contains(where: { $0.id == result.selectedID }) {
             result.selectedID = result.pages[0].id
         }
