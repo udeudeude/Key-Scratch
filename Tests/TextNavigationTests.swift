@@ -315,7 +315,7 @@ final class TextNavigationTests: XCTestCase {
         book.selectedID = "missing-page"
         XCTAssertEqual(book.normalized.selectedPage.text, "Original")
         book.pages = []
-        XCTAssertEqual(book.normalized.pages.count, 1)
+        XCTAssertEqual(book.normalized.pages.count, 3)
         book = ScratchpadNotebook.initial(legacy: "Original")
         book.pages += (0..<12).map { _ in ScratchpadPage() }
         XCTAssertEqual(book.normalized.pages.count, ScratchpadNotebook.maximumPages)
@@ -367,6 +367,44 @@ final class TextNavigationTests: XCTestCase {
         XCTAssertEqual(result.pages[0].images.count, ScratchpadNotebook.maximumImagesPerPage)
         XCTAssertEqual(result.pages[0].text, "Safe text")
         XCTAssertEqual(result.pages[1].text, "Other notes")
+    }
+
+    func testNativeContextKeysArePlacedImmediatelyBesideGoOrSearchAction() {
+        var prefs = KeyboardPreferences()
+        prefs.iphoneKeyPositions = true
+        let state = InputState()
+        let standard = KeyboardLayout.rows(state: state, needsGlobe: false, preferences: prefs)
+        XCTAssertEqual(standard[3].suffix(2).map(\.action), [.space, .enter])
+
+        let web = KeyboardLayout.rows(state: state, needsGlobe: false, preferences: prefs,
+                                      contextualPunctuation: ["/", "."])
+        XCTAssertEqual(web[3].suffix(3).map(\.action),
+                       [.text("/"), .text("."), .enter])
+        XCTAssertEqual(web[3][web[3].count - 2].alternatives.prefix(2), [".com", ".org"])
+
+        let email = KeyboardLayout.rows(state: state, needsGlobe: false, preferences: prefs,
+                                        contextualPunctuation: ["@", "."])
+        XCTAssertEqual(email[3].suffix(3).map(\.action),
+                       [.text("@"), .text("."), .enter])
+
+        var numbers = state
+        numbers.page = .numbers
+        let numeric = KeyboardLayout.rows(state: numbers, needsGlobe: false, preferences: prefs,
+                                          contextualPunctuation: ["/", "."])
+        XCTAssertFalse(numeric.last!.contains { $0.action == .text(".") },
+                       "Host-specific punctuation belongs on the letter page only")
+    }
+
+    func testThreePermanentScratchpadPagesKeepOlderExtraPages() {
+        var book = ScratchpadNotebook.initial(legacy: "Preserve")
+        book.pages.removeLast(2)
+        XCTAssertEqual(book.normalized.pages.count, 3)
+        XCTAssertEqual(book.normalized.pages[0].text, "Preserve")
+
+        book = ScratchpadNotebook.initial(legacy: "Preserve")
+        book.pages.append(ScratchpadPage(text: "Page 4 stays"))
+        XCTAssertEqual(book.normalized.pages.count, 4)
+        XCTAssertEqual(book.normalized.pages[3].text, "Page 4 stays")
     }
 
 }
