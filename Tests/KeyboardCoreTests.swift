@@ -488,6 +488,53 @@ final class KeyboardCoreTests: XCTestCase {
                        "Explicit custom alternatives still override built-in numeric holds")
     }
 
+    func testSymbolHoldsExposePunctuationCurrenciesAndMathOperators() {
+        let expected: [String: [String]] = [
+            "?": ["?", "!", "¿", "‽", "⸘"],
+            "!": ["¡", "‽", "⸘"],
+            "$": ["€", "£", "¥", "¢", "₹", "₩", "₽", "₴"],
+            "%": ["‰"],
+            "=": ["≠", "≈"],
+            "/": ["÷"],
+            "*": ["×"]
+        ]
+
+        for iphone in [true, false] {
+            var preferences = KeyboardPreferences()
+            preferences.iphoneKeyPositions = iphone
+            for page in [KeyboardPage.numbers, .symbols] {
+                var state = InputState()
+                state.page = page
+                let keys = KeyboardLayout.rows(state: state, needsGlobe: true, preferences: preferences).flatMap { $0 }
+                for (symbol, holds) in expected {
+                    if let key = keys.first(where: { $0.action == .text(symbol) }) {
+                        XCTAssertEqual(key.alternatives, holds,
+                                       "Page \(page), iPhone positions: \(iphone), key \(symbol)")
+                    }
+                }
+            }
+        }
+
+        // Every specified symbol is reachable from at least one built-in page
+        // even when iPhone key positions are enabled.
+        var state = InputState()
+        let numbers = KeyboardLayout.rows(state: { var s = state; s.page = .numbers; return s }(),
+                                         needsGlobe: false).flatMap { $0 }
+        state.page = .symbols
+        let symbols = KeyboardLayout.rows(state: state, needsGlobe: false).flatMap { $0 }
+        for (symbol, holds) in expected {
+            let key = (numbers + symbols).first { $0.action == .text(symbol) }
+            XCTAssertEqual(key?.alternatives, holds, "Missing hold on \(symbol)")
+        }
+
+        XCTAssertTrue(Key(action: .text("!")).alternatives.contains("‽"))
+        XCTAssertTrue(Key(action: .text("!")).alternatives.contains("⸘"))
+        XCTAssertTrue(Key(action: .text("?")).alternatives.contains("‽"))
+        XCTAssertTrue(Key(action: .text("?")).alternatives.contains("⸘"))
+        XCTAssertEqual(Key(action: .text("/"), letterAlternatives: ["∕"]).alternatives, ["∕"],
+                       "Person-defined alternatives take precedence")
+    }
+
     func testDigitsFlickFromTheTopRowOrSitInANumberRow() throws {
         var ukrainianState = InputState(); ukrainianState.language = .ukrainian
         let ukrainian = KeyboardLayout.rows(state: ukrainianState, needsGlobe: false)

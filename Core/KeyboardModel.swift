@@ -245,7 +245,13 @@ struct Key: Sendable {
         case "ʼ": return ["ʼ", "'", "’", "\""]
         case "-": return ["-", "–", "—", "_"]
         case "\"": return ["\"", "«", "»", "“", "”"]
-        case "?": return ["?", "!", "¿"]
+        case "?": return ["?", "!", "¿", "‽", "⸘"]
+        case "!": return ["¡", "‽", "⸘"]
+        case "$": return ["€", "£", "¥", "¢", "₹", "₩", "₽", "₴"]
+        case "%": return ["‰"]
+        case "=": return ["≠", "≈"]
+        case "/": return ["÷"]
+        case "*": return ["×"]
         // Built-in Unicode numeric holds are shared by the 123 page and the
         // optional permanent number row. Fractions live under their denominator.
         // The denominator 10 (⅒) is placed on 0.
