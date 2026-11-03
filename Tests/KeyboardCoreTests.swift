@@ -478,8 +478,10 @@ final class KeyboardCoreTests: XCTestCase {
             XCTAssertEqual(rows[0].first { $0.action == .text(digit) }?.alternatives, holds,
                            "Permanent number row: digit \(digit)")
         }
-        XCTAssertEqual(Set(expected.values.flatMap { $0 }.filter { $0.first?.isNumber == true }).count, 0,
-                       "Raised and lowered digits are separate Unicode characters from ordinary digits")
+        for (digit, holds) in expected {
+            XCTAssertEqual(Set(holds).count, holds.count, "No duplicate holds on \(digit)")
+            XCTAssertFalse(holds.contains(digit), "The ordinary digit stays the tap action")
+        }
         XCTAssertEqual(Key(action: .text("3"), letterAlternatives: ["⅔"]).alternatives, ["⅔"],
                        "Explicit custom alternatives still override built-in numeric holds")
     }
