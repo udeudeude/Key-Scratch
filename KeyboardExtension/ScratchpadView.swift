@@ -29,7 +29,7 @@ final class ScratchpadView: UIView, UITextViewDelegate, UIEditMenuInteractionDel
     private let tabsPanel = UIStackView()
     private let tabsScroller = UIScrollView()
     private let tabsRow = UIStackView()
-    private let addTab = UIButton(type: .system)
+    private let morePages = UIButton(type: .system)
     private let pasteImageButton = UIButton(type: .system)
     private let imageShelf = UIScrollView()
     private var imageShelfHeight: NSLayoutConstraint?
@@ -309,7 +309,7 @@ final class ScratchpadView: UIView, UITextViewDelegate, UIEditMenuInteractionDel
         returnToApp.addTarget(self, action: #selector(returnToAppTapped), for: .touchUpInside)
         returnToApp.isHidden = false
         returnToApp.translatesAutoresizingMaskIntoConstraints = false
-        returnToApp.widthAnchor.constraint(equalToConstant: 36).isActive = true
+        returnToApp.widthAnchor.constraint(equalToConstant: 32).isActive = true
         returnToApp.accessibilityHint = "At the bottom of the scratchpad; sends selected text or the entire current page to the app."
 
         // San Francisco's text cut is optically tuned for tiny point sizes,
@@ -615,7 +615,7 @@ final class ScratchpadView: UIView, UITextViewDelegate, UIEditMenuInteractionDel
         tabsPanel.spacing = 2
         // Fixed toolbar immediately below the image shelf, so neither
         // the send arrow nor the page buttons can overlap editable notes.
-        tabsPanel.heightAnchor.constraint(equalToConstant: 36).isActive = true
+        tabsPanel.heightAnchor.constraint(equalToConstant: 32).isActive = true
         tabsScroller.showsHorizontalScrollIndicator = false
         tabsScroller.alwaysBounceHorizontal = true
         tabsScroller.translatesAutoresizingMaskIntoConstraints = false
@@ -630,12 +630,13 @@ final class ScratchpadView: UIView, UITextViewDelegate, UIEditMenuInteractionDel
             tabsRow.bottomAnchor.constraint(equalTo: tabsScroller.contentLayoutGuide.bottomAnchor),
             tabsRow.heightAnchor.constraint(equalTo: tabsScroller.frameLayoutGuide.heightAnchor)
         ])
-        addTab.setTitle("+", for: .normal)
-        addTab.titleLabel?.font = .systemFont(ofSize: 19)
-        addTab.accessibilityLabel = "Add scratchpad page"
-        addTab.accessibilityIdentifier = "add-scratchpad-page"
-        addTab.addTarget(self, action: #selector(addPageTapped), for: .touchUpInside)
-        addTab.widthAnchor.constraint(equalToConstant: 25).isActive = true
+        // The keyboard has three permanent page tabs. Extra pages created
+        // earlier remain accessible under the overflow menu, never deleted.
+        morePages.setTitle("⋯", for: .normal)
+        morePages.titleLabel?.font = .systemFont(ofSize: 18, weight: .medium)
+        morePages.widthAnchor.constraint(equalToConstant: 25).isActive = true
+        morePages.showsMenuAsPrimaryAction = true
+        morePages.accessibilityLabel = "Additional scratchpad pages"
         pasteImageButton.setTitle("Paste", for: .normal)
         pasteImageButton.titleLabel?.font = .systemFont(ofSize: 11, weight: .semibold)
         pasteImageButton.accessibilityLabel = "Paste clipboard image onto scratchpad page"
@@ -646,8 +647,9 @@ final class ScratchpadView: UIView, UITextViewDelegate, UIEditMenuInteractionDel
         pasteImageButton.widthAnchor.constraint(equalToConstant: 46).isActive = true
         pasteImageButton.heightAnchor.constraint(equalToConstant: 26).isActive = true
         tabsPanel.addArrangedSubview(tabsScroller)
-        tabsPanel.addArrangedSubview(addTab)
-        // Send-to-app is bottom-right, after the numbered page tabs and +.
+        // Send-to-app stays pinned at bottom right; three normal page tabs
+        // scroll only in unusually narrow note panels.
+        // Additional pages appear through a menu rather than more tab clutter.
         // The tabs scroll horizontally instead of being covered by the arrow.
         tabsPanel.addArrangedSubview(returnToApp)
         renderTabs()
@@ -658,7 +660,7 @@ final class ScratchpadView: UIView, UITextViewDelegate, UIEditMenuInteractionDel
             tabsRow.removeArrangedSubview(item)
             item.removeFromSuperview()
         }
-        for (index, page) in notebook.pages.enumerated() {
+        for (index, page) in notebook.pages.prefix(3).enumerated() {
             let tab = UIButton(type: .system)
             tab.tag = index
             tab.setTitle("\(index + 1)", for: .normal)
@@ -669,12 +671,25 @@ final class ScratchpadView: UIView, UITextViewDelegate, UIEditMenuInteractionDel
                 ? UIColor.systemBlue.withAlphaComponent(0.18) : UIColor.clear
             tab.layer.cornerRadius = 4
             tab.setTitleColor(visualStyle == .standard ? .label : editor.textColor, for: .normal)
-            tab.widthAnchor.constraint(equalToConstant: 30).isActive = true
+            tab.widthAnchor.constraint(equalToConstant: 24).isActive = true
             tab.addTarget(self, action: #selector(pageTapped(_:)), for: .touchUpInside)
             tabsRow.addArrangedSubview(tab)
         }
-        addTab.isHidden = notebook.pages.count >= ScratchpadNotebook.maximumPages
-        addTab.tintColor = visualStyle == .standard ? .systemBlue : editor.textColor
+        if notebook.pages.count > 3 {
+            // A non-destructive escape hatch for users who previously made
+            // more than three pages in the companion app.
+            morePages.tintColor = visualStyle == .standard ? .systemBlue : editor.textColor
+            morePages.backgroundColor = notebook.selectedIndex >= 3
+                ? UIColor.systemBlue.withAlphaComponent(0.18) : .clear
+            morePages.menu = UIMenu(title: "Additional pages", children:
+                notebook.pages.enumerated().dropFirst(3).map { _, page in
+                    UIAction(title: "Page \((notebook.pages.firstIndex(where: { $0.id == page.id }) ?? 0) + 1)",
+                             state: page.id == notebook.selectedID ? .on : .off) { [weak self] _ in
+                        self?.switchPage(to: page.id)
+                    }
+                })
+            tabsRow.addArrangedSubview(morePages)
+        }
         pasteImageButton.tintColor = visualStyle == .standard ? .systemBlue : editor.textColor
     }
 
@@ -691,24 +706,15 @@ final class ScratchpadView: UIView, UITextViewDelegate, UIEditMenuInteractionDel
 
     @objc private func pageTapped(_ sender: UIButton) {
         guard notebook.pages.indices.contains(sender.tag) else { return }
-        let id = notebook.pages[sender.tag].id
-        guard id != notebook.selectedID else { return }
-        // Every edit is saved immediately; select from fresh shared data so
-        // edits from the companion app on other pages are never overwritten.
-        notebook = ScratchpadStore.selectPage(id: id) ?? notebook
-        notebook.selectedID = id
-        displaySelectedPage()
+        switchPage(to: notebook.pages[sender.tag].id)
     }
 
-    @objc private func addPageTapped() {
-        guard notebook.pages.count < ScratchpadNotebook.maximumPages else { return }
-        if let updated = ScratchpadStore.addPage() {
-            notebook = updated
-        } else {
-            let newPage = ScratchpadPage()
-            notebook.pages.append(newPage)
-            notebook.selectedID = newPage.id
-        }
+    private func switchPage(to id: String) {
+        guard id != notebook.selectedID,
+              notebook.pages.contains(where: { $0.id == id }) else { return }
+        // Keep the current page's edits and image metadata independent.
+        notebook = ScratchpadStore.selectPage(id: id) ?? notebook
+        notebook.selectedID = id
         displaySelectedPage()
     }
 
