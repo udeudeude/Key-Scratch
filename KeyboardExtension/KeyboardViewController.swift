@@ -618,7 +618,10 @@ final class KeyboardViewController: UIInputViewController {
         case .emailAddress:
             return ["@", "."]
         default:
-            return []
+            // Some browsers mark their combined search/address bar as a
+            // default or ASCII-capable text field with a Go return action.
+            // Match the iOS period key even without .URL/.webSearch traits.
+            return textDocumentProxy.returnKeyType == .go ? ["."] : []
         }
     }
 
