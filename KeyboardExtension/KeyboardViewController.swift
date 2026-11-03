@@ -65,6 +65,10 @@ final class KeyboardViewController: UIInputViewController {
         }
         scratchpad.onEditingChange = { [weak self] active in
             self?.keyboard.editingScratchpad = active
+            if let self {
+                self.keyboard.contextualPunctuation = active ? [] : self.hostPunctuation
+                self.keyboard.returnTitle = active ? "return" : self.returnLabel
+            }
             self?.pendingGlide = nil
             self?.noteSpacing.reset()
             self?.expander.forget()
@@ -548,7 +552,8 @@ final class KeyboardViewController: UIInputViewController {
         if context != languageContext { resolveLanguage(in: context) }
         reportLanguageIfNeeded()
         keyboard.needsGlobe = needsInputModeSwitchKey
-        keyboard.returnTitle = returnLabel
+        keyboard.returnTitle = scratchpad.isEditingNote ? "return" : returnLabel
+        keyboard.contextualPunctuation = scratchpad.isEditingNote ? [] : hostPunctuation
         keyboard.returnEnabled = !(textDocumentProxy.enablesReturnKeyAutomatically ?? false) || textDocumentProxy.hasText
         updateAutoShift()
         keyboard.inputState = inputState
@@ -600,6 +605,21 @@ final class KeyboardViewController: UIInputViewController {
         reportedLanguage = inputState.language
         primaryLanguage = inputState.language.code
         suggestions.prepareGlide(for: inputState.language)
+    }
+
+    /// Apple-style punctuation belongs immediately before the action key,
+    /// and should not be exposed in the scratchpad's own plain-text editor.
+    private var hostPunctuation: [String] {
+        switch textDocumentProxy.keyboardType ?? .default {
+        case .URL:
+            return ["/", "."]
+        case .webSearch:
+            return ["."]
+        case .emailAddress:
+            return ["@", "."]
+        default:
+            return []
+        }
     }
 
     private var returnLabel: String {
