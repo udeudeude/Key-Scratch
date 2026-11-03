@@ -252,7 +252,8 @@ struct Key: Sendable {
 }
 
 enum KeyboardLayout {
-    static func rows(state: InputState, needsGlobe: Bool, preferences: KeyboardPreferences = .init()) -> [[Key]] {
+    static func rows(state: InputState, needsGlobe: Bool, preferences: KeyboardPreferences = .init(),
+                     contextualPunctuation: [String] = []) -> [[Key]] {
         var result: [[Key]]
         switch state.page {
         case .letters: result = letterKeys(state.language, preferences: preferences)
@@ -302,8 +303,17 @@ enum KeyboardLayout {
         // Tap the star for personal frequent symbols; hold it to switch
         // enabled languages. Notes are focused by touching the note itself.
         controls.append(Key(action: .favorites, weight: 1.4))
-        controls += [Key(action: .space, weight: 3.8),
-                     Key(action: .enter, weight: preferences.validated.actionKeyWidth)]
+        controls.append(Key(action: .space, weight: 3.8))
+        // Native iOS URL, web-search and email fields expose punctuation
+        // directly beside their action key. The note editor stays plain.
+        if state.page == .letters {
+            for symbol in contextualPunctuation {
+                let holds = symbol == "." ? [".com", ".org", ".net", ".edu"] : []
+                controls.append(Key(action: .text(symbol), weight: 0.95,
+                                    letterAlternatives: holds))
+            }
+        }
+        controls.append(Key(action: .enter, weight: preferences.validated.actionKeyWidth))
         if state.page != .letters && !preferences.iphoneKeyPositions {
             controls.append(Key(action: .backspace, weight: preferences.validated.actionKeyWidth))
         }
@@ -887,10 +897,11 @@ enum KeyboardGeometry {
     static let ribbonHeight: Double = 38
 
     static func cells(width: Double, state: InputState, preferences: KeyboardPreferences,
-                      needsGlobe: Bool) -> [KeyCell] {
+                      needsGlobe: Bool, contextualPunctuation: [String] = []) -> [KeyCell] {
         guard width > 0 else { return [] }
         let p = preferences.validated
-        let rows = KeyboardLayout.rows(state: state, needsGlobe: needsGlobe, preferences: p)
+        let rows = KeyboardLayout.rows(state: state, needsGlobe: needsGlobe, preferences: p,
+                                       contextualPunctuation: contextualPunctuation)
         // Pages without the number row share its height, so the keyboard never jumps.
         let letterHeight = rows.count == 5 || p.numberRowHeight == 0 ? p.keyHeight
             : p.keyHeight + (p.numberRowHeight + p.rowSpacing) / 3
