@@ -37,4 +37,4 @@ iOS controls the system keyboard-switcher controls outside the extension's permi
 
 ## Origins
 
-Key Scratch is a fork of [Igor Varyvoda's Ortholinear](https://github.com/IgorVaryvoda/Ortholinear). The codebase retains internal upstream target names and some legacy layout-file identifiers for compatibility. See the original repository and this repository's `LICENSE` for attribution and licensing.
+Key Scratch is a fork of [Igor Varyvoda's Ortholinear](https://github.com/IgorVaryvoda/Ortholinear). The codebase retains internal upstream target names and some legacy layout-file identifiers for compatibility. The Ortholinear-derived code retains the [MIT License](LICENSE). Original Key Scratch scratchpad contributions carry separate [non-commercial terms](LICENSE-KEY-SCRATCH-NC.md), where explicitly marked. See the [licensing map](KEY-SCRATCH-LICENSING.md) for scope and outstanding third-party resource checks.
