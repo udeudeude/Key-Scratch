@@ -1,3 +1,10 @@
+// Key Scratch original scratchpad implementation.
+// Original portions copyright (c) 2026 Key Scratch contributors.
+// Original portions owned by the licensors are licensed for non-commercial use
+// under LICENSE-KEY-SCRATCH-NC.md. Ortholinear-derived and third-party
+// portions, if any, retain their existing licenses.
+// See KEY-SCRATCH-LICENSING.md for the scope and attribution rules.
+
 import UIKit
 
 /// A local, selectable note inside the keyboard extension.
