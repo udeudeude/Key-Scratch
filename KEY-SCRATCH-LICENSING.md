@@ -21,4 +21,8 @@ Before distributing a packaged build, inventory all bundled dictionaries, word l
 
 ## Development and publication
 
-The actual Key Scratch scratchpad implementation lives on `feature/scratchpad-first-pass`. The `main` branch still primarily reflects Ortholinear. The development README requires physical iPhone testing before merge. A public portfolio link should not represent the main branch as a ready-to-install Key Scratch build.
+The Key Scratch scratchpad implementation was merged into `main` after successful physical iPhone testing. Installation still requires Xcode and developer signing; no App Store release is claimed.
+
+## Resource-audit status
+
+The repository includes language dictionaries and other bundled language data inherited from Ortholinear. Their separate license provenance has not been conclusively established by this review. Preserve all existing third-party notices and do not apply the Key Scratch non-commercial license to those resources. A complete redistribution inventory requires inspecting each bundled file and its upstream source.
