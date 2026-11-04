@@ -1,13 +1,24 @@
-# Licensing of Key Scratch additions
+# Key Scratch licensing map
 
-The existing Ortholinear-derived source remains under the repository's [MIT License](LICENSE). Its copyright notices and permission to use, modify, redistribute and sell that code must be preserved.
+## Inherited Ortholinear code
+
+The existing [MIT License](LICENSE) remains in force for Ortholinear and its derived portions, including edits made in inherited Swift files. Its copyright notice must be retained. The MIT grant allows commercial use, sale and redistribution of those portions.
 
 ## Original Key Scratch material
 
-New material created specifically for Key Scratch **may** be licensed separately on a non-commercial basis, but only when its author or rights holder owns the relevant rights and the material is clearly identified as separately licensed.
+- `KeyboardExtension/ScratchpadView.swift`: a file introduced on the Key Scratch development branch (not present in the upstream baseline). Original portions owned by Key Scratch contributors carry the separate [Key Scratch Non-Commercial License](LICENSE-KEY-SCRATCH-NC.md), identified by a file-level notice. Any copied or third-party portions retain their previous rights.
+- `Resources/Assets.xcassets/KeyScratchIcon.imageset/KeyScratchIcon.png`: introduced on the development branch. **Not relicensed yet**: artwork ownership and any source materials need confirmation.
+- `docs/KEY-SCRATCH.md`, `docs/IOS_KEYBOARD_BEHAVIOR.md`: introduced on the development branch. **Not relicensed yet**: their contributions and authorship have not been established.
+- `App/ContentView.swift`, `KeyboardExtension/KeyboardViewController.swift`, `Core/*`, `SharedUI/*` and other modified inherited files: contain upstream-derived code and new changes. **No blanket relicensing**; distinguishing original contributions requires a line-by-line provenance audit.
 
-No existing Ortholinear-derived files are relicensed by this document. No existing file is presumed to be an original Key Scratch contribution merely because it is in this fork.
+The non-commercial license does not override any MIT permissions for upstream code. It is not an OSI-approved open-source license.
 
-For future wholly original Key Scratch artwork, documentation or standalone code, the copyright holder can add a file-level notice explicitly selecting **Creative Commons Attribution-NonCommercial 4.0 International (CC BY-NC 4.0)** for artwork or documentation, or a separately drafted non-commercial software license for standalone code. CC BY-NC is not recommended as a software license. A file without an explicit separate license remains subject to its existing applicable license.
+## Third-party and bundled resources
 
-Do not apply non-commercial restrictions to MIT-derived code, third-party language data or any other material without establishing ownership and the applicable licenses. A non-commercial license on original additions would not prevent others from commercially using the MIT-licensed Ortholinear base.
+The upstream README states that bundled language data has separate licenses. The development branch also references an external project with AGPL-3.0-or-later interface code in the CRT-style design notes, while stating no game text or artwork was copied. These references do **not** establish rights to relicense language data or imported assets.
+
+Before distributing a packaged build, inventory all bundled dictionaries, word lists, fonts, icons, libraries and other resources, record each source and license, and preserve their notices. The present review did not establish a complete per-resource license inventory.
+
+## Development and publication
+
+The actual Key Scratch scratchpad implementation lives on `feature/scratchpad-first-pass`. The `main` branch still primarily reflects Ortholinear. The development README requires physical iPhone testing before merge. A public portfolio link should not represent the main branch as a ready-to-install Key Scratch build.
