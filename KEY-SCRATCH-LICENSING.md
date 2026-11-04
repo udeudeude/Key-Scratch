@@ -34,6 +34,14 @@ The generator pins downloaded upstream resources and SHA-256 hashes; the manifes
 
 The development notes also refer to an external project's AGPL-3.0-or-later interface code as visual inspiration; they state that no game text or artwork was copied. This reference alone does not establish that AGPL code is bundled.
 
+## Application artwork and binary integrity
+
+The two committed application-icon files, `Resources/Assets.xcassets/AppIcon.appiconset/AppIcon.png` and `Resources/Assets.xcassets/KeyScratchIcon.imageset/KeyScratchIcon.png`, have the **same Git blob SHA** (`f71cd40a824a8b30bdf0869db786ff975c37c65b`). They are identical copies, not independent images. Their original creator and any input artwork rights cannot be established solely from the Git history; **no exclusive ownership or non-commercial restriction is asserted over these image files**. The public portfolio may display the existing app icon without changing its license.
+
+The binary suggestion lexicons `en.orthlex` and `uk.orthlex` are identified by Git blob IDs `0a6bbc19d4c36148699cf173c38c97053f9ba554` and `8ebd419a33b0339059884be5112c4efff0cf796c`. The provenance manifest separately provides SHA-256 checksums for these and the other generated resources.
+
+[Tools/check_resource_licenses.py](Tools/check_resource_licenses.py) verifies the five generated assets against the pinned manifest, checks their declared licenses and attribution markers, validates the PNG signatures, and ensures both app-icon copies are identical. The GitHub iOS build workflow now runs this check before compilation. These checks verify file integrity and documented provenance; they do not establish ownership of the original artwork or replace a legal review.
+
 ## Development and publication
 
 The Key Scratch scratchpad implementation was merged into `main` after successful physical iPhone testing. Installation still requires Xcode and developer signing; no App Store release is claimed.
