@@ -27,6 +27,6 @@ icons = [
     ROOT / "Resources/Assets.xcassets/AppIcon.appiconset/AppIcon.png",
     ROOT / "Resources/Assets.xcassets/KeyScratchIcon.imageset/KeyScratchIcon.png",
 ]
-assert all(p.exists() and p.read_bytes()[:8] == b"\\x89PNG\\r\\n\\x1a\\n" for p in icons)
+assert all(p.exists() and p.read_bytes()[:8] == bytes.fromhex("89504e470d0a1a0a") for p in icons)
 assert icons[0].read_bytes() == icons[1].read_bytes(), "App icon copies differ"
 print("Suggestion-data hashes, embedded licenses, attribution and app icons verified.")
