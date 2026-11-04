@@ -66,21 +66,23 @@ final class SuggestionBar: UIView {
 
     override func layoutSubviews() {
         super.layoutSubviews()
+        let rowHeight = bounds.height
+        let buttonHeight = max(26, rowHeight - 6)
         let content = max(0, bounds.width - 44)
         let words = compact ? content * 0.64 : content
         let width = words / (compact ? 2 : 3)
         for (index, button) in buttons.enumerated() {
-            button.frame = CGRect(x: CGFloat(index) * width + 2, y: 3, width: max(0, width - 4), height: 38)
+            button.frame = CGRect(x: CGFloat(index) * width + 2, y: 3, width: max(0, width - 4), height: buttonHeight)
         }
         let marks = compact ? min(Self.compactMarks, punctuationButtons.count) : punctuationButtons.count
         let markOrigin = compact ? words : 0
         let markWidth = marks == 0 ? 0 : (content - markOrigin) / CGFloat(marks)
         for (index, button) in punctuationButtons.enumerated() {
-            button.frame = CGRect(x: markOrigin + CGFloat(index) * markWidth + 2, y: 3, width: max(0, markWidth - 4), height: 38)
+            button.frame = CGRect(x: markOrigin + CGFloat(index) * markWidth + 2, y: 3, width: max(0, markWidth - 4), height: buttonHeight)
         }
-        hint.frame = CGRect(x: 0, y: 0, width: content, height: 44)
-        tipButton.frame = CGRect(x: 8, y: 0, width: max(0, content - 16), height: 44)
-        more.frame = CGRect(x: bounds.width - 44, y: 0, width: 44, height: 44)
+        hint.frame = CGRect(x: 0, y: 0, width: content, height: rowHeight)
+        tipButton.frame = CGRect(x: 8, y: 0, width: max(0, content - 16), height: rowHeight)
+        more.frame = CGRect(x: bounds.width - 44, y: 0, width: 44, height: rowHeight)
     }
 
     func style(_ palette: KeyboardPalette) {
@@ -285,6 +287,37 @@ private actor SuggestionWorker {
     func unload() { engines.removeAll() }
 }
 
+/// Independent, user-initiated glide decoding. Autocorrection work can never
+/// block a completed swipe in the other worker's queue.
+private actor FastGlideWorker {
+    private var cachedLanguage: KeyboardLanguage?
+    private var cachedEngine: SuggestionEngine?
+
+    func prepare(_ language: KeyboardLanguage) {
+        guard language.dictionaryCode != nil, cachedLanguage != language else { return }
+        cachedEngine = try? SuggestionResources.engine(language: language)
+        cachedLanguage = cachedEngine == nil ? nil : language
+    }
+
+    func glide(_ points: [CGPoint], language: KeyboardLanguage, learned: [String],
+               context: [String], preferences: KeyboardPreferences, width: Double) throws -> [WordSuggestion] {
+        try Task.checkCancellation()
+        prepare(language)
+        guard let engine = cachedEngine, cachedLanguage == language else {
+            throw CocoaError(.fileNoSuchFile)
+        }
+        let geometry = SuggestionGeometry(language: language, preferences: preferences, width: width)
+        try Task.checkCancellation()
+        return engine.glide(points, language: language, learned: learned, geometry: geometry,
+                            context: preferences.contextualSuggestions ? context : [])
+    }
+
+    func release() {
+        cachedEngine = nil
+        cachedLanguage = nil
+    }
+}
+
 /// Where a glide will type. A decoded word goes in only if all of this is unchanged.
 struct GlideContext: Equatable {
     var language: KeyboardLanguage
@@ -296,6 +329,7 @@ struct GlideContext: Equatable {
 @MainActor
 final class SuggestionCoordinator {
     private let worker = SuggestionWorker()
+    private let fastGlideWorker = FastGlideWorker()
     private weak var keyboard: KeyboardView?
     private var task: Task<Void, Never>?
     private var glideTask: Task<Void, Never>?
@@ -314,6 +348,8 @@ final class SuggestionCoordinator {
     var apply: ((SuggestionEdit, SuggestionSnapshot) -> Void)?
     /// Inserts a glided word with the host's spacing and Shift state; returns the text inserted.
     var insertWord: ((String) -> String?)?
+    /// Reports elapsed time, never the typed word, for local A/B testing.
+    var onGlideLatency: ((Double) -> Void)?
     var switchLanguage: ((KeyboardLanguage) -> Void)?
     var supplementary = SupplementaryWords()
 
@@ -351,8 +387,24 @@ final class SuggestionCoordinator {
         keyboard.onGlide = { [weak self] points in self?.glide(points) }
     }
 
+    /// Warm the swipe dictionary as soon as the active language is known,
+    /// rather than at the first finger lift. Never put this on the main actor.
+    func prepareGlide(for language: KeyboardLanguage) {
+        guard language.dictionaryCode != nil else { return }
+        Task(priority: .userInitiated) { [fastGlideWorker] in
+            await fastGlideWorker.prepare(language)
+        }
+    }
+
     /// A new keyboard appearance may show a tip again, up to its limit.
-    func beginSession() { cancelGlide(); tipChosen = false; sessionTip = nil }
+    func beginSession() {
+        cancelGlide()
+        tipChosen = false
+        sessionTip = nil
+        if let language = keyboard?.inputState.language {
+            prepareGlide(for: language)
+        }
+    }
 
     /// Any input, or the keyboard leaving, makes a glide still being decoded land in the wrong place.
     func cancelGlide() { glideTask?.cancel(); glideTask = nil }
@@ -369,6 +421,7 @@ final class SuggestionCoordinator {
         suspend()
         glideOffer = nil
         Task { await worker.unload() }
+        Task { await fastGlideWorker.release() }
     }
 
     private func punctuation(for language: KeyboardLanguage) -> [String] {
@@ -399,7 +452,10 @@ final class SuggestionCoordinator {
         keyboard.suggestionBar.punctuation = punctuation(for: current?.language ?? keyboard.inputState.language)
         keyboard.glideEnabled = preferences.glideTyping && keyboard.inputState.page == .letters
             && glideContext?()?.language.dictionaryCode != nil
-        guard preferences.suggestionsEnabled, keyboard.inputState.page == .letters, let current else { cancel(); return }
+        // Quiet mode keeps the same key geometry but skips live prediction work.
+        // Glide decoding remains available via its separate worker.
+        guard preferences.suggestionsEnabled, preferences.keyScratchMode.hasLiveSuggestions,
+              keyboard.inputState.page == .letters, let current else { cancel(); return }
         if let offer = glideOffer {
             if offer.snapshot == current {
                 guard force || requested != current else { return }
@@ -459,15 +515,32 @@ final class SuggestionCoordinator {
         let preferences = keyboard.preferences, width = keyboard.bounds.width
         suspend()
         glideOffer = nil
-        glideTask = Task { [weak self, worker] in
-            guard let words = try? await worker.glide(points, language: current.language, learned: learned,
-                                                      context: SuggestionText.context(current.before),
-                                                      preferences: preferences, width: width),
-                  !Task.isCancelled, let self, self.glideContext?() == current, let best = words.first,
+        let started = ProcessInfo.processInfo.systemUptime
+        glideTask = Task(priority: .userInitiated) { [weak self, worker, fastGlideWorker] in
+            let context = SuggestionText.context(current.before)
+            let words: [WordSuggestion]?
+            if preferences.keyScratchMode.usesDedicatedGlide {
+                words = try? await fastGlideWorker.glide(points, language: current.language,
+                                                         learned: learned, context: context,
+                                                         preferences: preferences, width: width)
+            } else {
+                // Blue reference mode intentionally preserves Ortholinear's
+                // original serialized dictionary/suggestion worker.
+                words = try? await worker.glide(points, language: current.language,
+                                                learned: learned, context: context,
+                                                preferences: preferences, width: width)
+            }
+            guard !Task.isCancelled, let self, self.glideContext?() == current,
+                  let best = words?.first,
                   let inserted = self.insertWord?(best.word) else { return }
+            let elapsedMS = (ProcessInfo.processInfo.systemUptime - started) * 1000
+            self.onGlideLatency?(elapsedMS)
+            #if DEBUG
+            print("KeyScratch glide-to-text latency: \(Int(elapsedMS.rounded())) ms")
+            #endif
             // Alternatives need a snapshot to replace safely; without host context, only the word goes in.
             guard let after = self.snapshot?() else { self.refresh(force: true); return }
-            let alternatives = words.dropFirst().map {
+            let alternatives = (words ?? []).dropFirst().map {
                 WordSuggestion(word: SuggestionText.cased($0.word, like: inserted, language: current.language), kind: .correction)
             }
             if !alternatives.isEmpty { self.glideOffer = (after, inserted, Array(alternatives.prefix(3))) }

@@ -66,4 +66,345 @@ final class TextNavigationTests: XCTestCase {
         XCTAssertNil(decoded?.command, "Unknown commands are dropped, not fatal")
         XCTAssertEqual(decoded?.cursorBack, 0)
     }
+    func testSpaceTrackpadMovesAcrossHardLineBreaks() {
+        XCTAssertEqual(TextNavigation.verticalOffset(rows: -1, before: "hello\nabc", after: ""), -6)
+        XCTAssertEqual(TextNavigation.verticalOffset(rows: 1, before: "hello\nabc", after: "\n123456"), 4)
+        XCTAssertNil(TextNavigation.verticalOffset(rows: -1, before: "only one line", after: ""))
+        XCTAssertNil(TextNavigation.verticalOffset(rows: 1, before: "only one", after: " line"))
+        XCTAssertEqual(TextNavigation.verticalOffset(rows: 1, before: "a\nlast", after: "\nx"), 2,
+                       "The next shorter line clamps the column")
+    }
+
+    func testIPhonePlacementDoesNotMoveDeleteOrReturnOnPageChanges() {
+        var preferences = KeyboardPreferences()
+        preferences.iphoneKeyPositions = true
+        var input = InputState()
+        input.language = .english
+        for page in [KeyboardPage.letters, .numbers, .symbols] {
+            input.page = page
+            let rows = KeyboardLayout.rows(state: input, needsGlobe: true, preferences: preferences)
+            XCTAssertEqual(rows[2].first?.action, .shift)
+            XCTAssertEqual(rows[2].last?.action, .backspace)
+            XCTAssertEqual(rows[3].last?.action, .enter)
+            XCTAssertEqual(rows[3].first?.action, .page)
+        }
+    }
+
+    func testEnglishIPhoneRowsHaveNativeQwertyPositions() {
+        var preferences = KeyboardPreferences()
+        preferences.iphoneKeyPositions = true
+        preferences.showApostrophe = true // The iPhone layout overrides extra letter-row keys.
+        let rows = KeyboardLayout.letterKeys(.english, preferences: preferences)
+        XCTAssertEqual(rows.map(\.count), [10, 9, 7])
+        XCTAssertEqual(rows[1].first?.action, .text("a"))
+        XCTAssertEqual(rows[2].last?.action, .text("m"))
+        XCTAssertTrue(rows[1].allSatisfy { $0.action != .text("'") })
+        let geometry = KeyboardGeometry.cells(width: 320, state: {
+            var input = InputState(); input.language = .english; return input
+        }(), preferences: preferences, needsGlobe: true)
+        let a = geometry.first { $0.key.action == .text("a") }
+        let q = geometry.first { $0.key.action == .text("q") }
+        XCTAssertGreaterThan(a?.visualFrame.minX ?? 0, q?.visualFrame.minX ?? 0,
+                             "The second row is visually inset; its invisible touch halo still reaches the edge")
+    }
+
+    func testEnglishAccentOptionsAreAvailableByHoldingLetters() {
+        let preferences = KeyboardPreferences()
+        let rows = KeyboardLayout.letterKeys(.english, preferences: preferences)
+        let a = rows.flatMap { $0 }.first { $0.action == .text("a") }
+        let e = rows.flatMap { $0 }.first { $0.action == .text("e") }
+        XCTAssertTrue(a?.alternatives.contains("æ") == true)
+        XCTAssertTrue(a?.alternatives.contains("á") == true)
+        XCTAssertTrue(e?.alternatives.contains("é") == true)
+    }
+    func testFavoritesKeyReplacesNotesAppToggle() {
+        let p = KeyboardPreferences()
+        XCTAssertEqual(p.defaultLanguage, .english)
+        XCTAssertEqual(p.languages, [.english])
+        for mode in [KeyScratchMode.split, .legacy, .quiet, .narrow] {
+            var options = p
+            options.keyScratchMode = mode
+            let rows = KeyboardLayout.rows(state: InputState(), needsGlobe: true, preferences: options)
+            XCTAssertEqual(rows[3].filter { $0.action == .favorites }.count, 1)
+            XCTAssertFalse(rows[3].contains { $0.action == .language })
+            XCTAssertEqual(rows[3].last?.action, .enter)
+        }
+        var reference = p
+        reference.keyScratchMode = .reference
+        let rows = KeyboardLayout.rows(state: InputState(), needsGlobe: true, preferences: reference)
+        XCTAssertEqual(rows[3].filter { $0.action == .favorites }.count, 1,
+                       "Favorites are available in every keyboard layout")
+    }
+
+    func testLanguageOrderRemainsUserControlled() {
+        var options = KeyboardPreferences()
+        options.languages = [.english, .ukrainian, .german]
+        XCTAssertEqual(options.validated.languages, [.english, .ukrainian, .german])
+        XCTAssertEqual(options.language(after: .english), .ukrainian)
+        XCTAssertEqual(options.language(after: .german), .english)
+    }
+
+    func testStaggeredMiddleRowRetainsFullWidthTouchCoverage() {
+        var state = InputState()
+        state.language = .english
+        var p = KeyboardPreferences()
+        p.iphoneKeyPositions = true
+        for width in [165.0, 240.0, 393.0] {
+            let cells = KeyboardGeometry.cells(width: width, state: state,
+                                               preferences: p, needsGlobe: true)
+            guard let first = cells.first(where: { $0.key.action == .text("a") }),
+                  let last = cells.first(where: { $0.key.action == .text("l") }) else {
+                return XCTFail("Missing middle-row letter")
+            }
+            XCTAssertGreaterThan(first.visualFrame.minX, 0)
+            XCTAssertLessThan(last.visualFrame.maxX, width)
+            XCTAssertEqual(first.hitFrame.minX, 0)
+            XCTAssertEqual(last.hitFrame.maxX, width, accuracy: 0.001)
+        }
+    }
+
+    func testSpaceReturnsToLettersFromNumbersAndSymbolsOnly() {
+        var state = InputState()
+        for page in [KeyboardPage.numbers, .symbols] {
+            state.page = page
+            state.returnToLettersAfterSpace()
+            XCTAssertEqual(state.page, .letters, "Space from \(page) returns to letters")
+        }
+        state.page = .letters
+        state.returnToLettersAfterSpace()
+        XCTAssertEqual(state.page, .letters)
+
+        // User-defined layers deliberately preserve their page across Space.
+        let custom = UUID()
+        state.page = .layer(custom)
+        state.returnToLettersAfterSpace()
+        XCTAssertEqual(state.page, .layer(custom))
+    }
+
+    func testNewKeySpacingAndHiddenHintsPersistThroughSaveAndMigration() throws {
+        let defaults = KeyboardPreferences()
+        XCTAssertEqual(defaults.rowSpacing, 8)
+        XCTAssertEqual(defaults.columnSpacing, 3)
+        XCTAssertFalse(defaults.showLongPressHints)
+        XCTAssertEqual(try JSONDecoder().decode(
+            KeyboardPreferences.self, from: JSONEncoder().encode(defaults)), defaults)
+
+        let oldDefaults = Data(
+            #"{"schemaVersion":7,"rowSpacing":2,"columnSpacing":2,"showLongPressHints":true}"#.utf8)
+        let migrated = try JSONDecoder().decode(KeyboardPreferences.self, from: oldDefaults)
+        XCTAssertEqual(migrated.rowSpacing, 8)
+        XCTAssertEqual(migrated.columnSpacing, 3)
+        XCTAssertFalse(migrated.showLongPressHints)
+
+        let deliberate = Data(
+            #"{"schemaVersion":7,"rowSpacing":5,"columnSpacing":6,"showLongPressHints":true}"#.utf8)
+        let custom = try JSONDecoder().decode(KeyboardPreferences.self, from: deliberate)
+        XCTAssertEqual(custom.rowSpacing, 5)
+        XCTAssertEqual(custom.columnSpacing, 6)
+        XCTAssertFalse(custom.showLongPressHints)
+    }
+
+    func testLandscapeKeyboardTakesRightEdgeAndLeavesMostWidthForNotes() {
+        let base = KeyboardPreferences()
+        for width in [600.0, 665.0, 896.0] {
+            let keyboard = KeyScratchAdaptiveLayout.keyboardWidth(
+                availableWidth: width, landscape: true,
+                portraitNoteFraction: base.keyScratchNoteWidth)
+            let notes = width - keyboard
+            XCTAssertGreaterThanOrEqual(keyboard, 390)
+            XCTAssertLessThanOrEqual(keyboard, 430)
+            XCTAssertGreaterThan(notes, 0)
+            XCTAssertEqual(notes + keyboard, width, accuracy: 0.001)
+        }
+        let portrait = KeyScratchAdaptiveLayout.keyboardWidth(
+            availableWidth: 414, landscape: false, portraitNoteFraction: 0.30)
+        XCTAssertEqual(portrait, 414 * 0.70, accuracy: 0.001)
+    }
+
+    func testLandscapeShrinksKeyHeightsWithoutChangingPortraitPreferences() {
+        var base = KeyboardPreferences()
+        base.keyHeight = 68
+        base.controlHeight = 52
+        base.rowSpacing = 8
+        base.letterSize = 26
+        base.digitAccess = .numberRow
+        let compact = KeyScratchAdaptiveLayout.appearance(base, landscape: true)
+        XCTAssertEqual(compact.keyHeight, 34)
+        XCTAssertEqual(compact.controlHeight, 32)
+        XCTAssertEqual(compact.rowSpacing, 2)
+        XCTAssertEqual(compact.letterSize, 19)
+        XCTAssertEqual(compact.digitAccess, .flick)
+        XCTAssertEqual(compact.suggestionHeight, 30)
+        XCTAssertEqual(compact.keyboardHeight, 172, accuracy: 0.001)
+        XCTAssertLessThan(compact.keyboardHeight, base.keyboardHeight)
+        XCTAssertTrue(compact.suggestionsEnabled, "A shorter layout must keep predictive suggestions")
+        XCTAssertEqual(KeyScratchAdaptiveLayout.appearance(base, landscape: false), base)
+        XCTAssertEqual(base.keyHeight, 68)
+        XCTAssertEqual(base.rowSpacing, 8)
+    }
+
+    func testFavoriteSymbolsAreEditableUnicodeAndPersistAcrossSettings() throws {
+        let defaults = KeyboardPreferences()
+        XCTAssertTrue(defaults.favoriteSymbols.contains("❤️"))
+        XCTAssertTrue(defaults.favoriteSymbols.contains("≠"))
+        XCTAssertTrue(defaults.favoriteSymbols.contains("→"))
+        var chosen = defaults
+        chosen.favoriteSymbols = ["🫶", "∴", "∞", "🫶", "", "≠"]
+        chosen = chosen.validated
+        XCTAssertEqual(chosen.favoriteSymbols, ["🫶", "∴", "∞", "≠"])
+        let stored = try JSONEncoder().encode(chosen)
+        let restored = try JSONDecoder().decode(KeyboardPreferences.self, from: stored)
+        XCTAssertEqual(restored.favoriteSymbols, chosen.favoriteSymbols)
+    }
+
+    func testOldKeyboardSettingsAcquireFavoritesWithoutOverwritingOtherPreferences() throws {
+        let original = Data(#"{"keyHeight":64,"defaultLanguage":"english"}"#.utf8)
+        let preferences = try JSONDecoder().decode(KeyboardPreferences.self, from: original)
+        XCTAssertEqual(preferences.keyHeight, 64)
+        XCTAssertTrue(preferences.favoriteSymbols.contains("★"))
+        XCTAssertEqual(preferences.favoriteSymbols.count, 32)
+    }
+
+    func testSplitHandednessAndTerminalThemesPersistWithoutChangingKeyboardHeight() throws {
+        let ordinary = KeyboardPreferences()
+        XCTAssertFalse(ordinary.leftHandedLayout)
+        XCTAssertEqual(ordinary.scratchpadVisualStyle, .standard)
+        let height = ordinary.keyboardHeight
+        for style in ScratchpadVisualStyle.allCases {
+            var configured = ordinary
+            configured.leftHandedLayout = true
+            configured.scratchpadVisualStyle = style
+            let stored = try JSONEncoder().encode(configured)
+            let restored = try JSONDecoder().decode(KeyboardPreferences.self, from: stored)
+            XCTAssertTrue(restored.leftHandedLayout)
+            XCTAssertEqual(restored.scratchpadVisualStyle, style)
+            XCTAssertEqual(restored.keyboardHeight, height)
+            let compact = KeyScratchAdaptiveLayout.appearance(restored, landscape: true)
+            XCTAssertEqual(compact.scratchpadVisualStyle, style)
+            XCTAssertTrue(compact.leftHandedLayout)
+            XCTAssertEqual(compact.keyboardHeight, 172, accuracy: 0.001)
+        }
+    }
+
+    func testOlderSavedPreferencesReceiveStandardStyleAndRightHandedSplit() throws {
+        let legacy = Data(#"{"schemaVersion":8,"keyHeight":55,"rowSpacing":6}"#.utf8)
+        let restored = try JSONDecoder().decode(KeyboardPreferences.self, from: legacy)
+        XCTAssertFalse(restored.leftHandedLayout)
+        XCTAssertEqual(restored.scratchpadVisualStyle, .standard)
+        XCTAssertEqual(restored.rowSpacing, 6)
+        XCTAssertEqual(restored.keyHeight, 55)
+    }
+
+    func testScratchpadNotebookHasThreeIndependentPagesAndPreservesLegacyNote() throws {
+        var book = ScratchpadNotebook.initial(legacy: "My original note")
+        XCTAssertEqual(book.pages.count, 3)
+        XCTAssertEqual(book.selectedPage.text, "My original note")
+        XCTAssertEqual(book.pages[1].text, "")
+        XCTAssertEqual(book.pages[2].text, "")
+        book.selectedID = book.pages[1].id
+        book.pages[1].text = "Second page"
+        let archive = try JSONEncoder().encode(book)
+        let decoded = try JSONDecoder().decode(ScratchpadNotebook.self, from: archive)
+        XCTAssertEqual(decoded.selectedPage.text, "Second page")
+        XCTAssertEqual(decoded.pages[0].text, "My original note")
+        XCTAssertEqual(decoded.pages[2].text, "")
+    }
+
+    func testScratchpadNotebookKeepsAtLeastOnePageAndRejectsBrokenSelection() {
+        var book = ScratchpadNotebook.initial(legacy: "Original")
+        book.selectedID = "missing-page"
+        XCTAssertEqual(book.normalized.selectedPage.text, "Original")
+        book.pages = []
+        XCTAssertEqual(book.normalized.pages.count, 3)
+        book = ScratchpadNotebook.initial(legacy: "Original")
+        book.pages += (0..<12).map { _ in ScratchpadPage() }
+        XCTAssertEqual(book.normalized.pages.count, ScratchpadNotebook.maximumPages)
+    }
+
+    func testSelectionForTransferUsesSelectedTextOrWholePage() {
+        // The arrow always inserts selected content, falling back to the
+        // entire active page without touching the clipboard or Shift.
+        let book = ScratchpadNotebook.initial(legacy: "one two")
+        let selection = "two"
+        XCTAssertEqual(selection.isEmpty ? book.selectedPage.text : selection, "two")
+        let noSelection = ""
+        XCTAssertEqual(noSelection.isEmpty ? book.selectedPage.text : noSelection, "one two")
+    }
+
+    func testOldNotebooksDecodeWithoutImagesAndPreserveAllText() throws {
+        // Existing on-device notebooks predate photos. Decoding them must
+        // never discard the user's notes or selected page.
+        let old = #"{"pages":[{"id":"first","text":"Important notes"},{"id":"second","text":"Keep this too"}],"selectedID":"second"}"#
+        let restored = try JSONDecoder().decode(ScratchpadNotebook.self, from: Data(old.utf8))
+        XCTAssertEqual(restored.pages.count, 2)
+        XCTAssertEqual(restored.pages[0].text, "Important notes")
+        XCTAssertEqual(restored.selectedPage.text, "Keep this too")
+        XCTAssertTrue(restored.pages.allSatisfy { $0.images.isEmpty })
+        XCTAssertEqual(try JSONDecoder().decode(ScratchpadNotebook.self,
+            from: JSONEncoder().encode(restored)), restored)
+    }
+
+    func testImagesRemainAttachedToTheirPageAndDeduplicateSafely() throws {
+        var book = ScratchpadNotebook.initial(legacy: "Page one")
+        let one = ScratchpadImage()
+        let two = ScratchpadImage()
+        book.pages[0].images = [one, one, ScratchpadImage(id: "../outside"), two]
+        book.pages[1].images = [ScratchpadImage()]
+        let normalized = book.normalized
+        XCTAssertEqual(normalized.pages[0].images.map(\.id), [one.id, two.id])
+        XCTAssertEqual(normalized.pages[1].images.count, 1)
+        let restored = try JSONDecoder().decode(ScratchpadNotebook.self,
+            from: JSONEncoder().encode(normalized))
+        XCTAssertEqual(restored, normalized)
+        XCTAssertEqual(restored.pages[0].text, "Page one")
+    }
+
+    func testPageImageLimitDoesNotChangeTextOrOtherPages() {
+        var book = ScratchpadNotebook.initial(legacy: "Safe text")
+        book.pages[0].images = (0..<20).map { _ in ScratchpadImage() }
+        book.pages[1].text = "Other notes"
+        let result = book.normalized
+        XCTAssertEqual(result.pages[0].images.count, ScratchpadNotebook.maximumImagesPerPage)
+        XCTAssertEqual(result.pages[0].text, "Safe text")
+        XCTAssertEqual(result.pages[1].text, "Other notes")
+    }
+
+    func testNativeContextKeysArePlacedImmediatelyBesideGoOrSearchAction() {
+        var prefs = KeyboardPreferences()
+        prefs.iphoneKeyPositions = true
+        let state = InputState()
+        let standard = KeyboardLayout.rows(state: state, needsGlobe: false, preferences: prefs)
+        XCTAssertEqual(standard[3].suffix(2).map(\.action), [.space, .enter])
+
+        let web = KeyboardLayout.rows(state: state, needsGlobe: false, preferences: prefs,
+                                      contextualPunctuation: ["/", "."])
+        XCTAssertEqual(web[3].suffix(3).map(\.action),
+                       [.text("/"), .text("."), .enter])
+        XCTAssertEqual(Array(web[3][web[3].count - 2].alternatives.prefix(2)), [".com", ".org"])
+
+        let email = KeyboardLayout.rows(state: state, needsGlobe: false, preferences: prefs,
+                                        contextualPunctuation: ["@", "."])
+        XCTAssertEqual(email[3].suffix(3).map(\.action),
+                       [.text("@"), .text("."), .enter])
+
+        var numbers = state
+        numbers.page = .numbers
+        let numeric = KeyboardLayout.rows(state: numbers, needsGlobe: false, preferences: prefs,
+                                          contextualPunctuation: ["/", "."])
+        XCTAssertFalse(numeric.last!.contains { $0.action == .text(".") },
+                       "Host-specific punctuation belongs on the letter page only")
+    }
+
+    func testThreePermanentScratchpadPagesKeepOlderExtraPages() {
+        var book = ScratchpadNotebook.initial(legacy: "Preserve")
+        book.pages.removeLast(2)
+        XCTAssertEqual(book.normalized.pages.count, 3)
+        XCTAssertEqual(book.normalized.pages[0].text, "Preserve")
+
+        book = ScratchpadNotebook.initial(legacy: "Preserve")
+        book.pages.append(ScratchpadPage(text: "Page 4 stays"))
+        XCTAssertEqual(book.normalized.pages.count, 4)
+        XCTAssertEqual(book.normalized.pages[3].text, "Page 4 stays")
+    }
+
 }

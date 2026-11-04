@@ -64,14 +64,16 @@ struct CustomLetterLayout: KeyRows, Codable, Equatable, Sendable {
     var rows: [[CustomKey]]
 
     static let maximumRowLength = 12
-    static let maximumAlternatives = 8
+    static let maximumAlternatives = 9
 
     /// The built-in layout as an editable starting point, holds included.
     init(builtIn language: KeyboardLanguage, preferences: KeyboardPreferences = .init()) {
-        rows = KeyboardLayout.letterRows(language, preferences: preferences).map { row in
-            row.map { character in
-                CustomKey(String(character),
-                          alternatives: KeyboardLayout.letterAlternatives(character, language: language, preferences: preferences))
+        // Copy the keys the device actually displays. The modern iPhone
+        // letter rows omit optional punctuation regardless of legacy toggles.
+        rows = KeyboardLayout.letterKeys(language, preferences: preferences).map { row in
+            row.compactMap { key -> CustomKey? in
+                guard case .text(let output) = key.action else { return nil }
+                return CustomKey(output, alternatives: key.alternatives)
             }
         }
     }

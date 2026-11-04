@@ -31,6 +31,13 @@ struct AppearanceSettings: View {
 
     private var controls: some View {
         Form {
+            Section {
+                Toggle("iPhone-style appearance", isOn: $preferences.appleKeyAppearance)
+                    .accessibilityIdentifier("ios-keyboard-appearance")
+            } footer: {
+                Text("Uses familiar iOS-style key colors, shadows, typography, and light/dark appearance. Turn off to use customized color themes.")
+            }
+            if !preferences.appleKeyAppearance {
             if let section = ProHooks.appearanceSection { section($preferences) }
             Section {
                 // Automatic spans the top, so the six fixed themes fill the grid evenly.
@@ -72,11 +79,12 @@ struct AppearanceSettings: View {
                     }
                 }
             } header: { Text("Accent") }
+            } // End custom themes
             Section {
                 Toggle("Show key hints", isOn: $preferences.showLongPressHints)
                     .accessibilityIdentifier("show-long-press-hints")
             } header: { Label("Key hints", systemImage: "character.bubble") } footer: {
-                Text("Small letters such as ґ show what holding a key types, and small digits show what a downward flick types. Enable ї on long-press і in Keyboard settings → Letters to move it off its separate key.")
+                Text("Hold a letter for accented alternatives. Small digits on the top row indicate downward-flick shortcuts.")
             }
         }.accessibilityIdentifier("appearance-controls")
     }
@@ -88,7 +96,7 @@ struct AppearanceSettings: View {
         return Button { preferences.theme = theme; preferences.keycaps = nil } label: {
             VStack(alignment: .leading, spacing: 8) {
                 HStack(spacing: 3) {
-                    ForEach(["й", "ц", "у", "a", "⌫"], id: \.self) { letter in
+                    ForEach(["q", "w", "e", "r", "⌫"], id: \.self) { letter in
                         Text(letter).font(.system(size: 19, weight: .medium))
                             .frame(maxWidth: .infinity, minHeight: 31)
                             .background(Color(uiColor: UIColor(keyboardHex: letter == "⌫" ? colors.control : colors.key)),

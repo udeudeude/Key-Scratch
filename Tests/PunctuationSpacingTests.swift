@@ -89,7 +89,8 @@ final class PunctuationSpacingTests: XCTestCase {
                        .init(deleteBackward: false, text: "»"))
         spacing.adoptSpace(before: "word ")
         XCTAssertEqual(spacing.edit(for: "-", before: "word ", enabled: true),
-                       .init(deleteBackward: false, text: "-"))
+                       .init(deleteBackward: true, text: "-"),
+                       "A hyphen attaches to a glided word instead of making 'word -'")
         spacing.adoptSpace(before: "привіт ")
         XCTAssertEqual(spacing.edit(for: "«", before: "привіт ", enabled: true),
                        .init(deleteBackward: false, text: "«"))
@@ -138,4 +139,65 @@ final class PunctuationSpacingTests: XCTestCase {
         XCTAssertEqual(spacing.edit(for: ";", before: "", enabled: true), .init(text: "; "), "Without such shortcuts, as before")
         XCTAssertEqual(spacing.edit(for: ";", before: nil, enabled: true, shortcutStarts: starts), .init(text: "; "), "Unknown text keeps the old behavior")
     }
+    func testTwoSpacesAfterSwipeBecomePeriodAndSpace() {
+        var spacing = PunctuationSpacing()
+        spacing.adoptSpace(before: "garden ")
+        let first = spacing.edit(for: " ", before: "garden ", enabled: true,
+                                 doubleSpacePeriod: true, at: 2)
+        XCTAssertEqual(first, .init(text: ""), "First Space accepts the swipe's provisional space")
+        let second = spacing.edit(for: " ", before: "garden ", enabled: true,
+                                  doubleSpacePeriod: true, at: 2.3)
+        XCTAssertEqual(second, .init(deleteBackward: true, text: ". "),
+                       "Second Space turns the existing separator into punctuation")
+    }
+
+    func testHyphensSlashesAndContractionsAttachToThePreviousWord() {
+        func insertAfterGlide(_ symbol: String, typedAfter: String = "") -> String {
+            var spacing = PunctuationSpacing()
+            var text = "well "
+            spacing.adoptSpace(before: text)
+            let edit = spacing.edit(for: symbol, before: text, enabled: true)
+            if edit.deleteBackward { text.removeLast() }
+            text += edit.text
+            let next = spacing.edit(for: typedAfter, before: text, enabled: true)
+            if next.deleteBackward { text.removeLast() }
+            text += next.text
+            return text
+        }
+        for symbol in ["-", "‐", "‑", "–", "—"] {
+            XCTAssertEqual(insertAfterGlide(symbol, typedAfter: "being"),
+                           "well" + symbol + "being", "Dash \(symbol) should attach")
+        }
+        XCTAssertEqual(insertAfterGlide("/", typedAfter: "known"), "well/known")
+        XCTAssertEqual(insertAfterGlide("'", typedAfter: "s"), "well's")
+        XCTAssertEqual(insertAfterGlide("’", typedAfter: "s"), "well’s")
+        XCTAssertEqual(insertAfterGlide(")"), "well)")
+        XCTAssertEqual(insertAfterGlide("%"), "well%")
+        XCTAssertEqual(insertAfterGlide("°"), "well°")
+    }
+
+    func testExplicitSpacesBeforeHyphenArePreserved() {
+        var spacing = PunctuationSpacing()
+        // The keyboard never invented this space, so it must not remove it.
+        XCTAssertEqual(spacing.edit(for: "-", before: "first ", enabled: true),
+                       .init(text: "-"))
+        // Once punctuation consumes a provisional space, the next characters
+        // join normally, without a second space after the hyphen.
+        spacing.adoptSpace(before: "first ")
+        XCTAssertEqual(spacing.edit(for: "-", before: "first ", enabled: true),
+                       .init(deleteBackward: true, text: "-"))
+        XCTAssertEqual(spacing.edit(for: "s", before: "first-", enabled: true),
+                       .init(text: "s"))
+    }
+
+    func testColonOwnedSpaceAllowsAnImmediateSlashForUrls() {
+        var spacing = PunctuationSpacing()
+        let colon = spacing.edit(for: ":", before: "https", enabled: true)
+        XCTAssertEqual(colon, .init(text: ": "))
+        let slash = spacing.edit(for: "/", before: "https: ", enabled: true)
+        XCTAssertEqual(slash, .init(deleteBackward: true, text: "/"))
+        XCTAssertEqual(spacing.edit(for: "/", before: "https:/", enabled: true),
+                       .init(text: "/"))
+    }
+
 }

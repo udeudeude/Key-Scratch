@@ -8,7 +8,13 @@ struct PunctuationSpacing {
     }
     /// A second Space within this window after a word types “. ”.
     static let doubleSpaceWindow: TimeInterval = 1.2
-    private static let closers: Set<String> = ["»", "”"]
+    /// Symbols that attach directly to preceding text rather than receiving
+    /// the provisional space from a swipe or accepted suggestion. Explicitly
+    /// typed spaces are never removed.
+    private static let attachToPrevious: Set<String> = [
+        "-", "‐", "‑", "–", "—", "/", "\\", "'", "’", "ʼ",
+        ")", "]", "}", "»", "”", "%", "‰", "°"
+    ]
     private var expectedSuffix: String?
     private var punctuation: String?
     private var spaceAfterWord: (suffix: String, time: TimeInterval)?
@@ -50,10 +56,19 @@ struct PunctuationSpacing {
         let ownsSpace = expectedSuffix.map { context?.hasSuffix($0) == true } ?? false
         let numericContinuation = ownsSpace && [".", ",", ":"].contains(punctuation ?? "")
             && value.first?.isNumber == true && context?.dropLast(2).last?.isNumber == true
-        let removeSpace = ownsSpace && (marks.contains(value) || Self.closers.contains(value) || value == "\n" || numericContinuation)
+        let removeSpace = ownsSpace && (marks.contains(value)
+            || Self.attachToPrevious.contains(value)
+            || value == "\n" || numericContinuation)
         reset()
         // A deliberate space after punctuation accepts the automatic space once.
-        if ownsSpace && value == " " { return Edit(text: "") }
+        if ownsSpace && value == " " {
+            // The implicit space after a glide counts as the first Space.
+            // One explicit Space accepts it; a second quick tap becomes ". ".
+            if doubleSpacePeriod, let context, context.last == " " {
+                spaceAfterWord = (String(context.suffix(32)), time)
+            }
+            return Edit(text: "")
+        }
         let before = removeSpace ? context.map { String($0.dropLast()) } : context
         let startsWord = shortcutStarts.contains(value) && (before.map { TextExpander.isShortcutBoundary($0.last) } ?? false)
         let output = value + (marks.contains(value) && !startsWord ? " " : "")

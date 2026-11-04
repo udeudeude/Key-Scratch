@@ -1,0 +1,970 @@
+// Key Scratch original scratchpad implementation.
+// Original portions copyright (c) 2026 Key Scratch contributors.
+// Original portions owned by the licensors are licensed for non-commercial use
+// under LICENSE-KEY-SCRATCH-NC.md. Ortholinear-derived and third-party
+// portions, if any, retain their existing licenses.
+// See KEY-SCRATCH-LICENSING.md for the scope and attribution rules.
+
+import UIKit
+
+/// A local, selectable note inside the keyboard extension.
+/// Key Scratch's keys edit this text view directly via its selected range.
+/// It intentionally never becomes first responder: that would summon a second keyboard.
+@MainActor
+// UIKit presents edit menus on the main thread, but this delegate's protocol
+// requirements are not consistently declared MainActor-isolated across SDKs.
+// Keep the view main-actor confined and check callback isolation at runtime.
+final class ScratchpadView: UIView, UITextViewDelegate, UIEditMenuInteractionDelegate {
+    private let editor = UITextView()
+    private let caret = UIView()
+    private let perimeter = CAShapeLayer()
+    private let scanlineFilm = UIView()
+    private var cornerGlow: [CAGradientLayer] = []
+    private var visualStyle: ScratchpadVisualStyle = .standard
+    var keyboardSurroundColor: UIColor = .systemGray5 {
+        didSet {
+            if !keyboardSurroundColor.isEqual(oldValue) { perimeter.strokeColor = keyboardSurroundColor.cgColor }
+        }
+    }
+    /// UITextView's native selection highlight can disappear when the view is
+    /// deliberately non-first-responder inside a keyboard extension.
+    /// Show selectionRects in iOS blue without changing the selected text.
+    private var selectionHighlights: [UIView] = []
+    private lazy var editMenu = UIEditMenuInteraction(delegate: self)
+    private let returnToApp = UIButton(type: .system)
+    private let message = UILabel()
+    private let tabsPanel = UIStackView()
+    private let tabsScroller = UIScrollView()
+    private let tabsRow = UIStackView()
+    private let morePages = UIButton(type: .system)
+    private let pasteImageButton = UIButton(type: .system)
+    private let imageShelf = UIScrollView()
+    private var imageShelfHeight: NSLayoutConstraint?
+    private let imageRow = UIStackView()
+    private var activeImagePreview: UIView?
+    private var notebook = ScratchpadNotebook.initial(legacy: "")
+    private let storeKey = "key-scratch.local-note.v1"
+    private(set) var isEditingNote = false
+
+    var onInsert: ((String) -> Void)?
+    var onEditingChange: ((Bool) -> Void)?
+    var onTextChange: (() -> Void)?
+    var onPageChange: (() -> Void)?
+    var canUseClipboard = false
+
+    var beforeCaret: String { pieces().before }
+    var afterCaret: String { pieces().after }
+    var selectedNoteText: String { pieces().selection }
+
+    private func safeSelection() -> NSRange {
+        let count = (editor.text as NSString).length
+        let selected = editor.selectedRange
+        guard selected.location != NSNotFound, selected.location <= count,
+              selected.length <= count - selected.location else {
+            return NSRange(location: count, length: 0)
+        }
+        return selected
+    }
+
+    private func pieces() -> (before: String, after: String, selection: String) {
+        let note = editor.text as NSString
+        let range = safeSelection()
+        let end = range.location + range.length
+        return (note.substring(to: range.location),
+                note.substring(from: end),
+                note.substring(with: range))
+    }
+
+    func snapshot(document: UUID, language: KeyboardLanguage) -> SuggestionSnapshot {
+        let parts = pieces()
+        return SuggestionSnapshot(document: document, before: parts.before, after: parts.after,
+                                  selection: parts.selection, language: language)
+    }
+
+    func activate() {
+        guard !isEditingNote else { return }
+        reloadSharedNote()
+        isEditingNote = true
+        returnToApp.isHidden = false
+        updateBorderAppearance()
+        onEditingChange?(true)
+        updateCaret()
+    }
+
+    func deactivate() {
+        guard isEditingNote else { return }
+        isEditingNote = false
+        // Keep the insert arrow available even when focus is in the host.
+        returnToApp.isHidden = false
+        updateBorderAppearance()
+        onEditingChange?(false)
+        updateCaret()
+    }
+
+    /// Draw the top and both sides only. Their color matches the keys' backing
+    /// surface rather than using iOS's blue focus border or a default separator.
+    private func updateBorderAppearance() {
+        layer.borderWidth = 0
+        perimeter.strokeColor = keyboardSurroundColor.cgColor
+        perimeter.lineWidth = 0.85
+        perimeter.fillColor = UIColor.clear.cgColor
+        setNeedsLayout()
+    }
+
+    override func layoutSubviews() {
+        super.layoutSubviews()
+        let r: CGFloat = min(6, bounds.width / 4, bounds.height / 4)
+        let path = UIBezierPath()
+        path.move(to: CGPoint(x: 0.45, y: bounds.height))
+        path.addLine(to: CGPoint(x: 0.45, y: r))
+        path.addQuadCurve(to: CGPoint(x: r, y: 0.45), controlPoint: CGPoint(x: 0.45, y: 0.45))
+        path.addLine(to: CGPoint(x: bounds.width - r, y: 0.45))
+        path.addQuadCurve(to: CGPoint(x: bounds.width - 0.45, y: r),
+                          controlPoint: CGPoint(x: bounds.width - 0.45, y: 0.45))
+        path.addLine(to: CGPoint(x: bounds.width - 0.45, y: bounds.height))
+        perimeter.path = path.cgPath
+        perimeter.frame = bounds
+        scanlineFilm.frame = bounds
+        for (index, glow) in cornerGlow.enumerated() {
+            let cornerWidth = min(80, bounds.width * 0.45)
+            let cornerHeight = min(45, bounds.height * 0.24)
+            glow.frame = CGRect(x: index.isMultiple(of: 2) ? 0 : bounds.width - cornerWidth,
+                                y: index < 2 ? 0 : bounds.height - cornerHeight,
+                                width: cornerWidth, height: cornerHeight)
+        }
+    }
+
+    /// UIKit-only interpretation of Temporarily Leave the Universe's display:
+    /// deep glass, phosphor/amber/composite ink, very subtle fixed scanlines,
+    /// and four static corner blooms. No WebView, timers, or animations.
+    func configure(font: KeyScratchNoteFont, size: Double, style: ScratchpadVisualStyle = .standard) {
+        visualStyle = style
+        let amount = CGFloat(size)
+        let base = UIFont.systemFont(ofSize: amount, weight: .medium)
+        if style == .standard {
+            switch font {
+            case .text: editor.font = base
+            case .rounded, .serif, .monospaced:
+                let design: UIFontDescriptor.SystemDesign
+                switch font {
+                case .rounded: design = .rounded
+                case .serif: design = .serif
+                case .monospaced: design = .monospaced
+                case .text: design = .rounded
+                }
+                let descriptor = base.fontDescriptor.withDesign(design)
+                editor.font = descriptor.map { UIFont(descriptor: $0, size: amount) } ?? base
+            }
+        } else {
+            editor.font = UIFont(name: "CourierNewPSMT", size: amount)
+                ?? .monospacedSystemFont(ofSize: amount, weight: .regular)
+        }
+        let ink: UIColor
+        let glass: UIColor
+        switch style {
+        case .standard:
+            ink = .label
+            glass = .secondarySystemBackground
+        case .phosphorGreen:
+            ink = UIColor(red: 0.47, green: 0.94, blue: 0.44, alpha: 1)
+            glass = UIColor(red: 0.004, green: 0.016, blue: 0.004, alpha: 1)
+        case .amber:
+            ink = UIColor(red: 1, green: 0.73, blue: 0.22, alpha: 1)
+            glass = UIColor(red: 0.016, green: 0.008, blue: 0, alpha: 1)
+        case .composite:
+            ink = UIColor(white: 0.95, alpha: 1)
+            glass = UIColor(red: 0.008, green: 0.008, blue: 0.016, alpha: 1)
+        }
+        backgroundColor = glass
+        editor.textColor = ink
+        caret.backgroundColor = style == .standard ? .systemBlue : ink
+        returnToApp.tintColor = style == .standard ? .secondaryLabel : ink
+        returnToApp.backgroundColor = style == .standard ? .tertiarySystemBackground : glass
+        message.textColor = style == .standard ? .secondaryLabel : ink
+
+        if style != .standard && cornerGlow.isEmpty {
+            for _ in 0..<4 {
+                let glow = CAGradientLayer()
+                glow.type = .radial
+                glow.isHidden = true
+                layer.insertSublayer(glow, at: 0)
+                cornerGlow.append(glow)
+            }
+        }
+        let glowColor: UIColor = switch style {
+        case .standard: .clear
+        case .phosphorGreen: UIColor(red: 0.34, green: 0.91, blue: 0.37, alpha: 0.19)
+        case .amber: UIColor(red: 1, green: 0.67, blue: 0, alpha: 0.18)
+        case .composite: UIColor(red: 0.68, green: 0.55, blue: 1, alpha: 0.16)
+        }
+        for (i, glow) in cornerGlow.enumerated() {
+            glow.colors = [glowColor.cgColor, glowColor.withAlphaComponent(0).cgColor]
+            glow.startPoint = CGPoint(x: i.isMultiple(of: 2) ? 0 : 1, y: i < 2 ? 0 : 1)
+            glow.endPoint = CGPoint(x: i.isMultiple(of: 2) ? 1 : 0, y: i < 2 ? 1 : 0)
+            glow.isHidden = style == .standard
+        }
+        scanlineFilm.alpha = style == .standard ? 0 : 0.18
+        selectionHighlights.forEach {
+            $0.backgroundColor = (style == .standard ? UIColor.systemBlue : ink).withAlphaComponent(0.27)
+        }
+        updateBorderAppearance()
+        renderTabs()
+        renderImages()
+        editor.setNeedsLayout()
+        updateCaret()
+    }
+
+    /// Replaces the selected UTF-16 range, keeping the selection/caret in the note.
+    func type(_ replacement: String) {
+        guard isEditingNote else { return }
+        let range = safeSelection()
+        guard let swiftRange = Range(range, in: editor.text) else { return }
+        var value = editor.text ?? ""
+        value.replaceSubrange(swiftRange, with: replacement)
+        editor.text = value
+        editor.selectedRange = NSRange(location: range.location + (replacement as NSString).length, length: 0)
+        editor.scrollRangeToVisible(editor.selectedRange)
+        updateCaret()
+        save()
+        onTextChange?()
+    }
+
+    /// Used by TextExpander to replace the shortcut immediately before the caret.
+    func replaceBeforeCaret(characters: Int, with replacement: String) {
+        guard isEditingNote, characters >= 0 else { return }
+        let selection = safeSelection()
+        guard selection.length == 0, beforeCaret.count >= characters else { return }
+        let previous = String(beforeCaret.suffix(characters))
+        let utf16Length = (previous as NSString).length
+        guard selection.location >= utf16Length else { return }
+        editor.selectedRange = NSRange(location: selection.location - utf16Length,
+                                       length: utf16Length)
+        type(replacement)
+    }
+
+    func deleteBackward() {
+        guard isEditingNote else { return }
+        let selection = safeSelection()
+        if selection.length > 0 {
+            type("")
+        } else if selection.location > 0 {
+            let previous = (editor.text as NSString).rangeOfComposedCharacterSequence(at: selection.location - 1)
+            editor.selectedRange = previous
+            type("")
+        }
+    }
+
+    /// Use the actual rendered UITextView layout for up/down trackpad movement,
+    /// including soft-wrapped lines that a host app doesn't expose to extensions.
+    func moveCaretVertically(rows: Int) {
+        guard isEditingNote, rows != 0,
+              let selected = editor.selectedTextRange else { return }
+        let rect = editor.caretRect(for: selected.start)
+        let height = max(editor.font?.lineHeight ?? 14, 12)
+        let destination = CGPoint(x: rect.minX, y: rect.midY + CGFloat(rows) * height)
+        guard let position = editor.closestPosition(to: destination),
+              let range = editor.textRange(from: position, to: position) else { return }
+        editor.selectedTextRange = range
+        editor.scrollRangeToVisible(editor.selectedRange)
+        updateCaret()
+        onTextChange?()
+    }
+
+    func moveCaret(steps: Int) {
+        guard isEditingNote, steps != 0,
+              let start = editor.selectedTextRange?.start,
+              let next = editor.position(from: start, offset: steps),
+              let range = editor.textRange(from: next, to: next) else { return }
+        editor.selectedTextRange = range
+        updateCaret()
+        onTextChange?()
+    }
+
+    /// Safely applies a Key Scratch suggestion against the exact note it was offered for.
+    func apply(_ edit: SuggestionEdit, offered: SuggestionSnapshot, document: UUID,
+               language: KeyboardLanguage) -> Bool {
+        guard isEditingNote, snapshot(document: document, language: language) == offered else { return false }
+        let selected = safeSelection()
+        let left = (edit.left as NSString).length
+        let right = (edit.right as NSString).length
+        let total = (editor.text as NSString).length
+        guard selected.location >= left,
+              selected.location + selected.length + right <= total else { return false }
+        editor.selectedRange = NSRange(location: selected.location - left,
+                                      length: left + selected.length + right)
+        type(edit.text)
+        return true
+    }
+
+    override init(frame: CGRect) {
+        super.init(frame: frame)
+        backgroundColor = .secondarySystemBackground
+        layer.cornerRadius = 6
+        layer.masksToBounds = true
+        perimeter.isHidden = false
+        layer.addSublayer(perimeter)
+        updateBorderAppearance()
+
+        // The send-to-app action belongs in the bottom tab toolbar, not
+        // over the editable text. It never obscures the first line of notes.
+        returnToApp.setImage(UIImage(systemName: "arrow.up.forward.square.fill"), for: .normal)
+        returnToApp.tintColor = .secondaryLabel
+        returnToApp.backgroundColor = .tertiarySystemBackground
+        returnToApp.layer.cornerRadius = 5
+        returnToApp.accessibilityLabel = "Insert selected note text in app, or entire page"
+        returnToApp.accessibilityIdentifier = "insert-note-into-host"
+        returnToApp.addTarget(self, action: #selector(returnToAppTapped), for: .touchUpInside)
+        returnToApp.isHidden = false
+        returnToApp.translatesAutoresizingMaskIntoConstraints = false
+        returnToApp.widthAnchor.constraint(equalToConstant: 32).isActive = true
+        returnToApp.accessibilityHint = "At the bottom of the scratchpad; sends selected text or the entire current page to the app."
+
+        // San Francisco's text cut is optically tuned for tiny point sizes,
+        // with less wasted width than the previous monospaced face.
+        editor.font = .systemFont(ofSize: 11, weight: .medium)
+        editor.textColor = .label
+        editor.tintColor = .systemBlue
+        editor.textContainer.lineFragmentPadding = 1
+        editor.backgroundColor = .clear
+        editor.isEditable = false
+        editor.isSelectable = true
+        editor.isScrollEnabled = true
+        editor.delegate = self
+        caret.backgroundColor = .systemBlue
+        caret.isHidden = true
+        caret.isUserInteractionEnabled = false
+        editor.addSubview(caret)
+        editor.textContainerInset = UIEdgeInsets(top: 2, left: 2, bottom: 19, right: 2)
+        notebook = ScratchpadStore.migrateNotebook(legacy: UserDefaults.standard.string(forKey: storeKey))
+        editor.text = notebook.selectedPage.text
+        editor.accessibilityLabel = "Scratchpad note. Tap to type with Key Scratch."
+        // Recognize multi-taps before moving the caret. Without this failure
+        // hierarchy, the single-tap cursor handler can undo the selection
+        // created by a double or triple tap.
+        let paragraphTap = UITapGestureRecognizer(target: self, action: #selector(selectParagraphAtTap(_:)))
+        paragraphTap.numberOfTapsRequired = 3
+        paragraphTap.cancelsTouchesInView = true
+
+        let wordTap = UITapGestureRecognizer(target: self, action: #selector(selectWordAtTap(_:)))
+        wordTap.numberOfTapsRequired = 2
+        wordTap.cancelsTouchesInView = true
+        wordTap.require(toFail: paragraphTap)
+
+        let tap = UITapGestureRecognizer(target: self, action: #selector(noteTapped(_:)))
+        tap.numberOfTapsRequired = 1
+        tap.cancelsTouchesInView = true
+        tap.require(toFail: wordTap)
+
+        editor.addGestureRecognizer(paragraphTap)
+        editor.addGestureRecognizer(wordTap)
+        editor.addGestureRecognizer(tap)
+        editor.addInteraction(editMenu)
+        let longPress = UILongPressGestureRecognizer(target: self, action: #selector(noteLongPressed(_:)))
+        longPress.minimumPressDuration = 0.45
+        longPress.cancelsTouchesInView = true
+        editor.addGestureRecognizer(longPress)
+
+        message.font = .systemFont(ofSize: 9)
+        message.textColor = .secondaryLabel
+        message.numberOfLines = 3
+        message.isHidden = true
+
+        configureTabs()
+        configureImageShelf()
+        let stack = UIStackView(arrangedSubviews: [message, editor, imageShelf, tabsPanel])
+        stack.axis = .vertical
+        stack.spacing = 2
+        stack.translatesAutoresizingMaskIntoConstraints = false
+        addSubview(stack)
+        NSLayoutConstraint.activate([
+            stack.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 4),
+            stack.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -4),
+            stack.topAnchor.constraint(equalTo: topAnchor, constant: 3),
+            stack.bottomAnchor.constraint(equalTo: bottomAnchor, constant: -3)
+        ])
+        // Fixed, noninteractive film; scrollable text remains independent.
+        // Cache one tiny image instead of drawing a scanline for every frame.
+        let film = UIGraphicsImageRenderer(size: CGSize(width: 2, height: 4)).image { ctx in
+            UIColor.black.withAlphaComponent(0.68).setFill()
+            ctx.fill(CGRect(x: 0, y: 2, width: 2, height: 1))
+        }
+        scanlineFilm.backgroundColor = UIColor(patternImage: film)
+        scanlineFilm.isUserInteractionEnabled = false
+        scanlineFilm.alpha = 0
+        addSubview(scanlineFilm)
+        layer.addSublayer(perimeter)
+    }
+
+    required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
+
+    @objc private func noteTapped(_ gesture: UITapGestureRecognizer) {
+        guard gesture.state == .ended else { return }
+        activate()
+        let location = gesture.location(in: editor)
+        if let position = editor.closestPosition(to: location) {
+            editor.selectedTextRange = editor.textRange(from: position, to: position)
+        }
+        updateCaret()
+        onTextChange?()
+    }
+
+    @objc private func selectWordAtTap(_ gesture: UITapGestureRecognizer) {
+        guard gesture.state == .ended else { return }
+        activate()
+        let text = editor.text ?? ""
+        guard !text.isEmpty, let position = editor.closestPosition(to: gesture.location(in: editor)) else { return }
+        let utf16Position = editor.offset(from: editor.beginningOfDocument, to: position)
+        var found: NSRange?
+        text.enumerateSubstrings(in: text.startIndex..<text.endIndex, options: .byWords) {
+            _, range, _, stop in
+            let candidate = NSRange(range, in: text)
+            if NSLocationInRange(min(utf16Position, max(0, (text as NSString).length - 1)), candidate) {
+                found = candidate
+                stop = true
+            }
+        }
+        if let found {
+            editor.selectedRange = found
+            updateCaret()
+            onTextChange?()
+            editMenu.presentEditMenu(with: UIEditMenuConfiguration(
+                identifier: nil, sourcePoint: gesture.location(in: editor)))
+        }
+    }
+
+    @objc private func selectParagraphAtTap(_ gesture: UITapGestureRecognizer) {
+        guard gesture.state == .ended else { return }
+        activate()
+        let text = editor.text as NSString
+        guard text.length > 0,
+              let position = editor.closestPosition(to: gesture.location(in: editor)) else { return }
+        let offset = min(max(0, editor.offset(from: editor.beginningOfDocument, to: position)),
+                         text.length - 1)
+        editor.selectedRange = text.paragraphRange(for: NSRange(location: offset, length: 0))
+        updateCaret()
+        onTextChange?()
+        editMenu.presentEditMenu(with: UIEditMenuConfiguration(
+            identifier: nil, sourcePoint: gesture.location(in: editor)))
+    }
+
+    /// Our own long-press menu is bound to this local note. Prevent UIKit's
+    /// generic, read-only UITextView menu from competing with it.
+    func textView(_ textView: UITextView, editMenuForTextIn range: NSRange,
+                  suggestedActions: [UIMenuElement]) -> UIMenu? {
+        UIMenu(children: [])
+    }
+
+    func textViewDidChangeSelection(_ textView: UITextView) {
+        updateCaret()
+    }
+
+    func scrollViewDidScroll(_ scrollView: UIScrollView) {
+        updateCaret()
+    }
+
+    private func updateCaret() {
+        updateSelectionHighlights()
+        guard isEditingNote, let selection = editor.selectedTextRange,
+              selection.isEmpty else {
+            caret.isHidden = true
+            return
+        }
+        let rect = editor.caretRect(for: selection.start)
+        guard rect.minX.isFinite, rect.minY.isFinite, rect.height.isFinite, rect.height > 0 else {
+            caret.isHidden = true
+            return
+        }
+        caret.frame = CGRect(x: rect.minX, y: rect.minY, width: 1.5, height: max(rect.height, 12))
+        caret.isHidden = false
+    }
+
+    /// Reuse lightweight overlays instead of rewriting attributedText, which
+    /// would destroy the selected range or cause nested UITextView delegate calls.
+    private func updateSelectionHighlights() {
+        let selected = safeSelection()
+        guard isEditingNote, selected.length > 0,
+              let start = editor.position(from: editor.beginningOfDocument, offset: selected.location),
+              let end = editor.position(from: start, offset: selected.length),
+              let range = editor.textRange(from: start, to: end) else {
+            selectionHighlights.forEach { $0.isHidden = true }
+            return
+        }
+        let highlights = editor.selectionRects(for: range)
+            .map(\.rect)
+            .filter { $0.width > 0.5 && $0.height > 1 && $0.minX.isFinite && $0.minY.isFinite }
+            .prefix(80)
+        for (index, rect) in highlights.enumerated() {
+            let overlay: UIView
+            if index < selectionHighlights.count {
+                overlay = selectionHighlights[index]
+            } else {
+                overlay = UIView()
+                let ink = visualStyle == .standard ? UIColor.systemBlue : editor.textColor ?? .systemGreen
+                overlay.backgroundColor = ink.withAlphaComponent(0.27)
+                overlay.isUserInteractionEnabled = false
+                editor.addSubview(overlay)
+                selectionHighlights.append(overlay)
+            }
+            // UITextInput selection rectangles are already in UITextView coordinates.
+            overlay.frame = rect.intersection(editor.bounds)
+            overlay.isHidden = overlay.frame.isNull || overlay.frame.isEmpty
+        }
+        for index in highlights.count..<selectionHighlights.count {
+            selectionHighlights[index].isHidden = true
+        }
+        editor.bringSubviewToFront(caret)
+    }
+
+    /// Hold a finger on a word to select it and display iOS's floating edit menu.
+    /// Holding empty space instead offers Paste and Select All.
+    @objc private func noteLongPressed(_ gesture: UILongPressGestureRecognizer) {
+        guard gesture.state == .began else { return }
+        activate()
+        let point = gesture.location(in: editor)
+        let text = editor.text ?? ""
+        let cursor = editor.closestPosition(to: point)
+        if let cursor, !text.isEmpty {
+            let utf16Position = editor.offset(from: editor.beginningOfDocument, to: cursor)
+            var word: NSRange?
+            text.enumerateSubstrings(in: text.startIndex..<text.endIndex, options: .byWords) {
+                _, range, _, stop in
+                let candidate = NSRange(range, in: text)
+                if NSLocationInRange(min(utf16Position, (text as NSString).length - 1), candidate) {
+                    word = candidate
+                    stop = true
+                }
+            }
+            if let word { editor.selectedRange = word }
+            else if editor.selectedRange.length == 0 {
+                editor.selectedTextRange = editor.textRange(from: cursor, to: cursor)
+            }
+        } else if let cursor, editor.selectedRange.length == 0 {
+            editor.selectedTextRange = editor.textRange(from: cursor, to: cursor)
+        }
+        updateCaret()
+        onTextChange?()
+        editMenu.presentEditMenu(with: UIEditMenuConfiguration(identifier: nil, sourcePoint: point))
+    }
+
+    /// Only these actions should appear for the local scratchpad. We do not
+    /// borrow UIKit's host-app menu: it edits a different text destination.
+    nonisolated func editMenuInteraction(_ interaction: UIEditMenuInteraction,
+                                        menuFor configuration: UIEditMenuConfiguration,
+                                        suggestedActions: [UIMenuElement]) -> UIMenu? {
+        // This UIKit delegate requirement is nonisolated in some iOS SDKs.
+        // UIKit calls it on the main thread. Keep all view/UI work isolated,
+        // while making the protocol entry point explicitly nonisolated.
+        MainActor.assumeIsolated { self.makeNoteEditMenu() }
+    }
+
+    private func makeNoteEditMenu() -> UIMenu? {
+        var actions: [UIMenuElement] = []
+        let selected = selectedNoteText
+        let hasText = !(editor.text ?? "").isEmpty
+        if hasText {
+            actions.append(UIAction(title: "Copy", image: UIImage(systemName: "doc.on.doc"),
+                                    attributes: canUseClipboard ? [] : [.disabled]) { [weak self] _ in
+                self?.copyNote()
+            })
+            if !selected.isEmpty {
+                actions.append(UIAction(title: "Cut", image: UIImage(systemName: "scissors"),
+                                        attributes: canUseClipboard ? [] : [.disabled]) { [weak self] _ in
+                    guard let self else { return }
+                    self.copyNote()
+                    self.type("")
+                })
+            }
+        }
+        actions.append(UIAction(title: "Paste", image: UIImage(systemName: "doc.on.clipboard"),
+                                attributes: canUseClipboard ? [] : [.disabled]) { [weak self] _ in
+            self?.pasteClipboard()
+        })
+        if hasText && editor.selectedRange.length != (editor.text as NSString).length {
+            actions.append(UIAction(title: "Select All") { [weak self] _ in
+                guard let self else { return }
+                self.editor.selectedRange = NSRange(location: 0,
+                                                    length: (self.editor.text as NSString).length)
+                self.updateCaret()
+                self.onTextChange?()
+                self.editMenu.reloadVisibleMenu()
+            })
+        }
+        if hasText {
+            actions.append(UIAction(title: "Insert in App", image: UIImage(systemName: "arrow.up.forward.square")) { [weak self] _ in
+                self?.insertNote()
+            })
+        }
+        if hasText {
+            let erase = UIAction(title: "Erase note (cannot undo)",
+                                 image: UIImage(systemName: "trash"),
+                                 attributes: [.destructive]) { [weak self] _ in
+                guard let self else { return }
+                self.editor.text = ""
+                self.editor.selectedRange = NSRange(location: 0, length: 0)
+                self.save()
+                self.updateCaret()
+                self.onTextChange?()
+            }
+            // A deliberate second menu choice guards against accidental erasure.
+            actions.append(UIMenu(title: "Clear…", image: UIImage(systemName: "trash"),
+                                  children: [erase]))
+        }
+        if !canUseClipboard {
+            actions.append(UIAction(title: "Clipboard needs Full Access",
+                                    attributes: [.disabled]) { _ in })
+        }
+        return UIMenu(children: actions)
+    }
+
+    private func configureTabs() {
+        tabsPanel.axis = .horizontal
+        tabsPanel.alignment = .fill
+        tabsPanel.spacing = 2
+        // Fixed toolbar immediately below the image shelf, so neither
+        // the send arrow nor the page buttons can overlap editable notes.
+        tabsPanel.heightAnchor.constraint(equalToConstant: 32).isActive = true
+        tabsScroller.showsHorizontalScrollIndicator = false
+        tabsScroller.alwaysBounceHorizontal = true
+        tabsScroller.translatesAutoresizingMaskIntoConstraints = false
+        tabsRow.axis = .horizontal
+        tabsRow.spacing = 2
+        tabsRow.translatesAutoresizingMaskIntoConstraints = false
+        tabsScroller.addSubview(tabsRow)
+        NSLayoutConstraint.activate([
+            tabsRow.leadingAnchor.constraint(equalTo: tabsScroller.contentLayoutGuide.leadingAnchor),
+            tabsRow.trailingAnchor.constraint(equalTo: tabsScroller.contentLayoutGuide.trailingAnchor),
+            tabsRow.topAnchor.constraint(equalTo: tabsScroller.contentLayoutGuide.topAnchor),
+            tabsRow.bottomAnchor.constraint(equalTo: tabsScroller.contentLayoutGuide.bottomAnchor),
+            tabsRow.heightAnchor.constraint(equalTo: tabsScroller.frameLayoutGuide.heightAnchor)
+        ])
+        // The keyboard has three permanent page tabs. Extra pages created
+        // earlier remain accessible under the overflow menu, never deleted.
+        morePages.setTitle("⋯", for: .normal)
+        morePages.titleLabel?.font = .systemFont(ofSize: 18, weight: .medium)
+        morePages.widthAnchor.constraint(equalToConstant: 25).isActive = true
+        morePages.showsMenuAsPrimaryAction = true
+        morePages.accessibilityLabel = "Additional scratchpad pages"
+        pasteImageButton.setTitle("Paste", for: .normal)
+        pasteImageButton.titleLabel?.font = .systemFont(ofSize: 11, weight: .semibold)
+        pasteImageButton.accessibilityLabel = "Paste clipboard image onto scratchpad page"
+        pasteImageButton.accessibilityHint = "Paste a picture copied from Photos or another app."
+        pasteImageButton.accessibilityIdentifier = "paste-image-in-keyboard-scratchpad"
+        pasteImageButton.setContentHuggingPriority(.required, for: .horizontal)
+        pasteImageButton.addTarget(self, action: #selector(pasteImageTapped), for: .touchUpInside)
+        pasteImageButton.widthAnchor.constraint(equalToConstant: 46).isActive = true
+        pasteImageButton.heightAnchor.constraint(equalToConstant: 26).isActive = true
+        tabsPanel.addArrangedSubview(tabsScroller)
+        // Send-to-app stays pinned at bottom right; three normal page tabs
+        // scroll only in unusually narrow note panels.
+        // Additional pages appear through a menu rather than more tab clutter.
+        // The tabs scroll horizontally instead of being covered by the arrow.
+        tabsPanel.addArrangedSubview(returnToApp)
+        renderTabs()
+    }
+
+    private func renderTabs() {
+        for item in tabsRow.arrangedSubviews {
+            tabsRow.removeArrangedSubview(item)
+            item.removeFromSuperview()
+        }
+        for (index, page) in notebook.pages.prefix(3).enumerated() {
+            let tab = UIButton(type: .system)
+            tab.tag = index
+            tab.setTitle("\(index + 1)", for: .normal)
+            tab.titleLabel?.font = .systemFont(ofSize: 11, weight: page.id == notebook.selectedID ? .bold : .medium)
+            tab.accessibilityLabel = "Scratchpad page \(index + 1) of \(notebook.pages.count)"
+            tab.accessibilityIdentifier = "scratchpad-tab-\(index + 1)"
+            tab.backgroundColor = page.id == notebook.selectedID
+                ? UIColor.systemBlue.withAlphaComponent(0.18) : UIColor.clear
+            tab.layer.cornerRadius = 4
+            tab.setTitleColor(visualStyle == .standard ? .label : editor.textColor, for: .normal)
+            tab.widthAnchor.constraint(equalToConstant: 24).isActive = true
+            tab.addTarget(self, action: #selector(pageTapped(_:)), for: .touchUpInside)
+            tabsRow.addArrangedSubview(tab)
+        }
+        if notebook.pages.count > 3 {
+            // A non-destructive escape hatch for users who previously made
+            // more than three pages in the companion app.
+            morePages.tintColor = visualStyle == .standard ? .systemBlue : editor.textColor
+            morePages.backgroundColor = notebook.selectedIndex >= 3
+                ? UIColor.systemBlue.withAlphaComponent(0.18) : .clear
+            morePages.menu = UIMenu(title: "Additional pages", children:
+                notebook.pages.enumerated().dropFirst(3).map { _, page in
+                    UIAction(title: "Page \((notebook.pages.firstIndex(where: { $0.id == page.id }) ?? 0) + 1)",
+                             state: page.id == notebook.selectedID ? .on : .off) { [weak self] _ in
+                        self?.switchPage(to: page.id)
+                    }
+                })
+            tabsRow.addArrangedSubview(morePages)
+        }
+        pasteImageButton.tintColor = visualStyle == .standard ? .systemBlue : editor.textColor
+    }
+
+    private func displaySelectedPage() {
+        editor.text = notebook.selectedPage.text
+        editor.selectedRange = NSRange(location: (editor.text as NSString).length, length: 0)
+        editor.setContentOffset(.zero, animated: false)
+        renderTabs()
+        renderImages()
+        updateCaret()
+        onPageChange?()
+        onTextChange?()
+    }
+
+    @objc private func pageTapped(_ sender: UIButton) {
+        guard notebook.pages.indices.contains(sender.tag) else { return }
+        switchPage(to: notebook.pages[sender.tag].id)
+    }
+
+    private func switchPage(to id: String) {
+        guard id != notebook.selectedID,
+              notebook.pages.contains(where: { $0.id == id }) else { return }
+        // Keep the current page's edits and image metadata independent.
+        notebook = ScratchpadStore.selectPage(id: id) ?? notebook
+        notebook.selectedID = id
+        displaySelectedPage()
+    }
+
+    private func configureImageShelf() {
+        imageShelf.showsHorizontalScrollIndicator = false
+        imageShelf.alwaysBounceHorizontal = true
+        imageShelf.translatesAutoresizingMaskIntoConstraints = false
+        // Even with no pictures, show Paste above the numbered page tabs.
+        // The empty shelf is only 28 pt tall; with pictures it grows to 45.
+        imageShelf.isHidden = false
+        let height = imageShelf.heightAnchor.constraint(equalToConstant: 28)
+        imageShelfHeight = height
+        // UIStackView collapses this arranged view entirely when no images
+        // exist. A non-required height avoids an Auto Layout conflict.
+        height.priority = .defaultHigh
+        height.isActive = true
+
+        imageRow.axis = .horizontal
+        imageRow.alignment = .center
+        imageRow.spacing = 4
+        imageRow.translatesAutoresizingMaskIntoConstraints = false
+        imageShelf.addSubview(imageRow)
+        NSLayoutConstraint.activate([
+            imageRow.leadingAnchor.constraint(equalTo: imageShelf.contentLayoutGuide.leadingAnchor, constant: 2),
+            imageRow.trailingAnchor.constraint(equalTo: imageShelf.contentLayoutGuide.trailingAnchor, constant: -2),
+            imageRow.topAnchor.constraint(equalTo: imageShelf.contentLayoutGuide.topAnchor),
+            imageRow.bottomAnchor.constraint(equalTo: imageShelf.contentLayoutGuide.bottomAnchor),
+            imageRow.heightAnchor.constraint(equalTo: imageShelf.frameLayoutGuide.heightAnchor)
+        ])
+        renderImages()
+    }
+
+    private func renderImages() {
+        for child in imageRow.arrangedSubviews {
+            imageRow.removeArrangedSubview(child)
+            child.removeFromSuperview()
+        }
+        let images = notebook.selectedPage.images
+        imageShelfHeight?.constant = images.isEmpty ? 28 : 45
+        pasteImageButton.setTitleColor(visualStyle == .standard ? .systemBlue : editor.textColor,
+                                       for: .normal)
+        imageRow.addArrangedSubview(pasteImageButton)
+        for (index, image) in images.enumerated() {
+            let button = UIButton(type: .custom)
+            button.tag = index
+            button.backgroundColor = .tertiarySystemFill
+            button.layer.cornerRadius = 6
+            button.clipsToBounds = true
+            button.accessibilityLabel = "Copy scratchpad photo \(index + 1). Hold to preview."
+            button.accessibilityIdentifier = "copy-scratchpad-image-\(index + 1)"
+            button.imageView?.contentMode = .scaleAspectFill
+            button.contentHorizontalAlignment = .fill
+            button.contentVerticalAlignment = .fill
+            if let url = ScratchpadImageStore.imageURL(id: image.id, thumbnail: true),
+               let photo = UIImage(contentsOfFile: url.path) {
+                button.setImage(photo, for: .normal)
+            } else {
+                button.setImage(UIImage(systemName: "photo"), for: .normal)
+                button.tintColor = .secondaryLabel
+            }
+            button.widthAnchor.constraint(equalToConstant: 42).isActive = true
+            button.heightAnchor.constraint(equalToConstant: 42).isActive = true
+            button.addTarget(self, action: #selector(imageTapped(_:)), for: .touchUpInside)
+            let hold = UILongPressGestureRecognizer(target: self, action: #selector(imageHeld(_:)))
+            hold.minimumPressDuration = 0.5
+            button.addGestureRecognizer(hold)
+            imageRow.addArrangedSubview(button)
+        }
+        imageShelf.setContentOffset(.zero, animated: false)
+    }
+
+    @objc private func imageTapped(_ sender: UIButton) {
+        guard notebook.selectedPage.images.indices.contains(sender.tag) else { return }
+        guard canUseClipboard else {
+            inform("Enable Full Access to copy photos")
+            return
+        }
+        let image = notebook.selectedPage.images[sender.tag]
+        guard let url = ScratchpadImageStore.imageURL(id: image.id),
+              let photo = UIImage(contentsOfFile: url.path) else {
+            inform("Photo file unavailable")
+            return
+        }
+        UIPasteboard.general.image = photo
+        inform("Photo copied · Paste in app")
+    }
+
+    @objc private func imageHeld(_ gesture: UILongPressGestureRecognizer) {
+        guard gesture.state == .began,
+              let button = gesture.view as? UIButton,
+              notebook.selectedPage.images.indices.contains(button.tag) else { return }
+        showPhotoPreview(notebook.selectedPage.images[button.tag])
+    }
+
+    private func showPhotoPreview(_ reference: ScratchpadImage) {
+        guard let url = ScratchpadImageStore.imageURL(id: reference.id),
+              let photo = UIImage(contentsOfFile: url.path) else {
+            inform("Photo file unavailable")
+            return
+        }
+        activeImagePreview?.removeFromSuperview()
+        let overlay = UIView()
+        overlay.backgroundColor = UIColor(white: 0.035, alpha: 0.98)
+        overlay.layer.cornerRadius = 6
+        overlay.translatesAutoresizingMaskIntoConstraints = false
+        let image = UIImageView(image: photo)
+        image.contentMode = .scaleAspectFit
+        image.translatesAutoresizingMaskIntoConstraints = false
+        let done = UIButton(type: .system)
+        done.setTitle("Done", for: .normal)
+        done.tintColor = .white
+        done.titleLabel?.font = .systemFont(ofSize: 14, weight: .semibold)
+        done.accessibilityLabel = "Close image preview"
+        done.addTarget(self, action: #selector(dismissPhotoPreview), for: .touchUpInside)
+        done.translatesAutoresizingMaskIntoConstraints = false
+        overlay.addSubview(image)
+        overlay.addSubview(done)
+        addSubview(overlay)
+        NSLayoutConstraint.activate([
+            overlay.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 3),
+            overlay.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -3),
+            overlay.topAnchor.constraint(equalTo: topAnchor, constant: 3),
+            overlay.bottomAnchor.constraint(equalTo: bottomAnchor, constant: -3),
+            done.topAnchor.constraint(equalTo: overlay.topAnchor),
+            done.trailingAnchor.constraint(equalTo: overlay.trailingAnchor),
+            done.widthAnchor.constraint(equalToConstant: 52),
+            done.heightAnchor.constraint(equalToConstant: 32),
+            image.leadingAnchor.constraint(equalTo: overlay.leadingAnchor, constant: 5),
+            image.trailingAnchor.constraint(equalTo: overlay.trailingAnchor, constant: -5),
+            image.topAnchor.constraint(equalTo: done.bottomAnchor),
+            image.bottomAnchor.constraint(equalTo: overlay.bottomAnchor, constant: -4)
+        ])
+        activeImagePreview = overlay
+    }
+
+    @objc private func dismissPhotoPreview() {
+        activeImagePreview?.removeFromSuperview()
+        activeImagePreview = nil
+    }
+
+    @objc private func returnToAppTapped() { insertNote() }
+
+    private func inform(_ text: String) {
+        message.text = text
+        message.isHidden = false
+    }
+
+    /// Paste uses the normal note edit menu as well as the bottom Paste
+    /// control. An image goes to the shelf; text still edits the text view.
+    @objc private func pasteClipboard() {
+        guard canUseClipboard else {
+            inform("Enable Full Access to paste")
+            return
+        }
+        if let image = UIPasteboard.general.image {
+            savePastedImage(image)
+            return
+        }
+        guard let value = UIPasteboard.general.string, !value.isEmpty else {
+            inform("Clipboard has no text or image")
+            return
+        }
+        activate()
+        message.isHidden = true
+        type(value)
+    }
+
+    @objc private func pasteImageTapped() {
+        guard canUseClipboard else {
+            inform("Allow Full Access to paste copied photos")
+            return
+        }
+        guard let image = UIPasteboard.general.image else {
+            inform("Copy an image in Photos, then tap Paste")
+            return
+        }
+        savePastedImage(image)
+    }
+
+    private func savePastedImage(_ image: UIImage) {
+        do {
+            // App Group writes can fail when Full Access isn't granted.
+            let updated = try ScratchpadImageStore.addImage(
+                pageID: notebook.selectedID, from: image)
+            notebook = updated
+            renderImages()
+            inform("Image added to page \(updated.selectedIndex + 1)")
+        } catch {
+            inform(error.localizedDescription)
+        }
+    }
+
+    @objc private func copyNote() {
+        guard canUseClipboard else {
+            inform("Enable Full Access to copy")
+            return
+        }
+        let value = selectedNoteText.isEmpty ? editor.text ?? "" : selectedNoteText
+        guard !value.isEmpty else { return }
+        UIPasteboard.general.string = value
+        inform("Copied")
+    }
+
+    @objc private func insertNote() {
+        let value = selectedNoteText.isEmpty ? editor.text ?? "" : selectedNoteText
+        guard !value.isEmpty else { return }
+        deactivate()
+        onInsert?(value)
+    }
+
+    @objc private func clearNoteOnHold(_ gesture: UILongPressGestureRecognizer) {
+        guard gesture.state == .began else { return }
+        editor.text = ""
+        editor.selectedRange = NSRange(location: 0, length: 0)
+        save()
+        onTextChange?()
+        inform("Note cleared")
+    }
+
+    /// Refresh after the containing app edits the shared note.
+    /// Do not silently overwrite an active selection or in-progress note edit.
+    func reloadSharedNote() {
+        guard !isEditingNote, let shared = ScratchpadStore.loadNotebook(),
+              shared != notebook || shared.selectedPage.text != editor.text else { return }
+        notebook = shared
+        let text = shared.selectedPage.text
+        editor.text = text
+        editor.selectedRange = NSRange(location: (text as NSString).length, length: 0)
+        renderTabs()
+        renderImages()
+        updateCaret()
+        onTextChange?()
+    }
+
+    private func save() {
+        let pageID = notebook.selectedID
+        if let index = notebook.pages.firstIndex(where: { $0.id == pageID }) {
+            notebook.pages[index].text = editor.text ?? ""
+        }
+        // Preserve the legacy extension-local backup for page 1 only.
+        if notebook.selectedID == notebook.pages.first?.id {
+            UserDefaults.standard.set(editor.text, forKey: storeKey)
+        }
+        _ = ScratchpadStore.savePage(id: pageID, text: editor.text ?? "")
+    }
+}

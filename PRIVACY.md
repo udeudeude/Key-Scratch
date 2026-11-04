@@ -1,5 +1,7 @@
 # Privacy policy
 
+> Key Scratch is a modified fork of Ortholinear. The following additional rules describe the fork's local scratchpad and optional clipboard access.
+
 Effective October 6, 2026.
 
 Ortholinear is an on-device Ukrainian and English keyboard for iPhone and iPad, with optional layouts for other European languages, maintained by Igor Varyvoda.
@@ -24,9 +26,15 @@ Layout and setup files are created only when you choose to share one, and go whe
 
 Ortholinear Pro is a one-time in-app purchase handled by Apple. When you buy or restore it, the app talks to the App Store through Apple's StoreKit; Apple processes the payment under its own privacy policy. The developer does not receive your name, Apple Account or payment details. The app keeps only whether Pro is unlocked, on your device.
 
-## No tracking or Full Access
+## Key Scratch notes and clipboard access
 
-The app and keyboard include no analytics, advertising, accounts, or tracking SDKs. The keyboard does not request Full Access and makes no network requests. The app's only network use is the App Store for purchases, as described above.
+Key Scratch stores independent scratchpad pages locally on this iPhone in its private App Group container. The companion app offers full-size per-page editing and explicit Share/Export actions. Earlier single-page notes are migrated intact into Page 1 and an older backup remains in local storage. Pages do not record what you type into other apps, and they are not transmitted to a server. Deleting the app may remove them, so exporting important text is recommended.
+
+**Optional photographs:** Key Scratch stores pictures only after you explicitly select them in Apple's Photos picker or choose **Paste**/**Paste image** on a scratchpad page after copying an image in another app. They are locally downscaled to at most 1,200 pixels with a separate 180-pixel thumbnail, then saved as JPEG files in the private App Group container. The original photographs in Photos are not modified or deleted. A page can hold at most 12 images. In the keyboard, tapping a thumbnail copies its associated image to the clipboard **only when Allow Full Access is enabled**. You can then paste it into an app that accepts images. Removing an image or deleting its page deletes the stored Key Scratch copies. Pictures are never uploaded or transmitted by Key Scratch.
+
+Key Scratch requests eligibility for Apple's optional **Allow Full Access** permission for clipboard actions and writing the shared App Group note. Without that permission the keyboard continues to type and its extension-local notes still work, but clipboard operations and reliable note sharing with the companion app are unavailable. When permission is enabled, the keyboard reads the clipboard only after an explicit Paste action (text or image) and writes to it only when you choose Copy, Cut or tap an image thumbnail to copy it. The companion app's native editor also offers text selection, Copy All, and Share/Export. Key Scratch does not upload clipboard contents or keystrokes and the keyboard extension has no network transmission code.
+
+The app and keyboard include no added analytics, advertising, accounts, or tracking SDKs. The underlying Ortholinear app retains its original optional in-app purchase and Apple StoreKit behavior.
 
 ## External links and support
 
