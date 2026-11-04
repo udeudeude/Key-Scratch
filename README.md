@@ -18,12 +18,12 @@ A custom iPhone keyboard with an always-visible, editable scratchpad. Built from
 
 ## Install and test on iPhone
 
-The development branch is `feature/scratchpad-first-pass`; don't merge it until on-device testing passes.
+The scratchpad implementation is merged into `main` following successful iPhone testing.
 
 For a Mac folder that already contains the signed Xcode project, run these commands **from that folder**:
 
 ```sh
-curl -fL https://raw.githubusercontent.com/udeudeude/Key-Scratch/feature/scratchpad-first-pass/tools/update-device.sh -o update-key-scratch.sh
+curl -fL https://raw.githubusercontent.com/udeudeude/Key-Scratch/main/tools/update-device.sh -o update-key-scratch.sh
 sh update-key-scratch.sh
 ```
 
