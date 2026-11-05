@@ -853,7 +853,7 @@ final class ScratchpadView: UIView, UITextViewDelegate, UIEditMenuInteractionDel
         inform("Photo copied · Paste in app")
     }
 
-     private func showPhotoPreview(_ reference: ScratchpadImage) {
+    private func showPhotoPreview(_ reference: ScratchpadImage) {
         guard let url = ScratchpadImageStore.imageURL(id: reference.id),
               let photo = UIImage(contentsOfFile: url.path) else {
             inform("Photo file unavailable")
