@@ -38,6 +38,8 @@ final class ScratchpadView: UIView, UITextViewDelegate, UIEditMenuInteractionDel
     private let tabsRow = UIStackView()
     private let morePages = UIButton(type: .system)
     private let pasteImageButton = UIButton(type: .system)
+    private let importPhotoGlyph = UIImageView(image: UIImage(systemName: "photo"))
+    private let importDownGlyph = UIImageView(image: UIImage(systemName: "arrow.down"))
     private let imageShelf = UIScrollView()
     private var imageShelfHeight: NSLayoutConstraint?
     private let imageRow = UIStackView()
@@ -644,15 +646,31 @@ final class ScratchpadView: UIView, UITextViewDelegate, UIEditMenuInteractionDel
         morePages.widthAnchor.constraint(equalToConstant: 25).isActive = true
         morePages.showsMenuAsPrimaryAction = true
         morePages.accessibilityLabel = "Additional scratchpad pages"
-        pasteImageButton.setTitle("Paste", for: .normal)
-        pasteImageButton.titleLabel?.font = .systemFont(ofSize: 11, weight: .semibold)
-        pasteImageButton.accessibilityLabel = "Paste clipboard image onto scratchpad page"
-        pasteImageButton.accessibilityHint = "Paste a picture copied from Photos or another app."
+        // A compact image-above-down-arrow glyph replaces the ambiguous
+        // "Paste" text. It always IMPORTS a copied image onto this page.
+        pasteImageButton.accessibilityLabel = "Import copied image into this scratchpad page"
+        pasteImageButton.accessibilityHint = "Copies a picture from the clipboard into this page's image shelf."
         pasteImageButton.accessibilityIdentifier = "paste-image-in-keyboard-scratchpad"
         pasteImageButton.setContentHuggingPriority(.required, for: .horizontal)
+        for glyph in [importPhotoGlyph, importDownGlyph] {
+            glyph.contentMode = .scaleAspectFit
+            glyph.isUserInteractionEnabled = false
+            glyph.translatesAutoresizingMaskIntoConstraints = false
+            pasteImageButton.addSubview(glyph)
+        }
+        NSLayoutConstraint.activate([
+            importPhotoGlyph.centerXAnchor.constraint(equalTo: pasteImageButton.centerXAnchor),
+            importPhotoGlyph.topAnchor.constraint(equalTo: pasteImageButton.topAnchor, constant: 1),
+            importPhotoGlyph.widthAnchor.constraint(equalToConstant: 19),
+            importPhotoGlyph.heightAnchor.constraint(equalToConstant: 15),
+            importDownGlyph.centerXAnchor.constraint(equalTo: pasteImageButton.centerXAnchor),
+            importDownGlyph.topAnchor.constraint(equalTo: importPhotoGlyph.bottomAnchor, constant: -1),
+            importDownGlyph.widthAnchor.constraint(equalToConstant: 12),
+            importDownGlyph.heightAnchor.constraint(equalToConstant: 11)
+        ])
         pasteImageButton.addTarget(self, action: #selector(pasteImageTapped), for: .touchUpInside)
-        pasteImageButton.widthAnchor.constraint(equalToConstant: 46).isActive = true
-        pasteImageButton.heightAnchor.constraint(equalToConstant: 26).isActive = true
+        pasteImageButton.widthAnchor.constraint(equalToConstant: 30).isActive = true
+        pasteImageButton.heightAnchor.constraint(equalToConstant: 28).isActive = true
         tabsPanel.addArrangedSubview(tabsScroller)
         // Send-to-app stays pinned at bottom right; three normal page tabs
         // scroll only in unusually narrow note panels.
@@ -729,7 +747,7 @@ final class ScratchpadView: UIView, UITextViewDelegate, UIEditMenuInteractionDel
         imageShelf.showsHorizontalScrollIndicator = false
         imageShelf.alwaysBounceHorizontal = true
         imageShelf.translatesAutoresizingMaskIntoConstraints = false
-        // Even with no pictures, show Paste above the numbered page tabs.
+        // Even with no pictures, show the image-import icon above the page tabs.
         // The empty shelf is only 28 pt tall; with pictures it grows to 45.
         imageShelf.isHidden = false
         let height = imageShelf.heightAnchor.constraint(equalToConstant: 28)
@@ -761,8 +779,7 @@ final class ScratchpadView: UIView, UITextViewDelegate, UIEditMenuInteractionDel
         }
         let images = notebook.selectedPage.images
         imageShelfHeight?.constant = images.isEmpty ? 28 : 45
-        pasteImageButton.setTitleColor(visualStyle == .standard ? .systemBlue : editor.textColor,
-                                       for: .normal)
+        pasteImageButton.tintColor = visualStyle == .standard ? .systemBlue : editor.textColor
         imageRow.addArrangedSubview(pasteImageButton)
         for (index, image) in images.enumerated() {
             let button = UIButton(type: .custom)
@@ -770,7 +787,7 @@ final class ScratchpadView: UIView, UITextViewDelegate, UIEditMenuInteractionDel
             button.backgroundColor = .tertiarySystemFill
             button.layer.cornerRadius = 6
             button.clipsToBounds = true
-            button.accessibilityLabel = "Copy scratchpad photo \(index + 1). Hold to preview."
+            button.accessibilityLabel = "Copy scratchpad photo \(index + 1). Hold to preview. Use the X button to remove."
             button.accessibilityIdentifier = "copy-scratchpad-image-\(index + 1)"
             button.imageView?.contentMode = .scaleAspectFill
             button.contentHorizontalAlignment = .fill
@@ -782,15 +799,61 @@ final class ScratchpadView: UIView, UITextViewDelegate, UIEditMenuInteractionDel
                 button.setImage(UIImage(systemName: "photo"), for: .normal)
                 button.tintColor = .secondaryLabel
             }
-            button.widthAnchor.constraint(equalToConstant: 42).isActive = true
-            button.heightAnchor.constraint(equalToConstant: 42).isActive = true
+            button.translatesAutoresizingMaskIntoConstraints = false
             button.addTarget(self, action: #selector(imageTapped(_:)), for: .touchUpInside)
             let hold = UILongPressGestureRecognizer(target: self, action: #selector(imageHeld(_:)))
             hold.minimumPressDuration = 0.5
             button.addGestureRecognizer(hold)
-            imageRow.addArrangedSubview(button)
+
+            // An always-visible X gives removal a discoverable entry point.
+            // The second tap, on a destructive menu item, confirms deletion.
+            // Capture the page and image IDs so the wrong page can't be edited.
+            let tile = UIView()
+            tile.translatesAutoresizingMaskIntoConstraints = false
+            tile.addSubview(button)
+            let remove = UIButton(type: .system)
+            remove.translatesAutoresizingMaskIntoConstraints = false
+            remove.setImage(UIImage(systemName: "xmark.circle.fill"), for: .normal)
+            remove.tintColor = .white
+            remove.backgroundColor = UIColor.black.withAlphaComponent(0.7)
+            remove.layer.cornerRadius = 11
+            remove.accessibilityLabel = "Remove scratchpad image \(index + 1)"
+            remove.accessibilityIdentifier = "remove-scratchpad-image-\(index + 1)"
+            let imageID = image.id
+            let pageID = notebook.selectedID
+            remove.menu = UIMenu(title: "Remove this image?", children: [
+                UIAction(title: "Remove from page", image: UIImage(systemName: "trash"),
+                         attributes: .destructive) { [weak self] _ in
+                    self?.removeImage(id: imageID, from: pageID)
+                }
+            ])
+            remove.showsMenuAsPrimaryAction = true
+            tile.addSubview(remove)
+            NSLayoutConstraint.activate([
+                tile.widthAnchor.constraint(equalToConstant: 42),
+                tile.heightAnchor.constraint(equalToConstant: 42),
+                button.leadingAnchor.constraint(equalTo: tile.leadingAnchor),
+                button.trailingAnchor.constraint(equalTo: tile.trailingAnchor),
+                button.topAnchor.constraint(equalTo: tile.topAnchor),
+                button.bottomAnchor.constraint(equalTo: tile.bottomAnchor),
+                remove.topAnchor.constraint(equalTo: tile.topAnchor),
+                remove.trailingAnchor.constraint(equalTo: tile.trailingAnchor),
+                remove.widthAnchor.constraint(equalToConstant: 22),
+                remove.heightAnchor.constraint(equalToConstant: 22)
+            ])
+            imageRow.addArrangedSubview(tile)
         }
         imageShelf.setContentOffset(.zero, animated: false)
+    }
+
+    private func removeImage(id: String, from pageID: String) {
+        guard let updated = ScratchpadImageStore.removeImage(pageID: pageID, id: id) else {
+            inform("Could not remove this image")
+            return
+        }
+        notebook = updated
+        renderImages()
+        inform("Image removed from this page")
     }
 
     @objc private func imageTapped(_ sender: UIButton) {
@@ -869,8 +932,8 @@ final class ScratchpadView: UIView, UITextViewDelegate, UIEditMenuInteractionDel
         message.isHidden = false
     }
 
-    /// Paste uses the normal note edit menu as well as the bottom Paste
-    /// control. An image goes to the shelf; text still edits the text view.
+    /// Paste uses the normal note edit menu; the small shelf import icon
+    /// accepts images only. Text pasted from the edit menu edits the note.
     @objc private func pasteClipboard() {
         guard canUseClipboard else {
             inform("Enable Full Access to paste")
@@ -895,7 +958,7 @@ final class ScratchpadView: UIView, UITextViewDelegate, UIEditMenuInteractionDel
             return
         }
         guard let image = UIPasteboard.general.image else {
-            inform("Copy an image in Photos, then tap Paste")
+            inform("Copy an image in Photos, then tap the image import icon")
             return
         }
         savePastedImage(image)

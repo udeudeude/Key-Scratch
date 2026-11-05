@@ -841,6 +841,9 @@ private struct KeyScratchFullNotes: View {
     @State private var showDeleteConfirmation = false
     @State private var pickedPhotos: [PhotosPickerItem] = []
     @State private var photoPreview: ScratchpadImage?
+    @State private var photoPendingRemoval: ScratchpadImage?
+    @State private var imageRemovalPageID: String?
+    @State private var showImageRemovalConfirmation = false
     @State private var importingPhotos = false
     @State private var notice: String?
     @FocusState private var focused: Bool
@@ -946,13 +949,27 @@ private struct KeyScratchFullNotes: View {
                                         copyImage(photo)
                                     }
                                     Button("Remove from page", systemImage: "trash", role: .destructive) {
-                                        removeImage(photo)
+                                        confirmImageRemoval(photo)
                                     }
+                                }
+                                .overlay(alignment: .topTrailing) {
+                                    Button(role: .destructive) {
+                                        confirmImageRemoval(photo)
+                                    } label: {
+                                        Image(systemName: "xmark.circle.fill")
+                                            .font(.system(size: 20))
+                                            .symbolRenderingMode(.palette)
+                                            .foregroundStyle(.white, .black.opacity(0.85))
+                                            .padding(3)
+                                    }
+                                    .buttonStyle(.plain)
+                                    .accessibilityLabel("Remove scratchpad image")
+                                    .accessibilityIdentifier("remove-companion-scratchpad-image-\(photo.id)")
                                 }
                             }
                         }
                     }
-                    Text("Tap an image to preview or copy it. Hold an image to remove it.")
+                    Text("Tap an image to preview or copy it. Tap its X to remove it, or hold for more options.")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
@@ -1062,6 +1079,23 @@ private struct KeyScratchFullNotes: View {
                 notice = "Open the updated Key Scratch keyboard once to import your existing note, then reopen this editor."
             }
         }
+        .confirmationDialog("Remove this image from the page?",
+                            isPresented: $showImageRemovalConfirmation,
+                            titleVisibility: .visible) {
+            Button("Remove image", role: .destructive) {
+                if let photoPendingRemoval, let imageRemovalPageID {
+                    removeImage(photoPendingRemoval, from: imageRemovalPageID)
+                }
+                photoPendingRemoval = nil
+                imageRemovalPageID = nil
+            }
+            Button("Cancel", role: .cancel) {
+                photoPendingRemoval = nil
+                imageRemovalPageID = nil
+            }
+        } message: {
+            Text("The saved image and thumbnail will be deleted from Key Scratch. Your original photo is unaffected.")
+        }
         .confirmationDialog("Clear this page?", isPresented: $showClearConfirmation,
                             titleVisibility: .visible) {
             Button("Erase page text", role: .destructive) { editableNote.wrappedValue = "" }
@@ -1168,9 +1202,15 @@ private struct KeyScratchFullNotes: View {
         notice = "Image copied. Paste into an app that accepts pictures."
     }
 
-    private func removeImage(_ photo: ScratchpadImage) {
+    private func confirmImageRemoval(_ photo: ScratchpadImage) {
+        photoPendingRemoval = photo
+        imageRemovalPageID = notebook.selectedID
+        showImageRemovalConfirmation = true
+    }
+
+    private func removeImage(_ photo: ScratchpadImage, from pageID: String) {
         guard let updated = ScratchpadImageStore.removeImage(
-            pageID: notebook.selectedID, id: photo.id) else {
+            pageID: pageID, id: photo.id) else {
             notice = "Could not remove this image."
             return
         }
