@@ -787,7 +787,7 @@ final class ScratchpadView: UIView, UITextViewDelegate, UIEditMenuInteractionDel
             button.backgroundColor = .tertiarySystemFill
             button.layer.cornerRadius = 6
             button.clipsToBounds = true
-            button.accessibilityLabel = "Copy scratchpad photo \(index + 1). Hold to preview. Use the X button to remove."
+            button.accessibilityLabel = "Copy scratchpad photo \(index + 1). Hold for preview and removal options."
             button.accessibilityIdentifier = "copy-scratchpad-image-\(index + 1)"
             button.imageView?.contentMode = .scaleAspectFill
             button.contentHorizontalAlignment = .fill
@@ -799,49 +799,30 @@ final class ScratchpadView: UIView, UITextViewDelegate, UIEditMenuInteractionDel
                 button.setImage(UIImage(systemName: "photo"), for: .normal)
                 button.tintColor = .secondaryLabel
             }
-            button.translatesAutoresizingMaskIntoConstraints = false
+            button.widthAnchor.constraint(equalToConstant: 42).isActive = true
+            button.heightAnchor.constraint(equalToConstant: 42).isActive = true
             button.addTarget(self, action: #selector(imageTapped(_:)), for: .touchUpInside)
-            let hold = UILongPressGestureRecognizer(target: self, action: #selector(imageHeld(_:)))
-            hold.minimumPressDuration = 0.5
-            button.addGestureRecognizer(hold)
 
-            // An always-visible X gives removal a discoverable entry point.
-            // The second tap, on a destructive menu item, confirms deletion.
-            // Capture the page and image IDs so the wrong page can't be edited.
-            let tile = UIView()
-            tile.translatesAutoresizingMaskIntoConstraints = false
-            tile.addSubview(button)
-            let remove = UIButton(type: .system)
-            remove.translatesAutoresizingMaskIntoConstraints = false
-            remove.setImage(UIImage(systemName: "xmark.circle.fill"), for: .normal)
-            remove.tintColor = .white
-            remove.backgroundColor = UIColor.black.withAlphaComponent(0.7)
-            remove.layer.cornerRadius = 11
-            remove.accessibilityLabel = "Remove scratchpad image \(index + 1)"
-            remove.accessibilityIdentifier = "remove-scratchpad-image-\(index + 1)"
+            // UIKit displays this menu on a long press. Ordinary taps still copy.
+            // A nested destructive submenu keeps removal deliberate while leaving
+            // the thumbnail completely unobscured.
+            let reference = image
             let imageID = image.id
             let pageID = notebook.selectedID
-            remove.menu = UIMenu(title: "Remove this image?", children: [
-                UIAction(title: "Remove from page", image: UIImage(systemName: "trash"),
-                         attributes: .destructive) { [weak self] _ in
-                    self?.removeImage(id: imageID, from: pageID)
-                }
+            button.menu = UIMenu(children: [
+                UIAction(title: "Preview image", image: UIImage(systemName: "eye")) { [weak self] _ in
+                    self?.showPhotoPreview(reference)
+                },
+                UIMenu(title: "Remove image…", image: UIImage(systemName: "trash"),
+                       options: .destructive, children: [
+                    UIAction(title: "Confirm removal", image: UIImage(systemName: "trash"),
+                             attributes: .destructive) { [weak self] _ in
+                        self?.removeImage(id: imageID, from: pageID)
+                    }
+                ])
             ])
-            remove.showsMenuAsPrimaryAction = true
-            tile.addSubview(remove)
-            NSLayoutConstraint.activate([
-                tile.widthAnchor.constraint(equalToConstant: 42),
-                tile.heightAnchor.constraint(equalToConstant: 42),
-                button.leadingAnchor.constraint(equalTo: tile.leadingAnchor),
-                button.trailingAnchor.constraint(equalTo: tile.trailingAnchor),
-                button.topAnchor.constraint(equalTo: tile.topAnchor),
-                button.bottomAnchor.constraint(equalTo: tile.bottomAnchor),
-                remove.topAnchor.constraint(equalTo: tile.topAnchor),
-                remove.trailingAnchor.constraint(equalTo: tile.trailingAnchor),
-                remove.widthAnchor.constraint(equalToConstant: 22),
-                remove.heightAnchor.constraint(equalToConstant: 22)
-            ])
-            imageRow.addArrangedSubview(tile)
+            button.showsMenuAsPrimaryAction = false
+            imageRow.addArrangedSubview(button)
         }
         imageShelf.setContentOffset(.zero, animated: false)
     }
@@ -872,14 +853,7 @@ final class ScratchpadView: UIView, UITextViewDelegate, UIEditMenuInteractionDel
         inform("Photo copied · Paste in app")
     }
 
-    @objc private func imageHeld(_ gesture: UILongPressGestureRecognizer) {
-        guard gesture.state == .began,
-              let button = gesture.view as? UIButton,
-              notebook.selectedPage.images.indices.contains(button.tag) else { return }
-        showPhotoPreview(notebook.selectedPage.images[button.tag])
-    }
-
-    private func showPhotoPreview(_ reference: ScratchpadImage) {
+     private func showPhotoPreview(_ reference: ScratchpadImage) {
         guard let url = ScratchpadImageStore.imageURL(id: reference.id),
               let photo = UIImage(contentsOfFile: url.path) else {
             inform("Photo file unavailable")

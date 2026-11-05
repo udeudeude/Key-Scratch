@@ -945,6 +945,9 @@ private struct KeyScratchFullNotes: View {
                                 .buttonStyle(.plain)
                                 .accessibilityLabel("Preview scratchpad image")
                                 .contextMenu {
+                                    Button("Preview image", systemImage: "eye") {
+                                        photoPreview = photo
+                                    }
                                     Button("Copy image", systemImage: "doc.on.doc") {
                                         copyImage(photo)
                                     }
@@ -952,24 +955,10 @@ private struct KeyScratchFullNotes: View {
                                         confirmImageRemoval(photo)
                                     }
                                 }
-                                .overlay(alignment: .topTrailing) {
-                                    Button(role: .destructive) {
-                                        confirmImageRemoval(photo)
-                                    } label: {
-                                        Image(systemName: "xmark.circle.fill")
-                                            .font(.system(size: 20))
-                                            .symbolRenderingMode(.palette)
-                                            .foregroundStyle(.white, .black.opacity(0.85))
-                                            .padding(3)
-                                    }
-                                    .buttonStyle(.plain)
-                                    .accessibilityLabel("Remove scratchpad image")
-                                    .accessibilityIdentifier("remove-companion-scratchpad-image-\(photo.id)")
-                                }
                             }
                         }
                     }
-                    Text("Tap an image to preview or copy it. Tap its X to remove it, or hold for more options.")
+                    Text("Tap an image to preview it. Hold for Copy and Remove from page.")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
