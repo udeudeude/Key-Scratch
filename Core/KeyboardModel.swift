@@ -448,19 +448,35 @@ enum KeyboardLayout {
     static func letterAlternatives(_ character: Character, language: KeyboardLanguage,
                                    preferences: KeyboardPreferences) -> [String] {
         switch (language, character) {
-        // English uses the same iOS-style long-press diacritics as other languages.
+        // English long-press forms: familiar accents first, followed by
+        // scholarly/phonetic forms and Unicode super-/subscript letters.
+        // Keep the existing first choices stable for muscle memory.
         case (.english, "a"): ["à", "á", "â", "ä", "æ", "ã", "å", "ā", "ą"]
-        case (.english, "e"): ["è", "é", "ê", "ë", "ē", "ė", "ę"]
-        case (.english, "i"): ["ì", "í", "î", "ï", "ī", "į"]
-        case (.english, "o"): ["ò", "ó", "ô", "ö", "œ", "ø", "ō", "õ"]
-        case (.english, "u"): ["ù", "ú", "û", "ü", "ū"]
-        case (.english, "c"): ["ç", "ć", "č"]
-        case (.english, "n"): ["ñ", "ń"]
-        case (.english, "s"): ["ß", "ś", "š"]
-        case (.english, "y"): ["ÿ", "ý"]
-        case (.english, "z"): ["ž", "ź", "ż"]
-        case (.english, "d"): ["ð"]
-        case (.english, "t"): ["þ"]
+        case (.english, "b"): ["ḃ", "ḅ", "ɓ", "ᵇ"]
+        case (.english, "c"): ["ç", "ć", "č", "ĉ", "ċ", "ᶜ"]
+        case (.english, "d"): ["ð", "ď", "đ", "ḋ", "ḍ", "ᵈ"]
+        case (.english, "e"): ["è", "é", "ê", "ë", "ē", "ė", "ę", "ᵉ", "ₑ"]
+        case (.english, "f"): ["ƒ", "ḟ", "ᶠ"]
+        case (.english, "g"): ["ğ", "ĝ", "ġ", "ģ", "ǧ", "ᵍ"]
+        case (.english, "h"): ["ĥ", "ħ", "ḥ", "ḧ", "ʰ", "ₕ"]
+        case (.english, "i"): ["ì", "í", "î", "ï", "ī", "į", "ⁱ", "ᵢ"]
+        case (.english, "j"): ["ĵ", "ǰ", "ʲ", "ⱼ"]
+        case (.english, "k"): ["ķ", "ǩ", "ḳ", "ᵏ", "ₖ"]
+        case (.english, "l"): ["ł", "ľ", "ĺ", "ļ", "ḷ", "ˡ", "ₗ"]
+        case (.english, "m"): ["ṁ", "ṃ", "ᵐ", "ₘ"]
+        case (.english, "n"): ["ñ", "ń", "ň", "ņ", "ṅ", "ṇ", "ŋ", "ⁿ", "ₙ"]
+        case (.english, "o"): ["ò", "ó", "ô", "ö", "œ", "ø", "ō", "õ", "ᵒ", "ₒ"]
+        case (.english, "p"): ["ṕ", "ṗ", "ᵖ", "ₚ"]
+        case (.english, "q"): ["ɋ", "ʠ"]
+        case (.english, "r"): ["ŕ", "ř", "ŗ", "ṙ", "ṛ", "ʳ", "ᵣ"]
+        case (.english, "s"): ["ß", "ś", "š", "ş", "ŝ", "ṣ", "ˢ", "ₛ"]
+        case (.english, "t"): ["þ", "ť", "ţ", "ṭ", "ŧ", "ᵗ", "ₜ"]
+        case (.english, "u"): ["ù", "ú", "û", "ü", "ū", "ů", "ű", "ᵘ", "ᵤ"]
+        case (.english, "v"): ["ṽ", "ṿ", "ʋ", "ᵛ", "ᵥ"]
+        case (.english, "w"): ["ŵ", "ẁ", "ẃ", "ẅ", "ẉ", "ʷ"]
+        case (.english, "x"): ["ẋ", "ẍ", "ˣ", "ₓ", "×"]
+        case (.english, "y"): ["ÿ", "ý", "ŷ", "ẏ", "ʸ"]
+        case (.english, "z"): ["ž", "ź", "ż", "ẑ", "ẓ", "ᶻ"]
         // Only Ukrainian has ґ; Russian and Serbian г must not offer it.
         case (.ukrainian, "г"): ["ґ"]
         case (.ukrainian, "і"): preferences.yiOnLongPress ? ["ї"] : []

@@ -416,6 +416,43 @@ final class KeyboardCoreTests: XCTestCase {
         XCTAssertTrue(KeyboardLayout.rows(state: state, needsGlobe: false).flatMap { $0 }.allSatisfy { $0.letterAlternatives.isEmpty })
     }
 
+    func testEnglishLongPressFormsCoverEveryLetterAndPreserveExistingChoices() {
+        let preferences = KeyboardPreferences()
+        let expected: [Character: [String]] = [
+            "x": ["ẋ", "ẍ", "ˣ", "ₓ", "×"],
+            "n": ["ñ", "ń", "ň", "ņ", "ṅ", "ṇ", "ŋ", "ⁿ", "ₙ"],
+            "b": ["ḃ", "ḅ", "ɓ", "ᵇ"],
+            "g": ["ğ", "ĝ", "ġ", "ģ", "ǧ", "ᵍ"],
+            "l": ["ł", "ľ", "ĺ", "ļ", "ḷ", "ˡ", "ₗ"],
+            "w": ["ŵ", "ẁ", "ẃ", "ẅ", "ẉ", "ʷ"]
+        ]
+        for (letter, forms) in expected {
+            XCTAssertEqual(KeyboardLayout.letterAlternatives(letter, language: .english,
+                                                            preferences: preferences), forms,
+                           "Incorrect forms for \(letter)")
+        }
+        let keys = KeyboardLayout.letterKeys(.english, preferences: preferences).flatMap { $0 }
+        let letters = keys.compactMap { key -> (String, [String])? in
+            guard case .text(let value) = key.action, value.count == 1,
+                  value.first?.isLetter == true else { return nil }
+            return (value, key.alternatives)
+        }
+        XCTAssertEqual(letters.count, 26)
+        for (letter, forms) in letters {
+            XCTAssertFalse(forms.isEmpty, "Missing forms for \(letter)")
+            XCTAssertEqual(forms.count, Set(forms).count, "Duplicate forms for \(letter)")
+            XCTAssertFalse(forms.contains(letter), "The original letter is already a popup choice")
+            XCTAssertLessThanOrEqual(forms.count, 10, "Too many hold choices for \(letter)")
+        }
+        // Locale-specific holds remain intentional rather than inheriting English extras.
+        XCTAssertEqual(KeyboardLayout.letterAlternatives("n", language: .polish,
+                                                       preferences: preferences), ["ń"])
+        XCTAssertEqual(KeyboardLayout.letterAlternatives("n", language: .spanish,
+                                                       preferences: preferences), [])
+        XCTAssertEqual(KeyboardLayout.letterAlternatives("x", language: .german,
+                                                       preferences: preferences), [])
+    }
+
     func testLanguageCodesMapToLayouts() {
         XCTAssertEqual(KeyboardLanguage(languageCode: "en-GB"), .english)
         XCTAssertEqual(KeyboardLanguage(languageCode: "uk"), .ukrainian)

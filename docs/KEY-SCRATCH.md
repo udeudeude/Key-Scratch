@@ -61,6 +61,8 @@ Key Scratch's standard configuration uses **8 pt row gaps** and **3 pt column ga
 
 Tiny numbers and accented-letter hint labels are **hidden by default**, without disabling their actions: short downward flicks on top-row letters still type digits when digit flicks are enabled, and pressing/holding letters still displays accented alternatives. To show hints again, enable **Appearance → Key hints**.
 
+English letter holds also include extended Unicode letterforms on every A–Z key. In particular, **x** offers ẋ, ẍ, ˣ, ₓ and ×; **n** offers ñ, ń, ň, ņ, ṅ, ṇ, ŋ, ⁿ and ₙ. Familiar accents remain first, and other language layouts retain their language-specific holds. Existing custom key alternatives still take precedence.
+
 As on the iPhone keyboard, a tap on **space** from the 123 or #+= page switches back to the letter page, in both the host app and the compact scratchpad. User-created additional key pages stay open.
 
 Hyphens and similar joining punctuation now attach directly to the preceding glided or suggested word, rather than retaining an unwanted automatic space. This covers hyphens and other dashes, slashes, apostrophes, closing brackets and typographic closers, plus percent and degree signs. Automatically added spaces are removed when appropriate, but a space the person explicitly typed is preserved. A following glide after a hyphen or slash also attaches without an unwanted leading space.
