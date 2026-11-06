@@ -167,6 +167,28 @@ enum ShiftPlacement: String, Codable, CaseIterable, Sendable {
     var title: String { self == .beforeLastRow ? "Third row (left)" : "Control row" }
 }
 
+/// The actual Unicode mathematical alphabets, not styled system-font glyphs.
+/// The script alphabet has three historic Unicode code points (e, g, o).
+private enum StyledEnglishLetters {
+    static let alphabet = Array("abcdefghijklmnopqrstuvwxyz")
+    static let script = Array("𝒶𝒷𝒸𝒹ℯ𝒻ℊ𝒽𝒾𝒿𝓀𝓁𝓂𝓃ℴ𝓅𝓆𝓇𝓈𝓉𝓊𝓋𝓌𝓍𝓎𝓏")
+    static let boldItalic = Array("𝒂𝒃𝒄𝒅𝒆𝒇𝒈𝒉𝒊𝒋𝒌𝒍𝒎𝒏𝒐𝒑𝒒𝒓𝒔𝒕𝒖𝒗𝒘𝒙𝒚𝒛")
+    static let scriptCapitals = Array("𝒜ℬ𝒞𝒟ℰℱ𝒢ℋℐ𝒥𝒦ℒℳ𝒩𝒪𝒫𝒬ℛ𝒮𝒯𝒰𝒱𝒲𝒳𝒴𝒵")
+    static let boldItalicCapitals = Array("𝑨𝑩𝑪𝑫𝑬𝑭𝑮𝑯𝑰𝑱𝑲𝑳𝑴𝑵𝑶𝑷𝑸𝑹𝑺𝑻𝑼𝑽𝑾𝑿𝒀𝒁")
+
+    static func forms(for letter: Character) -> [String] {
+        guard let index = alphabet.firstIndex(of: letter) else { return [] }
+        return [String(script[index]), String(boldItalic[index])]
+    }
+
+    static func uppercase(of value: String) -> String? {
+        guard value.count == 1, let letter = value.first else { return nil }
+        if let index = script.firstIndex(of: letter) { return String(scriptCapitals[index]) }
+        if let index = boldItalic.firstIndex(of: letter) { return String(boldItalicCapitals[index]) }
+        return nil
+    }
+}
+
 struct InputState: Sendable {
     var language: KeyboardLanguage = .english
     var page: KeyboardPage = .letters
@@ -197,7 +219,7 @@ struct InputState: Sendable {
         // Layer keys type exactly what they hold: a phrase, or a Greek π, never shifted.
         if page.isLayer { return value }
         let result = shift == .off ? value : value.shifted
-        if value.lowercased() != value.uppercased() {
+        if value.lowercased() != value.uppercased() || StyledEnglishLetters.uppercase(of: value) != nil {
             if shift == .once { shift = .off }
             lastShiftTap = nil
         }
@@ -207,7 +229,10 @@ struct InputState: Sendable {
 
 extension String {
     /// Shift, not text-transform uppercasing: ß becomes ẞ rather than "SS".
-    var shifted: String { self == "ß" ? "ẞ" : uppercased() }
+    var shifted: String {
+        if let styledCapital = StyledEnglishLetters.uppercase(of: self) { return styledCapital }
+        return self == "ß" ? "ẞ" : uppercased()
+    }
 }
 
 enum KeyAction: Hashable, Sendable {
@@ -238,14 +263,14 @@ struct Key: Sendable {
         guard case .text(let value) = action else { return [] }
         if !letterAlternatives.isEmpty { return letterAlternatives }
         switch value {
-        case ".": return [".", "…", "!", "?"]
-        case ",": return [",", ";", ":"]
-        case "'": return ["'", "’", "ʼ", "\""]
+        case ".": return ["…", "!", "?"]
+        case ",": return [";", ":"]
+        case "'": return ["’", "ʼ", "\""]
         // Ukrainian types the modifier-letter apostrophe, as macOS does.
-        case "ʼ": return ["ʼ", "'", "’", "\""]
-        case "-": return ["-", "–", "—", "_"]
-        case "\"": return ["\"", "«", "»", "“", "”"]
-        case "?": return ["?", "!", "¿", "‽", "⸘"]
+        case "ʼ": return ["'", "’", "\""]
+        case "-": return ["–", "—", "_"]
+        case "\"": return ["«", "»", "“", "”"]
+        case "?": return ["¿", "‽", "⸘"]
         case "!": return ["¡", "‽", "⸘"]
         case "$": return ["€", "£", "¥", "¢", "₹", "₩", "₽", "₴"]
         case "%": return ["‰"]
@@ -447,36 +472,11 @@ enum KeyboardLayout {
     /// Hold a letter for these; releasing in place types the first one.
     static func letterAlternatives(_ character: Character, language: KeyboardLanguage,
                                    preferences: KeyboardPreferences) -> [String] {
+        if language == .english {
+            return StyledEnglishLetters.forms(for: character) + englishAccents(character)
+        }
         switch (language, character) {
-        // English long-press forms: familiar accents first, followed by
-        // scholarly/phonetic forms and Unicode super-/subscript letters.
-        // Keep the existing first choices stable for muscle memory.
-        case (.english, "a"): ["à", "á", "â", "ä", "æ", "ã", "å", "ā", "ą"]
-        case (.english, "b"): ["ḃ", "ḅ", "ɓ", "ᵇ"]
-        case (.english, "c"): ["ç", "ć", "č", "ĉ", "ċ", "ᶜ"]
-        case (.english, "d"): ["ð", "ď", "đ", "ḋ", "ḍ", "ᵈ"]
-        case (.english, "e"): ["è", "é", "ê", "ë", "ē", "ė", "ę", "ᵉ", "ₑ"]
-        case (.english, "f"): ["ƒ", "ḟ", "ᶠ"]
-        case (.english, "g"): ["ğ", "ĝ", "ġ", "ģ", "ǧ", "ᵍ"]
-        case (.english, "h"): ["ĥ", "ħ", "ḥ", "ḧ", "ʰ", "ₕ"]
-        case (.english, "i"): ["ì", "í", "î", "ï", "ī", "į", "ⁱ", "ᵢ"]
-        case (.english, "j"): ["ĵ", "ǰ", "ʲ", "ⱼ"]
-        case (.english, "k"): ["ķ", "ǩ", "ḳ", "ᵏ", "ₖ"]
-        case (.english, "l"): ["ł", "ľ", "ĺ", "ļ", "ḷ", "ˡ", "ₗ"]
-        case (.english, "m"): ["ṁ", "ṃ", "ᵐ", "ₘ"]
-        case (.english, "n"): ["ñ", "ń", "ň", "ņ", "ṅ", "ṇ", "ŋ", "ⁿ", "ₙ"]
-        case (.english, "o"): ["ò", "ó", "ô", "ö", "œ", "ø", "ō", "õ", "ᵒ", "ₒ"]
-        case (.english, "p"): ["ṕ", "ṗ", "ᵖ", "ₚ"]
-        case (.english, "q"): ["ɋ", "ʠ"]
-        case (.english, "r"): ["ŕ", "ř", "ŗ", "ṙ", "ṛ", "ʳ", "ᵣ"]
-        case (.english, "s"): ["ß", "ś", "š", "ş", "ŝ", "ṣ", "ˢ", "ₛ"]
-        case (.english, "t"): ["þ", "ť", "ţ", "ṭ", "ŧ", "ᵗ", "ₜ"]
-        case (.english, "u"): ["ù", "ú", "û", "ü", "ū", "ů", "ű", "ᵘ", "ᵤ"]
-        case (.english, "v"): ["ṽ", "ṿ", "ʋ", "ᵛ", "ᵥ"]
-        case (.english, "w"): ["ŵ", "ẁ", "ẃ", "ẅ", "ẉ", "ʷ"]
-        case (.english, "x"): ["ẋ", "ẍ", "ˣ", "ₓ", "×"]
-        case (.english, "y"): ["ÿ", "ý", "ŷ", "ẏ", "ʸ"]
-        case (.english, "z"): ["ž", "ź", "ż", "ẑ", "ẓ", "ᶻ"]
+        // Other languages retain their own compact, language-specific holds.
         // Only Ukrainian has ґ; Russian and Serbian г must not offer it.
         case (.ukrainian, "г"): ["ґ"]
         case (.ukrainian, "і"): preferences.yiOnLongPress ? ["ї"] : []
@@ -539,6 +539,26 @@ enum KeyboardLayout {
         case (.dutch, "u"): ["ü", "ú"]
         case (.russian, "е"): ["ё"]
         case (.russian, "ь"): ["ъ"]
+        default: []
+        }
+    }
+
+    /// Preserve the familiar iPhone-style English accent holds after the
+    /// two mathematical styles, without filling menus with unrelated glyphs.
+    private static func englishAccents(_ character: Character) -> [String] {
+        switch character {
+        case "a": ["à", "á", "â", "ä", "æ", "ã", "å", "ā", "ą"]
+        case "c": ["ç", "ć", "č"]
+        case "d": ["ð"]
+        case "e": ["è", "é", "ê", "ë", "ē", "ė", "ę"]
+        case "i": ["ì", "í", "î", "ï", "ī", "į"]
+        case "n": ["ñ", "ń"]
+        case "o": ["ò", "ó", "ô", "ö", "œ", "ø", "ō", "õ"]
+        case "s": ["ß", "ś", "š"]
+        case "t": ["þ"]
+        case "u": ["ù", "ú", "û", "ü", "ū"]
+        case "y": ["ÿ", "ý"]
+        case "z": ["ž", "ź", "ż"]
         default: []
         }
     }

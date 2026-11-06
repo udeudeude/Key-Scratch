@@ -61,7 +61,7 @@ Key Scratch's standard configuration uses **8 pt row gaps** and **3 pt column ga
 
 Tiny numbers and accented-letter hint labels are **hidden by default**, without disabling their actions: short downward flicks on top-row letters still type digits when digit flicks are enabled, and pressing/holding letters still displays accented alternatives. To show hints again, enable **Appearance → Key hints**.
 
-English letter holds also include extended Unicode letterforms on every A–Z key. In particular, **x** offers ẋ, ẍ, ˣ, ₓ and ×; **n** offers ñ, ń, ň, ņ, ṅ, ṇ, ŋ, ⁿ and ₙ. Familiar accents remain first, and other language layouts retain their language-specific holds. Existing custom key alternatives still take precedence.
+English long-press menus put two mathematical letterforms first for **every A–Z key**: script (for example, 𝓍 and 𝓃) and bold italic (𝒙 and 𝒏). Familiar accented forms remain available after them; earlier experimental phonetic and subscript additions are omitted to avoid crowded menus. Shift converts these styled lowercase letters into the corresponding styled capitals. Other language layouts keep their own long-press options, and custom key alternatives take precedence. Built-in punctuation menus do not repeat the original key; holding **?** offers ¿, ‽ and ⸘, without a redundant !.
 
 As on the iPhone keyboard, a tap on **space** from the 123 or #+= page switches back to the letter page, in both the host app and the compact scratchpad. User-created additional key pages stay open.
 

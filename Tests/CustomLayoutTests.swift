@@ -145,7 +145,7 @@ final class CustomLayoutTests: XCTestCase {
     }
 
     func testCustomHoldsReplacePunctuationDefaultsOnlyWhenGiven() {
-        XCTAssertEqual(Key(action: .text(".")).alternatives, [".", "…", "!", "?"])
+        XCTAssertEqual(Key(action: .text(".")).alternatives, ["…", "!", "?"])
         XCTAssertEqual(Key(action: .text("."), letterAlternatives: [".", "·"]).alternatives, [".", "·"])
         XCTAssertEqual(Key(action: .text("q")).alternatives, [])
     }

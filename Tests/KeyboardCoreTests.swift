@@ -416,41 +416,44 @@ final class KeyboardCoreTests: XCTestCase {
         XCTAssertTrue(KeyboardLayout.rows(state: state, needsGlobe: false).flatMap { $0 }.allSatisfy { $0.letterAlternatives.isEmpty })
     }
 
-    func testEnglishLongPressFormsCoverEveryLetterAndPreserveExistingChoices() {
+    func testEnglishLongPressOffersScriptAndBoldItalicForEveryLetter() {
         let preferences = KeyboardPreferences()
-        let expected: [Character: [String]] = [
-            "x": ["ẋ", "ẍ", "ˣ", "ₓ", "×"],
-            "n": ["ñ", "ń", "ň", "ņ", "ṅ", "ṇ", "ŋ", "ⁿ", "ₙ"],
-            "b": ["ḃ", "ḅ", "ɓ", "ᵇ"],
-            "g": ["ğ", "ĝ", "ġ", "ģ", "ǧ", "ᵍ"],
-            "l": ["ł", "ľ", "ĺ", "ļ", "ḷ", "ˡ", "ₗ"],
-            "w": ["ŵ", "ẁ", "ẃ", "ẅ", "ẉ", "ʷ"]
-        ]
-        for (letter, forms) in expected {
-            XCTAssertEqual(KeyboardLayout.letterAlternatives(letter, language: .english,
-                                                            preferences: preferences), forms,
-                           "Incorrect forms for \(letter)")
-        }
+        let lowercase = Array("abcdefghijklmnopqrstuvwxyz")
+        let script = Array("𝒶𝒷𝒸𝒹ℯ𝒻ℊ𝒽𝒾𝒿𝓀𝓁𝓂𝓃ℴ𝓅𝓆𝓇𝓈𝓉𝓊𝓋𝓌𝓍𝓎𝓏")
+        let boldItalic = Array("𝒂𝒃𝒄𝒅𝒆𝒇𝒈𝒉𝒊𝒋𝒌𝒍𝒎𝒏𝒐𝒑𝒒𝒓𝒔𝒕𝒖𝒗𝒘𝒙𝒚𝒛")
+        XCTAssertEqual(lowercase.count, 26)
+        XCTAssertEqual(script.count, 26)
+        XCTAssertEqual(boldItalic.count, 26)
         let keys = KeyboardLayout.letterKeys(.english, preferences: preferences).flatMap { $0 }
-        let letters = keys.compactMap { key -> (String, [String])? in
-            guard case .text(let value) = key.action, value.count == 1,
-                  value.first?.isLetter == true else { return nil }
-            return (value, key.alternatives)
-        }
-        XCTAssertEqual(letters.count, 26)
-        for (letter, forms) in letters {
-            XCTAssertFalse(forms.isEmpty, "Missing forms for \(letter)")
+        for (index, letter) in lowercase.enumerated() {
+            let forms = keys.first { $0.action == .text(String(letter)) }?.alternatives ?? []
+            XCTAssertEqual(Array(forms.prefix(2)), [String(script[index]), String(boldItalic[index])],
+                           "Missing mathematical styles for \(letter)")
             XCTAssertEqual(forms.count, Set(forms).count, "Duplicate forms for \(letter)")
-            XCTAssertFalse(forms.contains(letter), "The original letter is already a popup choice")
-            XCTAssertLessThanOrEqual(forms.count, 10, "Too many hold choices for \(letter)")
+            XCTAssertFalse(forms.contains(String(letter)), "The original letter is already a popup choice")
         }
-        // Locale-specific holds remain intentional rather than inheriting English extras.
+        XCTAssertEqual(KeyboardLayout.letterAlternatives("x", language: .english,
+                                                       preferences: preferences), ["𝓍", "𝒙"])
+        XCTAssertEqual(KeyboardLayout.letterAlternatives("n", language: .english,
+                                                       preferences: preferences), ["𝓃", "𝒏", "ñ", "ń"])
+        XCTAssertEqual(KeyboardLayout.letterAlternatives("a", language: .english,
+                                                       preferences: preferences).suffix(2), ["ā", "ą"])
+        // Shift preserves the mathematical style, rather than typing a plain capital.
+        var state = InputState()
+        state.tapShift(at: 1)
+        XCTAssertEqual(state.consume("𝓍"), "𝒳")
+        XCTAssertEqual(state.shift, .off)
+        state.tapShift(at: 2)
+        XCTAssertEqual(state.consume("𝒏"), "𝑵")
+        XCTAssertEqual(state.shift, .off)
+        // Other languages keep their own accents; custom alternatives still override defaults.
         XCTAssertEqual(KeyboardLayout.letterAlternatives("n", language: .polish,
                                                        preferences: preferences), ["ń"])
         XCTAssertEqual(KeyboardLayout.letterAlternatives("n", language: .spanish,
                                                        preferences: preferences), [])
         XCTAssertEqual(KeyboardLayout.letterAlternatives("x", language: .german,
                                                        preferences: preferences), [])
+        XCTAssertEqual(Key(action: .text("x"), letterAlternatives: ["ⅹ"]).alternatives, ["ⅹ"])
     }
 
     func testLanguageCodesMapToLayouts() {
@@ -527,7 +530,7 @@ final class KeyboardCoreTests: XCTestCase {
 
     func testSymbolHoldsExposePunctuationCurrenciesAndMathOperators() {
         let expected: [String: [String]] = [
-            "?": ["?", "!", "¿", "‽", "⸘"],
+            "?": ["¿", "‽", "⸘"],
             "!": ["¡", "‽", "⸘"],
             "$": ["€", "£", "¥", "¢", "₹", "₩", "₽", "₴"],
             "%": ["‰"],
@@ -568,6 +571,8 @@ final class KeyboardCoreTests: XCTestCase {
         XCTAssertTrue(Key(action: .text("!")).alternatives.contains("⸘"))
         XCTAssertTrue(Key(action: .text("?")).alternatives.contains("‽"))
         XCTAssertTrue(Key(action: .text("?")).alternatives.contains("⸘"))
+        XCTAssertFalse(Key(action: .text("?")).alternatives.contains("!"))
+        XCTAssertFalse(Key(action: .text("?")).alternatives.contains("?"))
         XCTAssertEqual(Key(action: .text("/"), letterAlternatives: ["∕"]).alternatives, ["∕"],
                        "Person-defined alternatives take precedence")
     }
@@ -612,7 +617,7 @@ final class KeyboardCoreTests: XCTestCase {
     func testUkrainianNumbersPageTypesTheModifierApostrophe() {
         var state = InputState(); state.language = .ukrainian; state.page = .numbers
         let keys = KeyboardLayout.rows(state: state, needsGlobe: false).joined()
-        XCTAssertEqual(keys.first { $0.action == .text("ʼ") }?.alternatives, ["ʼ", "'", "’", "\""])
+        XCTAssertEqual(keys.first { $0.action == .text("ʼ") }?.alternatives, ["'", "’", "\""])
         XCTAssertFalse(keys.contains { $0.action == .text("'") })
         state.language = .english
         XCTAssertTrue(KeyboardLayout.rows(state: state, needsGlobe: false).joined().contains { $0.action == .text("'") })
