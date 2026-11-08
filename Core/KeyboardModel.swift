@@ -645,6 +645,165 @@ enum ScratchpadVisualStyle: String, Codable, CaseIterable, Identifiable, Sendabl
     }
 }
 
+/// A practical character library, generated from selected Unicode blocks.
+/// It is lazy: regular typing never constructs these entries or their names.
+/// Only printable, individually insertable characters are exposed; variation
+/// selectors, joining controls and combining marks are intentionally excluded.
+struct CharacterFinderItem: Sendable, Equatable {
+    let symbol: String
+    let name: String
+    let category: String
+    let code: String
+}
+
+enum CharacterFinder {
+    struct Category: Sendable {
+        let title: String
+        let blocks: [ClosedRange<UInt32>]
+        let featured: String
+        let emojiOnly: Bool
+
+        init(_ title: String, _ blocks: [ClosedRange<UInt32>], featured: String = "",
+             emojiOnly: Bool = false) {
+            self.title = title
+            self.blocks = blocks
+            self.featured = featured
+            self.emojiOnly = emojiOnly
+        }
+    }
+
+    // Ranges are deliberately selective, not a dump of every code point.
+    // Many include hundreds of useful symbols that previously required
+    // visiting the companion app or searching the web.
+    static let categories: [Category] = [
+        .init("Emoji", [0x1F300...0x1F6FF, 0x1F900...0x1F9FF,
+                        0x1FA70...0x1FAFF, 0x1F000...0x1F02F],
+              featured: "❤️ 🩷 🧡 💛 💚 💙 🩵 💜 🤎 🖤 🩶 🤍 ☺️ ☹️ ☀️ ⛅ ☁️ ❄️ ✨ ⭐ ⚡ ☕ ✈️ ⚠️ ☎️ ✉️ ♻️ ✅ ☑️ ➡️ 🏳️‍🌈 🏳️‍⚧️ 👩‍💻 👨‍💻 🧑‍💻 🧑‍🎨 👩‍🚀 👨‍🚀 👩‍🔬 👨‍🔬 🇺🇸 🇬🇧 🇺🇦 🇨🇦 🇫🇷 🇩🇪 🇯🇵 🇮🇹 🇪🇸 🇲🇽",
+              emojiOnly: true),
+        .init("Arrows", [0x2190...0x21FF, 0x27F0...0x27FF,
+                         0x2900...0x297F, 0x2B00...0x2BFF]),
+        .init("Math & logic", [0x2200...0x22FF, 0x27C0...0x27EF,
+                               0x2980...0x29FF, 0x2A00...0x2AFF]),
+        .init("Typography", [0x2000...0x206F, 0x2E00...0x2E5F],
+              featured: "« » ‹ › “ ” ‘ ’ ‽ ⸘ ¿ ¡ ※ ⁂ ¶ § † ‡"),
+        .init("Shapes & dingbats", [0x2500...0x25FF, 0x2600...0x26FF,
+                                    0x2700...0x27BF]),
+        .init("Technical", [0x2300...0x23FF, 0x2400...0x243F,
+                            0x2440...0x245F]),
+        .init("Currency", [0x20A0...0x20CF],
+              featured: "$ ¢ £ € ¥ ₹ ₩ ₽ ₴ ₿ ₪ ฿"),
+        .init("Numbers & enclosed", [0x2070...0x209F, 0x2150...0x218F,
+                                     0x2460...0x24FF, 0x3200...0x32FF]),
+        .init("Letterforms", [0x2100...0x214F, 0x1D400...0x1D7FF]),
+        .init("Phonetics", [0x0250...0x02FF, 0x1D00...0x1D7F,
+                            0x1D80...0x1DBF]),
+        .init("Greek & other letters", [0x0370...0x03FF, 0x1E00...0x1EFF]),
+        .init("Music & notation", [0x1D100...0x1D1FF, 0x1D000...0x1D0FF],
+              featured: "♩ ♪ ♫ ♬ ♭ ♮ ♯ 𝄞 𝄢"),
+        .init("Braille", [0x2801...0x28FF]),
+        .init("Symbols & signs", [0x1F700...0x1F77F, 0x1F780...0x1F7FF,
+                                  0x1F800...0x1F8FF],
+              featured: "☮ ☯ ☸ ☪ ☭ ☬ ☤ ☥ ☦ ☧ ☨ ☩ ☰ ☱ ☲ ☳ ☴ ☵ ☶ ☷"),
+    ]
+
+    /// Useful search terms not necessarily present in official character names.
+    private static let aliases: [String: String] = [
+        "❤️": "love red heart", "🩷": "pink heart love",
+        "🏳️‍🌈": "pride rainbow flag", "🏳️‍⚧️": "transgender pride flag",
+        "🇺🇸": "usa united states america flag", "🇬🇧": "uk united kingdom flag",
+        "🇺🇦": "ukraine flag", "🇨🇦": "canada flag",
+        "🇫🇷": "france flag", "🇩🇪": "germany flag",
+        "🇯🇵": "japan flag", "🇮🇹": "italy flag",
+        "🇪🇸": "spain flag", "🇲🇽": "mexico flag",
+        "☑": "checkbox tick check", "✓": "check mark tick",
+        "★": "star favorite", "☆": "star outline",
+        "…": "ellipsis three dots", "‽": "interrobang question exclamation",
+        "∴": "therefore thus", "∵": "because since",
+        "≤": "less than equal", "≥": "greater than equal",
+        "♯": "music sharp", "♭": "music flat",
+        "𝓍": "mathematical script small x cursive",
+        "𝓃": "mathematical script small n cursive",
+        "𝒙": "mathematical bold italic small x",
+        "𝒏": "mathematical bold italic small n"
+    ]
+
+    static let items: [CharacterFinderItem] = {
+        var used = Set<String>()
+        var result: [CharacterFinderItem] = []
+        for category in categories {
+            func append(_ symbol: String) {
+                guard !symbol.isEmpty, used.insert(symbol).inserted else { return }
+                let name = aliases[symbol]
+                    ?? symbol.unicodeScalars.compactMap { $0.properties.name }.joined(separator: " ")
+                let code = symbol.unicodeScalars.map {
+                    "U+" + String($0.value, radix: 16, uppercase: true)
+                }.joined(separator: " ")
+                result.append(.init(symbol: symbol, name: name, category: category.title,
+                                    code: code))
+            }
+            for symbol in category.featured.split(whereSeparator: \.isWhitespace) {
+                append(String(symbol))
+            }
+            for block in category.blocks {
+                for codepoint in block {
+                    guard let scalar = Unicode.Scalar(codepoint),
+                          scalar.properties.name != nil else { continue }
+                    let properties = scalar.properties
+                    // Don't insert isolated modifiers or invisible composition
+                    // characters into unrelated user text.
+                    let printable: Bool
+                    switch properties.generalCategory {
+                    case .mathSymbol, .currencySymbol, .modifierSymbol, .otherSymbol,
+                         .dashPunctuation, .openPunctuation, .closePunctuation,
+                         .initialPunctuation, .finalPunctuation, .otherPunctuation,
+                         .uppercaseLetter, .lowercaseLetter, .titlecaseLetter,
+                         .modifierLetter, .otherLetter, .letterNumber,
+                         .otherNumber, .decimalNumber:
+                        printable = true
+                    default:
+                        printable = false
+                    }
+                    guard printable, !category.emojiOnly || properties.isEmojiPresentation else { continue }
+                    append(String(scalar))
+                }
+            }
+        }
+        return result
+    }()
+
+    static func symbols(in category: String) -> [CharacterFinderItem] {
+        items.filter { $0.category == category }
+    }
+
+    /// Name, meaning, and Unicode-number search. Query terms can be in any
+    /// order ("arrow right", "right arrow"); everything stays on-device.
+    static func search(_ query: String, limit: Int = 500) -> [CharacterFinderItem] {
+        let text = query.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        guard !text.isEmpty else { return [] }
+        let words = text.split(whereSeparator: \.isWhitespace).map(String.init)
+        let codeQuery = text.hasPrefix("u+") || text.hasPrefix("0x")
+        let strippedCode = text.replacingOccurrences(of: "u+", with: "")
+            .replacingOccurrences(of: "0x", with: "")
+        var preferred: [CharacterFinderItem] = []
+        var remainder: [CharacterFinderItem] = []
+        for entry in items {
+            let name = (entry.name + " " + (aliases[entry.symbol] ?? "")).lowercased()
+            let matches = entry.symbol == text
+                || (codeQuery && entry.code.lowercased().replacingOccurrences(of: "u+", with: "")
+                        .hasPrefix(strippedCode))
+                || (!codeQuery && words.allSatisfy { name.contains($0) || entry.category.lowercased().contains($0) })
+            guard matches else { continue }
+            if entry.symbol == text || name.hasPrefix(text) {
+                preferred.append(entry)
+            } else {
+                remainder.append(entry)
+            }
+            if preferred.count + remainder.count >= max(limit * 3, limit) { break }
+        }
+        return Array((preferred + remainder).prefix(max(0, limit)))
+    }
+}
+
 /// A small keyboard action, not a document-formatting feature. Everything is
 /// plain Unicode text, so it works in both the host field and local scratchpad.
 struct SelectionWrapper: Codable, Equatable, Hashable, Sendable {

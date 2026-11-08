@@ -416,6 +416,24 @@ final class KeyboardCoreTests: XCTestCase {
         XCTAssertTrue(KeyboardLayout.rows(state: state, needsGlobe: false).flatMap { $0 }.allSatisfy { $0.letterAlternatives.isEmpty })
     }
 
+    func testCharacterFinderHasBroadOfflineCoverageAndSafeNameSearch() {
+        let catalog = CharacterFinder.items
+        XCTAssertGreaterThan(catalog.count, 1800)
+        XCTAssertEqual(catalog.count, Set(catalog.map(\.symbol)).count)
+        XCTAssertTrue(catalog.contains { $0.symbol == "𝓍" })
+        XCTAssertTrue(catalog.contains { $0.symbol == "𝒙" })
+        XCTAssertTrue(catalog.contains { $0.symbol == "🇺🇸" })
+        XCTAssertTrue(catalog.contains { $0.symbol == "∴" })
+        XCTAssertTrue(catalog.contains { $0.symbol == "𝄞" })
+        XCTAssertTrue(CharacterFinder.search("therefore").contains { $0.symbol == "∴" })
+        XCTAssertTrue(CharacterFinder.search("arrow right").contains { $0.symbol == "→" })
+        XCTAssertTrue(CharacterFinder.search("u+2192").contains { $0.symbol == "→" })
+        XCTAssertTrue(CharacterFinder.search("grinning face").contains { $0.symbol == "😀" })
+        XCTAssertFalse(catalog.contains { $0.symbol == "\u{200D}" })
+        XCTAssertFalse(catalog.contains { $0.symbol == "\u{0301}" })
+        XCTAssertTrue(CharacterFinder.search("nonexistent-moon-object-zz").isEmpty)
+    }
+
     func testSelectionWrappersPreserveTextAndMigrateExistingPreferences() throws {
         XCTAssertEqual(SelectionWrapper.builtIn.first?.wrap("hi"), "“hi”")
         XCTAssertEqual(SelectionWrapper.builtIn.first { $0.name == "Double asterisks" }?.wrap("hi"), "**hi**")
