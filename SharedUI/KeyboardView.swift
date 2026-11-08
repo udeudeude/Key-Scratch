@@ -796,7 +796,7 @@ final class FavoriteSymbolsPanel: UIView {
 
     private let heading = UILabel()
     private let done = UIButton(type: .system)
-    private let modes = UISegmentedControl(items: ["★", "Ω", "Wrap"])
+    private let modes = UISegmentedControl(items: ["Favorites", "Symbols", "Wrap"])
     private let hint = UILabel()
     private let categoryButton = UIButton(type: .system)
     private let scroller = UIScrollView()
@@ -895,9 +895,9 @@ final class FavoriteSymbolsPanel: UIView {
         self.favorites = favorites
         self.recent = recent
         self.wrappers = wrappers
-        page = .favorites
+        // Reopening the palette should return to the last category or tool,
+        // not force repeated navigation back through Favorites.
         modes.selectedSegmentIndex = page.rawValue
-        categoryIndex = 0
         updatePage()
     }
 
