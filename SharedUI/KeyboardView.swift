@@ -875,7 +875,7 @@ final class FavoriteSymbolsPanel: UIView {
             categoryButton.leadingAnchor.constraint(equalTo: hint.leadingAnchor),
             categoryButton.trailingAnchor.constraint(equalTo: hint.trailingAnchor),
             categoryButton.topAnchor.constraint(equalTo: hint.topAnchor),
-            categoryButton.heightAnchor.constraint(equalTo: 23),
+            categoryButton.heightAnchor.constraint(equalToConstant: 23),
             scroller.topAnchor.constraint(equalTo: hint.bottomAnchor),
             scroller.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 5),
             scroller.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -5),
