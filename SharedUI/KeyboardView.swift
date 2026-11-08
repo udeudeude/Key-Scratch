@@ -1102,12 +1102,11 @@ final class FavoriteSymbolsPanel: UIView, UICollectionViewDataSource,
     }
 
     private func makeSearchKeypad() {
-        for rowValues in [
-            "1234567890".map(String.init),
-            "qwertyuiop".map(String.init),
-            "asdfghjkl".map(String.init),
-            "zxcvbnm".map(String.init) + ["space", "⌫"]
-        ] {
+        let letterRows: [[String]] = ["1234567890", "qwertyuiop", "asdfghjkl"]
+            .map { row in Array(row).map { String($0) } }
+        let lastRow = Array("zxcvbnm").map { String($0) } + ["+", "space", "⌫"]
+        let rows: [[String]] = letterRows + [lastRow]
+        for rowValues in rows {
             let row = UIStackView()
             row.axis = .horizontal
             row.distribution = .fillEqually
