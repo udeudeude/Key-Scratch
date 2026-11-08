@@ -114,7 +114,21 @@ final class PreviewContainer: UIView, UITextViewDelegate {
             self.favoritesPanel.isHidden = true
             self.punctuationSpacing.reset()
             self.editor.insertText(symbol)
-            self.placeholder.isHidden = true
+            self.placeholder.isHidden = !self.editor.text.isEmpty
+            self.suggestions.refresh()
+        }
+        favoritesPanel.onWrap = { [weak self] pair in
+            guard let self, pair.isUsable else { return }
+            self.favoritesPanel.isHidden = true
+            self.punctuationSpacing.reset()
+            let originalSelection = self.selectedText
+            self.editor.insertText(pair.wrap(originalSelection))
+            if originalSelection.isEmpty {
+                let end = self.editor.selectedRange.location
+                self.editor.selectedRange = NSRange(location: max(0, end - (pair.closing as NSString).length),
+                                                    length: 0)
+            }
+            self.placeholder.isHidden = !self.editor.text.isEmpty
             self.suggestions.refresh()
         }
         height = keyboard.heightAnchor.constraint(equalToConstant: keyboard.preferences.keyboardHeight)
@@ -330,7 +344,8 @@ final class PreviewContainer: UIView, UITextViewDelegate {
                 manualShiftContext = textBeforeCaret
             } else { state.page = KeyboardLayout.page(after: state.page, preferences: keyboard.preferences) }
         case .favorites:
-            favoritesPanel.configure(symbols: keyboard.preferences.favoriteSymbols)
+            favoritesPanel.configure(favorites: keyboard.preferences.favoriteSymbols,
+                                     recent: [], wrappers: keyboard.preferences.customWrappers)
             favoritesPanel.isHidden.toggle()
         case .page: state.page = state.page == .letters ? .numbers : .letters
         case .layers: state.page = KeyboardLayout.firstLayerPage(keyboard.preferences) ?? .letters
