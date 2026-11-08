@@ -33,6 +33,15 @@ final class CustomLayoutTests: XCTestCase {
         }
     }
 
+    func testLongPressStylesRemainUsableWhenCopiedIntoCustomLayouts() {
+        let builtIn = CustomLetterLayout(builtIn: .english)
+        XCTAssertEqual(builtIn.problems(for: .english), [])
+        let a = builtIn.rows.joined().first { $0.output == "a" }
+        XCTAssertEqual(a?.alternatives.prefix(2), ["𝒶", "𝒂"])
+        XCTAssertGreaterThan(a?.alternatives.count ?? 0, 9)
+        XCTAssertLessThanOrEqual(a?.alternatives.count ?? 0, CustomLetterLayout.maximumAlternatives)
+    }
+
     func testCustomLayoutDrivesTouchSuggestionsAndGlide() throws {
         var layout = CustomLetterLayout(builtIn: .english)
         layout.rows[0][0] = CustomKey("z")
@@ -111,7 +120,7 @@ final class CustomLayoutTests: XCTestCase {
         var layout = CustomLetterLayout(builtIn: .english)
         layout.rows[1].removeAll { $0.output == "s" }
         layout.rows[0][0] = CustomKey("W")
-        layout.rows[0][1] = CustomKey("ab", alternatives: Array(repeating: "x", count: 10))
+        layout.rows[0][1] = CustomKey("ab", alternatives: Array(repeating: "x", count: 13))
         layout.rows[2][0] = CustomKey("x")
         let problems = layout.problems(for: .english)
         XCTAssertTrue(problems.contains(.missingLetters("qswz")))

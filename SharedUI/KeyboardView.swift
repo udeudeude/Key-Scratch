@@ -335,21 +335,33 @@ final class KeyboardView: UIControl {
         return style
     }
 
-    /// Position accent choices next to the held key instead of requiring a
-    /// long journey into the suggestion ribbon. Clamp inside the extension.
+    /// Keep every option large enough to read and hit. More than seven
+    /// choices use two rows rather than thirteen 20-point slivers on an iPhone.
     private func heldAlternativesFrame(owner: ObjectIdentifier, count: Int) -> CGRect {
         let keyCenter: CGPoint
         let top: CGFloat
+        let keyHeight: CGFloat
         if let index = sessions[owner]?.startCell, cells.indices.contains(index) {
-            keyCenter = CGPoint(x: cells[index].visualFrame.midX, y: cells[index].visualFrame.midY)
-            top = cells[index].visualFrame.minY
+            let keyFrame = cells[index].visualFrame
+            keyCenter = CGPoint(x: keyFrame.midX, y: keyFrame.midY)
+            top = keyFrame.minY
+            keyHeight = keyFrame.height
         } else {
             keyCenter = CGPoint(x: bounds.midX, y: 38)
             top = 38
+            keyHeight = 40
         }
-        let width = min(max(1, bounds.width - 8), CGFloat(count) * 38)
+        let twoRows = count > 7
+        let columns = twoRows ? (count + 1) / 2 : count
+        let height: CGFloat = twoRows ? 72 : 34
+        let width = min(max(1, bounds.width - 8), CGFloat(columns) * 38)
         let x = min(max(4, keyCenter.x - width / 2), max(4, bounds.width - width - 4))
-        return CGRect(x: x, y: max(1, top - 37), width: width, height: 34)
+        // When the upper row is close to the top, open beneath that key
+        // instead of cutting off most of the popup.
+        let above = top - height - 3
+        let y = above >= 1 ? above : min(max(1, top + keyHeight + 3),
+                                          max(1, bounds.height - height - 1))
+        return CGRect(x: x, y: y, width: width, height: height)
     }
 
     override func draw(_ rect: CGRect) {
@@ -453,10 +465,14 @@ final class KeyboardView: UIControl {
         }
         if let popup {
             let ribbon = heldAlternativesFrame(owner: popup.owner, count: popup.values.count)
+            let twoRows = popup.values.count > 7
+            let columns = twoRows ? (popup.values.count + 1) / 2 : popup.values.count
+            let rows = twoRows ? 2 : 1
             for (index, value) in popup.values.enumerated() {
-                let frame = CGRect(x: ribbon.minX + CGFloat(index) * ribbon.width / CGFloat(popup.values.count),
-                                   y: ribbon.minY, width: ribbon.width / CGFloat(popup.values.count),
-                                   height: ribbon.height)
+                let frame = CGRect(x: ribbon.minX + CGFloat(index % columns) * ribbon.width / CGFloat(columns),
+                                   y: ribbon.minY + CGFloat(index / columns) * ribbon.height / CGFloat(rows),
+                                   width: ribbon.width / CGFloat(columns),
+                                   height: ribbon.height / CGFloat(rows))
                 let path = UIBezierPath(roundedRect: frame.insetBy(dx: 1, dy: 0), cornerRadius: 8)
                 palette.key.setFill(); path.fill()
                 if index == popup.selected {
@@ -635,9 +651,15 @@ final class KeyboardView: UIControl {
                 // Horizontal dragging works even if the finger remains near the
                 // held key, rather than reaching the top of the keyboard.
                 if abs(point.x - session.start.x) > 10 || ribbon.contains(point) {
-                    let unit = ribbon.width / CGFloat(current.values.count)
-                    current.selected = min(current.values.count - 1,
-                                           max(0, Int((point.x - ribbon.minX) / unit)))
+                    let twoRows = current.values.count > 7
+                    let columns = twoRows ? (current.values.count + 1) / 2 : current.values.count
+                    let unit = ribbon.width / CGFloat(columns)
+                    let column = min(columns - 1, max(0, Int((point.x - ribbon.minX) / unit)))
+                    // Horizontal movement beside the key chooses the first row.
+                    // Moving into the displayed second row reaches the extra forms.
+                    let row = twoRows && ribbon.contains(point)
+                        ? min(1, max(0, Int((point.y - ribbon.minY) / (ribbon.height / 2)))) : 0
+                    current.selected = min(current.values.count - 1, row * columns + column)
                     popup = current
                 }
                 continue

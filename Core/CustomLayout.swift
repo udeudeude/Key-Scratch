@@ -64,7 +64,9 @@ struct CustomLetterLayout: KeyRows, Codable, Equatable, Sendable {
     var rows: [[CustomKey]]
 
     static let maximumRowLength = 12
-    static let maximumAlternatives = 9
+    // English script/italic plus the established accents can reach eleven holds.
+    // Popup layout wraps larger groups into two comfortable rows.
+    static let maximumAlternatives = 12
 
     /// The built-in layout as an editable starting point, holds included.
     init(builtIn language: KeyboardLanguage, preferences: KeyboardPreferences = .init()) {

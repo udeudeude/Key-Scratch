@@ -99,7 +99,7 @@ Full Access is used for keyboard **UIPasteboard** operations and writing the sha
 
 - Swiping inserts a temporary trailing separator, preventing manually typed letters from joining the word. Punctuation can replace that separator.
 - Standalone English lowercase "i" becomes "I" at a word boundary, while "inside" remains lowercase.
-- English long-press accents are available; the popup now appears near the held key. Holding and releasing unchanged types the original letter; horizontal drag chooses accents.
+- English long-press accents and mathematical script/italic letterforms are available; the popup now appears near the held key. More than seven options use a two-row popup to avoid excessively narrow choices on iPhone. Holding and releasing unchanged types the original letter; drag across the popup to choose a variant.
 - First Delete immediately following a glide removes the entire most recently swiped word if the caret still matches; later Deletes use normal character deletion.
 - Press-and-hold Space activates cursor movement, including up/down through the scratchpad's rendered soft-wrapped lines. Small slides use finer 15 pt character steps after a 6 pt dead zone; longer drags accelerate and movement produces subtle selection feedback. For text fields in other apps, Apple provides only a text proxy, not their visual line layout: this implementation handles explicit newlines but cannot precisely match all visual line wraps.
 - An enabled-by-default "iPhone key positions" option puts Shift / #+= at the lower-left of the third row, Delete at its right, and Return in the lower-right control position on every page. Ortholinear's original geometry remains available in the Lab.
