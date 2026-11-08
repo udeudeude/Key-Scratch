@@ -47,6 +47,7 @@ final class KeyboardViewController: UIInputViewController {
         favoritePad.translatesAutoresizingMaskIntoConstraints = false
         favoritePad.isHidden = true
         keyboard.addSubview(favoritePad)
+        favoritePad.referenceKeyboard = keyboard
         NSLayoutConstraint.activate([
             favoritePad.leadingAnchor.constraint(equalTo: keyboard.leadingAnchor),
             favoritePad.trailingAnchor.constraint(equalTo: keyboard.trailingAnchor),

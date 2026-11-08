@@ -12,11 +12,13 @@ The temporary five-color mode comparison is complete and **the colored modes and
 
 The scratchpad now has a thin neutral border and 6 pt rounded corners matching the keycaps, with a subtle blue active-focus border. The new app icon refers to a **metal key scratching dark car paint**, rather than a computer keyboard key.
 
-## The ★ character palette and selection wrapping
+## The ★ character finder
 
-Tap ★ to open a compact three-part keyboard palette: **★ Favorites** (recently used and pinned characters), **Ω Symbols** (categorised Unicode and emoji), and **Wrap** (quotes, parentheses, brackets, braces, asterisks, double asterisks, backticks, guillemets and more). Unicode browsing is directly inside the keyboard; the companion app's searchable catalog is still the place to manage saved favorites.
+Tap ★ for a lightweight finder with **Favorites**, **Symbols**, and **Wrap**. Favorites offers recently inserted and saved characters. Symbols has a broad offline catalog of arrows, mathematics, typography, shapes, technical signs, currency, numbers, mathematical lettering, phonetics, Greek and other letters, music, braille, and emoji. Pick a category and scroll. The catalog is loaded lazily only when ★ opens, and its scrolling grid reuses cells.
 
-To wrap selected text, select it in the host app or Key Scratch scratchpad, tap ★ → Wrap, then choose the pair. If nothing is selected, Key Scratch inserts the opening and closing delimiters and attempts to place the caret between them. A host app may restrict caret positioning; it will never delete neighbouring text to compensate. The companion app's Scratchpad & layout screen accepts up to 12 named **custom delimiter pairs**, included after the built-ins. No additional keys are added to the main typing grid.
+Tap the **search line** to type a name with the built-in miniature search keypad. This search does not type into the host text field. Tap **Results** to see matches for phrases like `therefore`, `arrow right` or `mathematical script small x`, or type a hexadecimal code such as `u2192` or `u+2192`. Tap the search line again to refine it, or **Clear** on the keypad to search afresh. Wrap offers quotes, parentheses, brackets, braces, asterisks, Markdown delimiters and up to twelve custom pairs from the companion app.
+
+**Close without inserting:** the × key replaces ★ in **the exact original key position** at the bottom of the keyboard, in portrait and landscape. Tapping × closes ★ without changing the document or its selection. Inserting a character or wrapping text closes the panel automatically. The in-app preview uses the same interface. This is a substantial curated Unicode repertoire rather than all Unicode or Apple's proprietary emoji features; invisible modifiers and control characters are omitted.
 
 ## Multiple note pages and send-to-app
 

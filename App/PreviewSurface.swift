@@ -102,6 +102,7 @@ final class PreviewContainer: UIView, UITextViewDelegate {
         favoritesPanel.translatesAutoresizingMaskIntoConstraints = false
         favoritesPanel.isHidden = true
         keyboard.addSubview(favoritesPanel)
+        favoritesPanel.referenceKeyboard = keyboard
         NSLayoutConstraint.activate([
             favoritesPanel.leadingAnchor.constraint(equalTo: keyboard.leadingAnchor),
             favoritesPanel.trailingAnchor.constraint(equalTo: keyboard.trailingAnchor),
