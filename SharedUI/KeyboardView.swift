@@ -818,6 +818,7 @@ final class FavoriteSymbolsPanel: UIView, UICollectionViewDataSource,
     private let categoryButton = UIButton(type: .system)
     private let exitKey = UIButton(type: .system)
     private let list: UICollectionView
+    private let emptyMessage = UILabel()
     private let searchHeader = UIView()
     private let searchLabel = UILabel()
     private let clearSearch = UIButton(type: .system)
@@ -854,6 +855,7 @@ final class FavoriteSymbolsPanel: UIView, UICollectionViewDataSource,
 
         searchButton.contentHorizontalAlignment = .left
         searchButton.titleLabel?.font = .systemFont(ofSize: 12)
+        searchButton.titleLabel?.lineBreakMode = .byTruncatingMiddle
         searchButton.backgroundColor = .tertiarySystemFill
         searchButton.layer.cornerRadius = 7
         searchButton.accessibilityIdentifier = "character-palette-search"
@@ -877,6 +879,13 @@ final class FavoriteSymbolsPanel: UIView, UICollectionViewDataSource,
         list.accessibilityIdentifier = "character-palette-results"
         list.translatesAutoresizingMaskIntoConstraints = false
         addSubview(list)
+        emptyMessage.textColor = .secondaryLabel
+        emptyMessage.textAlignment = .center
+        emptyMessage.font = .systemFont(ofSize: 12)
+        emptyMessage.numberOfLines = 2
+        emptyMessage.isHidden = true
+        emptyMessage.translatesAutoresizingMaskIntoConstraints = false
+        addSubview(emptyMessage)
 
         // Search uses its OWN little touch keypad: a third-party keyboard
         // extension must not cause typing to go into its host application's
@@ -938,6 +947,9 @@ final class FavoriteSymbolsPanel: UIView, UICollectionViewDataSource,
             list.leadingAnchor.constraint(equalTo: leadingAnchor),
             list.trailingAnchor.constraint(equalTo: trailingAnchor),
             list.topAnchor.constraint(equalTo: searchButton.bottomAnchor, constant: 4),
+            emptyMessage.centerXAnchor.constraint(equalTo: list.centerXAnchor),
+            emptyMessage.centerYAnchor.constraint(equalTo: list.centerYAnchor),
+            emptyMessage.widthAnchor.constraint(lessThanOrEqualTo: list.widthAnchor, constant: -16),
             searchHeader.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 6),
             searchHeader.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -6),
             searchHeader.topAnchor.constraint(equalTo: topAnchor),
@@ -1011,6 +1023,7 @@ final class FavoriteSymbolsPanel: UIView, UICollectionViewDataSource,
         categoryButton.isHidden = !showCategory
         categoryWidth?.constant = showCategory ? 111 : 0
         list.isHidden = isEnteringQuery
+        emptyMessage.isHidden = true
         searchHeader.isHidden = !isEnteringQuery
         searchKeys.isHidden = !isEnteringQuery
         if isEnteringQuery {
@@ -1050,6 +1063,11 @@ final class FavoriteSymbolsPanel: UIView, UICollectionViewDataSource,
             visible = (SelectionWrapper.builtIn + wrappers.filter(\.isUsable)).map(Item.wrapper)
         }
         list.reloadData()
+        emptyMessage.text = page == .favorites ? "No favorites yet. Add some in settings."
+            : page == .symbols ? (searching ? "No matching characters. Try a shorter name."
+                                            : "No characters in this category.")
+            : "No wrapping options."
+        emptyMessage.isHidden = !visible.isEmpty
         list.setContentOffset(.zero, animated: false)
         (list.collectionViewLayout as? UICollectionViewFlowLayout)?.invalidateLayout()
         setNeedsLayout()

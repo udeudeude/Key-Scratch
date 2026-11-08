@@ -781,9 +781,12 @@ enum CharacterFinder {
         let text = query.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
         guard !text.isEmpty else { return [] }
         let words = text.split(whereSeparator: \.isWhitespace).map(String.init)
-        let codeQuery = text.hasPrefix("u+") || text.hasPrefix("0x")
-        let strippedCode = text.replacingOccurrences(of: "u+", with: "")
-            .replacingOccurrences(of: "0x", with: "")
+        let bareUCode = text.count > 1 && text.first == "u"
+            && text.dropFirst().allSatisfy { "0123456789abcdef".contains($0) }
+        let codeQuery = text.hasPrefix("u+") || text.hasPrefix("0x") || bareUCode
+        let strippedCode = bareUCode ? String(text.dropFirst())
+            : text.replacingOccurrences(of: "u+", with: "")
+                  .replacingOccurrences(of: "0x", with: "")
         var preferred: [CharacterFinderItem] = []
         var remainder: [CharacterFinderItem] = []
         for entry in items {

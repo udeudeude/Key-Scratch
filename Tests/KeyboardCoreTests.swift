@@ -428,6 +428,7 @@ final class KeyboardCoreTests: XCTestCase {
         XCTAssertTrue(CharacterFinder.search("therefore").contains { $0.symbol == "∴" })
         XCTAssertTrue(CharacterFinder.search("arrow right").contains { $0.symbol == "→" })
         XCTAssertTrue(CharacterFinder.search("u+2192").contains { $0.symbol == "→" })
+        XCTAssertTrue(CharacterFinder.search("u2192").contains { $0.symbol == "→" })
         XCTAssertTrue(CharacterFinder.search("grinning face").contains { $0.symbol == "😀" })
         XCTAssertFalse(catalog.contains { $0.symbol == "\u{200D}" })
         XCTAssertFalse(catalog.contains { $0.symbol == "\u{0301}" })
