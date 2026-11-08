@@ -768,60 +768,111 @@ private extension UIColor {
     }
 }
 
-/// In-keyboard favorites surface: not an attempt to invoke Apple's emoji UI.
-/// The header stays visible in the 172 pt compact landscape keyboard.
+/// One compact in-keyboard palette. The companion app owns searchable catalog
+/// management; this surface concentrates on fast insertion and selection wrapping.
+@MainActor
 final class FavoriteSymbolsPanel: UIView {
     var onPick: ((String) -> Void)?
+    var onWrap: ((SelectionWrapper) -> Void)?
     var onClose: (() -> Void)?
 
-    private let titleLabel = UILabel()
-    private let closeButton = UIButton(type: .system)
+    private enum Page: Int { case favorites, symbols, wrapping }
+    private static let categories: [(name: String, characters: [String])] = [
+        ("Typography", "… · • ‣ ‧ ′ ″ ‹ › « » “ ” ‘ ’ ‽ ¿ ¡ § ¶ † ‡ № © ® ™ ° ⁂".split(separator: " ").map(String.init)),
+        ("Arrows", "← → ↑ ↓ ↔ ↕ ↖ ↗ ↘ ↙ ⇐ ⇒ ⇔ ⇑ ⇓ ↩ ↪ ↳ ↶ ↷ ⟵ ⟶ ⟷ ➜ ➝ ➞ ➤ ⤴ ⤵".split(separator: " ").map(String.init)),
+        ("Mathematics", "± × ÷ ≠ ≈ ≡ ≤ ≥ ∞ √ ∛ ∑ ∏ ∫ ∂ ∇ ∆ π τ φ θ λ Ω ∈ ∉ ∅ ∩ ∪ ∴ ∵ ∝ ∠ ⊕ ⊗".split(separator: " ").map(String.init)),
+        ("Writing", "☐ ☑ ☒ ✓ ✔ ✗ ✘ ★ ☆ ◆ ◇ ◉ ○ ● □ ■ ▸ ▹ ▪ ▫ ♡ ♥ ⚑ ☞ ☜ ☛ ☟".split(separator: " ").map(String.init)),
+        ("Currency", "$ € £ ¥ ¢ ₹ ₩ ₽ ₴ ₿ ₺ ₫ ₪ ₦ ₱ ฿ ₡ ₵ ₸".split(separator: " ").map(String.init)),
+        ("Music", "♩ ♪ ♫ ♬ ♭ ♮ ♯ 𝄞 𝄢 ♠ ♣ ♥ ♦ ⚀ ⚁ ⚂ ⚃ ⚄ ⚅".split(separator: " ").map(String.init)),
+        ("Science", "° ℃ ℉ µ Å Ω Ω ℏ 𝛼 𝛽 𝛾 𝛿 𝜀 𝜇 𝜋 𝜎 𝜔 ♂ ♀ ⚥ ⚛ ⚗ ⌘ ⌥ ⌫ ⏎".split(separator: " ").map(String.init)),
+        ("Emoji", "😀 😂 😅 🙂 🙃 😉 😍 🤔 🤨 😎 🥹 🥰 🫡 😬 👍 👎 👏 🙌 🙏 🫶 ❤️ 🩷 💙 💚 ✨ 🔥 🎉 ☕ 📌 💡 📝".split(separator: " ").map(String.init))
+    ]
+
+    private let heading = UILabel()
+    private let done = UIButton(type: .system)
+    private let modes = UISegmentedControl(items: ["★", "Ω", "Wrap"])
+    private let hint = UILabel()
+    private let categoryButton = UIButton(type: .system)
     private let scroller = UIScrollView()
     private let grid = UIStackView()
-    private var shownSymbols: [String] = []
+    private var page = Page.favorites
+    private var categoryIndex = 0
+    private var favorites: [String] = []
+    private var recent: [String] = []
+    private var wrappers: [SelectionWrapper] = []
     private var displayedColumns = 0
 
     override init(frame: CGRect) {
         super.init(frame: frame)
-        backgroundColor = .systemGray5
+        backgroundColor = .secondarySystemBackground
         layer.borderWidth = 0.5
         layer.borderColor = UIColor.separator.cgColor
-        isAccessibilityElement = false
+        accessibilityIdentifier = "key-scratch-quick-palette"
 
-        titleLabel.text = "★  Favorites · recent first"
-        titleLabel.font = .systemFont(ofSize: 12, weight: .semibold)
-        titleLabel.textColor = .secondaryLabel
-        titleLabel.translatesAutoresizingMaskIntoConstraints = false
-        addSubview(titleLabel)
+        heading.font = .systemFont(ofSize: 13, weight: .semibold)
+        heading.textColor = .label
+        heading.translatesAutoresizingMaskIntoConstraints = false
+        addSubview(heading)
 
-        closeButton.setTitle("Done", for: .normal)
-        closeButton.titleLabel?.font = .systemFont(ofSize: 13, weight: .semibold)
-        closeButton.accessibilityLabel = "Close favorite symbols"
-        closeButton.addAction(UIAction { [weak self] _ in self?.onClose?() }, for: .touchUpInside)
-        closeButton.translatesAutoresizingMaskIntoConstraints = false
-        addSubview(closeButton)
+        done.setTitle("Done", for: .normal)
+        done.titleLabel?.font = .systemFont(ofSize: 13, weight: .semibold)
+        done.accessibilityLabel = "Close the character palette"
+        done.addAction(UIAction { [weak self] _ in self?.onClose?() }, for: .touchUpInside)
+        done.translatesAutoresizingMaskIntoConstraints = false
+        addSubview(done)
 
-        scroller.translatesAutoresizingMaskIntoConstraints = false
+        modes.selectedSegmentIndex = 0
+        modes.accessibilityLabel = "Character palette"
+        modes.addTarget(self, action: #selector(changePage), for: .valueChanged)
+        modes.translatesAutoresizingMaskIntoConstraints = false
+        addSubview(modes)
+
+        hint.font = .systemFont(ofSize: 11)
+        hint.textColor = .secondaryLabel
+        hint.adjustsFontSizeToFitWidth = true
+        hint.minimumScaleFactor = 0.8
+        hint.translatesAutoresizingMaskIntoConstraints = false
+        addSubview(hint)
+
+        categoryButton.contentHorizontalAlignment = .left
+        categoryButton.titleLabel?.font = .systemFont(ofSize: 12, weight: .medium)
+        categoryButton.showsMenuAsPrimaryAction = true
+        categoryButton.translatesAutoresizingMaskIntoConstraints = false
+        addSubview(categoryButton)
+
         scroller.showsVerticalScrollIndicator = true
         scroller.alwaysBounceVertical = false
+        scroller.translatesAutoresizingMaskIntoConstraints = false
         addSubview(scroller)
         grid.axis = .vertical
-        grid.spacing = 3
         grid.distribution = .fill
+        grid.spacing = 4
         grid.translatesAutoresizingMaskIntoConstraints = false
         scroller.addSubview(grid)
 
         NSLayoutConstraint.activate([
-            titleLabel.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 9),
-            titleLabel.topAnchor.constraint(equalTo: topAnchor, constant: 3),
-            titleLabel.heightAnchor.constraint(equalToConstant: 26),
-            closeButton.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -6),
-            closeButton.topAnchor.constraint(equalTo: topAnchor),
-            closeButton.widthAnchor.constraint(greaterThanOrEqualToConstant: 48),
-            closeButton.heightAnchor.constraint(equalToConstant: 30),
-            scroller.topAnchor.constraint(equalTo: titleLabel.bottomAnchor, constant: 2),
-            scroller.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 4),
-            scroller.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -4),
+            heading.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 10),
+            heading.topAnchor.constraint(equalTo: topAnchor, constant: 3),
+            heading.heightAnchor.constraint(equalToConstant: 25),
+            done.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -7),
+            done.topAnchor.constraint(equalTo: topAnchor, constant: 1),
+            done.widthAnchor.constraint(greaterThanOrEqualToConstant: 44),
+            done.heightAnchor.constraint(equalToConstant: 27),
+            modes.topAnchor.constraint(equalTo: heading.bottomAnchor, constant: 2),
+            modes.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 7),
+            modes.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -7),
+            modes.heightAnchor.constraint(equalToConstant: 30),
+            hint.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 10),
+            hint.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -8),
+            hint.topAnchor.constraint(equalTo: modes.bottomAnchor, constant: 1),
+            hint.heightAnchor.constraint(equalToConstant: 23),
+            categoryButton.leadingAnchor.constraint(equalTo: hint.leadingAnchor),
+            categoryButton.trailingAnchor.constraint(equalTo: hint.trailingAnchor),
+            categoryButton.topAnchor.constraint(equalTo: hint.topAnchor),
+            categoryButton.heightAnchor.constraint(equalTo: 23),
+            scroller.topAnchor.constraint(equalTo: hint.bottomAnchor),
+            scroller.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 5),
+            scroller.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -5),
             scroller.bottomAnchor.constraint(equalTo: bottomAnchor, constant: -3),
             grid.topAnchor.constraint(equalTo: scroller.contentLayoutGuide.topAnchor),
             grid.leadingAnchor.constraint(equalTo: scroller.contentLayoutGuide.leadingAnchor),
@@ -829,57 +880,158 @@ final class FavoriteSymbolsPanel: UIView {
             grid.bottomAnchor.constraint(equalTo: scroller.contentLayoutGuide.bottomAnchor),
             grid.widthAnchor.constraint(equalTo: scroller.frameLayoutGuide.widthAnchor)
         ])
+        updatePage()
     }
 
     required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
 
-    func configure(symbols: [String]) {
-        shownSymbols = symbols
+    func configure(favorites: [String], recent: [String], wrappers: [SelectionWrapper]) {
+        self.favorites = favorites
+        self.recent = recent
+        self.wrappers = wrappers
+        page = .favorites
+        modes.selectedSegmentIndex = page.rawValue
+        categoryIndex = 0
+        updatePage()
+    }
+
+    @objc private func changePage() {
+        guard let new = Page(rawValue: modes.selectedSegmentIndex) else { return }
+        page = new
+        updatePage()
+    }
+
+    private func updatePage() {
+        heading.text = page == .favorites ? "Your characters"
+            : page == .symbols ? "Symbol library" : "Surround text"
+        hint.text = page == .favorites ? "Recent first · favorites below"
+            : page == .wrapping ? "Selection, or insert a pair at the cursor" : ""
+        hint.isHidden = page == .symbols
+        categoryButton.isHidden = page != .symbols
+        if page == .symbols {
+            categoryButton.setTitle(Self.categories[categoryIndex].name + "  ▾", for: .normal)
+            categoryButton.accessibilityLabel = "Symbol category: " + Self.categories[categoryIndex].name
+            categoryButton.menu = UIMenu(children: Self.categories.enumerated().map { index, category in
+                UIAction(title: category.name, state: index == categoryIndex ? .on : .off) { [weak self] _ in
+                    self?.categoryIndex = index
+                    self?.updatePage()
+                }
+            })
+        }
         displayedColumns = 0
         setNeedsLayout()
+        layoutIfNeeded()
     }
 
     override func layoutSubviews() {
         super.layoutSubviews()
-        // In portrait the split keyboard is narrow: six comfortable columns,
-        // not eight cramped touch targets. Landscape can show eight.
-        let columns = max(4, min(8, Int(max(0, bounds.width - 8) / 44)))
+        let columns = page == .wrapping ? (bounds.width >= 210 ? 2 : 1)
+            : max(3, min(8, Int(max(0, bounds.width - 10) / 46)))
         guard columns != displayedColumns else { return }
         displayedColumns = columns
-        rebuildRows(columns: columns)
+        rebuild(columns: columns)
     }
 
-    private func rebuildRows(columns: Int) {
-        for row in grid.arrangedSubviews {
-            grid.removeArrangedSubview(row)
-            row.removeFromSuperview()
+    private func rebuild(columns: Int) {
+        for child in grid.arrangedSubviews {
+            grid.removeArrangedSubview(child)
+            child.removeFromSuperview()
         }
-        for offset in stride(from: 0, to: shownSymbols.count, by: columns) {
-            let row = UIStackView()
-            row.axis = .horizontal
-            row.distribution = .fillEqually
-            row.spacing = 3
-            for column in 0..<columns {
-                let index = offset + column
-                let button = UIButton(type: .system)
-                if index < shownSymbols.count {
-                    let symbol = shownSymbols[index]
-                    button.setTitle(symbol, for: .normal)
-                    button.titleLabel?.font = .systemFont(ofSize: 22)
-                    button.accessibilityLabel = "Insert \(symbol)"
-                    button.backgroundColor = .secondarySystemGroupedBackground
-                    button.layer.cornerRadius = 6
-                    button.addAction(UIAction { [weak self] _ in
-                        self?.onPick?(symbol)
-                    }, for: .touchUpInside)
-                } else {
-                    button.isEnabled = false
-                }
-                row.addArrangedSubview(button)
-            }
-            row.heightAnchor.constraint(equalToConstant: 38).isActive = true
-            grid.addArrangedSubview(row)
+        switch page {
+        case .favorites:
+            let pinned = favorites.filter { !recent.contains($0) }
+            if !recent.isEmpty { addSection("Recently used", symbols: recent, columns: columns) }
+            if !pinned.isEmpty { addSection("Favorites", symbols: pinned, columns: columns) }
+            if recent.isEmpty && pinned.isEmpty { addEmpty("Add characters in Key Scratch settings.") }
+        case .symbols:
+            addSection(nil, symbols: Self.categories[categoryIndex].characters, columns: columns)
+        case .wrapping:
+            addWrappers(columns: columns)
         }
         scroller.setContentOffset(.zero, animated: false)
+    }
+
+    private func addSection(_ name: String?, symbols: [String], columns: Int) {
+        if let name { addHeading(name) }
+        for offset in stride(from: 0, to: symbols.count, by: columns) {
+            let row = makeRow()
+            for column in 0..<columns {
+                let index = offset + column
+                if index < symbols.count {
+                    let value = symbols[index]
+                    let button = makeButton()
+                    button.setTitle(value, for: .normal)
+                    button.titleLabel?.font = .systemFont(ofSize: 22)
+                    button.accessibilityLabel = "Insert " + value
+                    button.addAction(UIAction { [weak self] _ in self?.onPick?(value) }, for: .touchUpInside)
+                    row.addArrangedSubview(button)
+                } else {
+                    row.addArrangedSubview(UIView())
+                }
+            }
+            row.heightAnchor.constraint(equalToConstant: 42).isActive = true
+            grid.addArrangedSubview(row)
+        }
+    }
+
+    private func addWrappers(columns: Int) {
+        let options = SelectionWrapper.builtIn + wrappers.filter(\.isUsable)
+        for offset in stride(from: 0, to: options.count, by: columns) {
+            let row = makeRow()
+            for column in 0..<columns {
+                let index = offset + column
+                if index < options.count {
+                    let pair = options[index]
+                    let button = makeButton()
+                    var style = UIButton.Configuration.plain()
+                    style.title = pair.opening + " text " + pair.closing
+                    style.subtitle = pair.name
+                    style.titleAlignment = .center
+                    style.baseForegroundColor = .label
+                    button.configuration = style
+                    button.accessibilityLabel = "Surround selection with " + pair.name
+                    button.addAction(UIAction { [weak self] _ in self?.onWrap?(pair) }, for: .touchUpInside)
+                    row.addArrangedSubview(button)
+                } else {
+                    row.addArrangedSubview(UIView())
+                }
+            }
+            row.heightAnchor.constraint(equalToConstant: 47).isActive = true
+            grid.addArrangedSubview(row)
+        }
+    }
+
+    private func makeRow() -> UIStackView {
+        let row = UIStackView()
+        row.axis = .horizontal
+        row.spacing = 4
+        row.distribution = .fillEqually
+        return row
+    }
+
+    private func makeButton() -> UIButton {
+        let button = UIButton(type: .system)
+        button.backgroundColor = .tertiarySystemGroupedBackground
+        button.layer.cornerRadius = 8
+        button.tintColor = .label
+        return button
+    }
+
+    private func addHeading(_ title: String) {
+        let label = UILabel()
+        label.text = title
+        label.font = .systemFont(ofSize: 11, weight: .semibold)
+        label.textColor = .secondaryLabel
+        label.heightAnchor.constraint(equalToConstant: 19).isActive = true
+        grid.addArrangedSubview(label)
+    }
+
+    private func addEmpty(_ message: String) {
+        let label = UILabel()
+        label.text = message
+        label.textColor = .secondaryLabel
+        label.font = .systemFont(ofSize: 12)
+        label.numberOfLines = 2
+        grid.addArrangedSubview(label)
     }
 }

@@ -55,6 +55,7 @@ final class KeyboardViewController: UIInputViewController {
         ])
         favoritePad.onClose = { [weak self] in self?.favoritePad.isHidden = true }
         favoritePad.onPick = { [weak self] character in self?.insertFavorite(character) }
+        favoritePad.onWrap = { [weak self] pair in self?.surroundSelection(with: pair) }
         scratchpad.translatesAutoresizingMaskIntoConstraints = false
         view.addSubview(scratchpad)
         scratchpadWidth = scratchpad.widthAnchor.constraint(equalToConstant: 0)
@@ -465,6 +466,30 @@ final class KeyboardViewController: UIInputViewController {
         return edit.text
     }
 
+    private func surroundSelection(with pair: SelectionWrapper) {
+        guard pair.isUsable else { return }
+        favoritePad.isHidden = true
+        suggestions.cancelGlide()
+        pendingGlide = nil
+        expander.forget()
+        punctuationSpacing.reset()
+        noteSpacing.reset()
+        if scratchpad.isEditingNote {
+            let selected = scratchpad.selectedNoteText
+            scratchpad.type(pair.wrap(selected))
+            if selected.isEmpty { scratchpad.moveCaret(steps: -pair.closing.count) }
+        } else {
+            let selected = textDocumentProxy.selectedText ?? ""
+            textDocumentProxy.insertText(pair.wrap(selected))
+            if selected.isEmpty {
+                textDocumentProxy.adjustTextPosition(byCharacterOffset: -(pair.closing as NSString).length)
+            }
+        }
+        updateAutoShift()
+        keyboard.inputState = inputState
+        suggestions.refresh(force: true)
+    }
+
     private func insertFavorite(_ symbol: String) {
         guard !symbol.isEmpty else { return }
         favoritePad.isHidden = true
@@ -729,8 +754,9 @@ final class KeyboardViewController: UIInputViewController {
         case .favorites:
             // Tapping the scratchpad and a host field already selects the
             // text destination, so this control now opens one-tap characters.
-            favoritePad.configure(symbols: FavoriteSymbolsHistory.display(
-                favorites: keyboard.preferences.favoriteSymbols))
+            favoritePad.configure(favorites: keyboard.preferences.favoriteSymbols,
+                                  recent: FavoriteSymbolsHistory.recent(),
+                                  wrappers: keyboard.preferences.customWrappers)
             favoritePad.isHidden.toggle()
         case .language:
             inputState.language = keyboard.preferences.language(after: inputState.language)
@@ -842,11 +868,11 @@ private enum FavoriteSymbolsHistory {
         return .standard
     }
 
-    static func display(favorites: [String]) -> [String] {
+    static func recent() -> [String] {
         var seen = Set<String>()
-        return ((defaults.stringArray(forKey: key) ?? []) + favorites)
+        return (defaults.stringArray(forKey: key) ?? [])
             .filter { !$0.isEmpty && seen.insert($0).inserted }
-            .prefix(48).map { $0 }
+            .prefix(8).map { $0 }
     }
 
     static func record(_ symbol: String) {
