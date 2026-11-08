@@ -825,6 +825,7 @@ final class FavoriteSymbolsPanel: UIView, UICollectionViewDataSource,
     private let searchKeys = UIStackView()
     private var listBottom: NSLayoutConstraint?
     private var searchBottom: NSLayoutConstraint?
+    private var categoryWidth: NSLayoutConstraint?
 
     private var page = Page.favorites
     private var categoryIndex = 0
@@ -958,8 +959,8 @@ final class FavoriteSymbolsPanel: UIView, UICollectionViewDataSource,
         ])
         // One category chooser, hidden outside Symbols. When hidden, search
         // expands to full width without leaving a blank half of the row.
-        let chooserWidth = categoryButton.widthAnchor.constraint(equalToConstant: 111)
-        chooserWidth.isActive = true
+        categoryWidth = categoryButton.widthAnchor.constraint(equalToConstant: 0)
+        categoryWidth?.isActive = true
         let searchWidth = searchButton.trailingAnchor.constraint(equalTo: categoryButton.leadingAnchor, constant: -4)
         searchWidth.priority = .defaultHigh
         searchWidth.isActive = true
@@ -993,12 +994,8 @@ final class FavoriteSymbolsPanel: UIView, UICollectionViewDataSource,
             listBottom?.constant = -clearance
             searchBottom?.constant = -clearance
         }
-        let chooseCategory = page == .symbols && query.isEmpty && !isEnteringQuery
-        categoryButton.isHidden = !chooseCategory
-        let searchWidth = chooseCategory ? max(70, bounds.width - 134) : max(70, bounds.width - 14)
-        if abs(searchButton.bounds.width - searchWidth) > 0.5 {
-            searchButton.widthAnchor.constraint(equalToConstant: searchWidth).isActive = true
-        }
+        // The category selector has a fixed reserved width only while visible.
+        // No constraints are created from layoutSubviews (which runs often).
     }
 
     @objc private func selectPage() {
@@ -1010,7 +1007,9 @@ final class FavoriteSymbolsPanel: UIView, UICollectionViewDataSource,
     private func updatePage() {
         pages.isHidden = isEnteringQuery
         searchButton.isHidden = isEnteringQuery
-        categoryButton.isHidden = isEnteringQuery || page != .symbols || !query.isEmpty
+        let showCategory = !isEnteringQuery && page == .symbols && query.isEmpty
+        categoryButton.isHidden = !showCategory
+        categoryWidth?.constant = showCategory ? 111 : 0
         list.isHidden = isEnteringQuery
         searchHeader.isHidden = !isEnteringQuery
         searchKeys.isHidden = !isEnteringQuery
