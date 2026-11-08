@@ -645,6 +645,44 @@ enum ScratchpadVisualStyle: String, Codable, CaseIterable, Identifiable, Sendabl
     }
 }
 
+/// A small keyboard action, not a document-formatting feature. Everything is
+/// plain Unicode text, so it works in both the host field and local scratchpad.
+struct SelectionWrapper: Codable, Equatable, Hashable, Sendable {
+    var name: String
+    var opening: String
+    var closing: String
+
+    init(_ name: String, _ opening: String, _ closing: String) {
+        self.name = name
+        self.opening = opening
+        self.closing = closing
+    }
+
+    var isUsable: Bool {
+        !name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            && name.count <= 30 && !opening.isEmpty && !closing.isEmpty
+            && opening.count <= 12 && closing.count <= 12
+            && !opening.contains(where: \.isNewline) && !closing.contains(where: \.isNewline)
+    }
+
+    func wrap(_ text: String) -> String { opening + text + closing }
+
+    static let builtIn: [Self] = [
+        .init("Double quotes", "“", "”"),
+        .init("Single quotes", "‘", "’"),
+        .init("Straight quotes", "\"", "\""),
+        .init("Parentheses", "(", ")"),
+        .init("Square brackets", "[", "]"),
+        .init("Braces", "{", "}"),
+        .init("Angle brackets", "<", ">"),
+        .init("Asterisks", "*", "*"),
+        .init("Double asterisks", "**", "**"),
+        .init("Backticks", "`", "`"),
+        .init("Tildes", "~", "~"),
+        .init("Guillemets", "«", "»")
+    ]
+}
+
 struct KeyboardPreferences: Codable, Equatable, Sendable {
     let schemaVersion = 8
     var keyHeight: Double = 62
@@ -683,6 +721,8 @@ struct KeyboardPreferences: Codable, Equatable, Sendable {
         "°", "±", "×", "÷", "≠", "≤", "≥", "∞",
         "→", "←", "↔", "©", "®", "™", "☕", "🎉"
     ]
+    /// Personal wrapping pairs displayed after the built-in selection tools.
+    var customWrappers: [SelectionWrapper] = []
 
     var suggestionsEnabled: Bool = true
     var nextWordSuggestions: Bool = true
@@ -714,7 +754,7 @@ struct KeyboardPreferences: Codable, Equatable, Sendable {
         case schemaVersion, keyHeight, columnSpacing, rowSpacing, fillGaps, defaultLanguage
         case controlHeight, letterSize, actionKeyWidth, shiftPlacement, showPunctuation, showApostrophe, showHeader, autoSpacePunctuation
         case yiOnLongPress, autoCapitalize, doubleSpacePeriod, digitAccess, glideTyping
-        case keyScratchMode, keyScratchNoteWidth, keyScratchNoteFontSize, keyScratchNoteFont, favoriteSymbols
+        case keyScratchMode, keyScratchNoteWidth, keyScratchNoteFontSize, keyScratchNoteFont, favoriteSymbols, customWrappers
         case leftHandedLayout, scratchpadVisualStyle
         case iphoneKeyPositions, appleKeyAppearance
         case theme, accent, showLongPressHints
@@ -730,6 +770,10 @@ struct KeyboardPreferences: Codable, Equatable, Sendable {
         result.favoriteSymbols = favoriteSymbols.filter {
             !$0.isEmpty && $0.count <= 8 && symbolsSeen.insert($0).inserted
         }.prefix(48).map { $0 }
+        var wrapperSeen = Set<String>()
+        result.customWrappers = customWrappers.filter { pair in
+            pair.isUsable && wrapperSeen.insert(pair.opening + "\u{0}" + pair.closing).inserted
+        }.prefix(12).map { $0 }
         result.keyHeight = keyHeight.isFinite ? min(88, max(32, keyHeight)) : 62
         result.controlHeight = controlHeight.isFinite ? min(72, max(30, controlHeight)) : 48
         result.letterSize = letterSize.isFinite ? min(36, max(18, letterSize)) : 24
@@ -786,10 +830,10 @@ struct KeyboardPreferences: Codable, Equatable, Sendable {
         let suggestions = (suggestionsEnabled, nextWordSuggestions, contextualSuggestions)
         let typing = (autoCapitalize, doubleSpacePeriod, digitAccess, glideTyping, iphoneKeyPositions)
         let custom = (customLayouts, layers, showLayerKey, keycaps, expansions, extrasEnabled)
-        let scratch = (keyScratchMode, keyScratchNoteWidth, keyScratchNoteFontSize, keyScratchNoteFont, favoriteSymbols, leftHandedLayout, scratchpadVisualStyle)
+        let scratch = (keyScratchMode, keyScratchNoteWidth, keyScratchNoteFontSize, keyScratchNoteFont, favoriteSymbols, customWrappers, leftHandedLayout, scratchpadVisualStyle)
         self = preset.preferences
         (customLayouts, layers, showLayerKey, keycaps, expansions, extrasEnabled) = custom
-        (keyScratchMode, keyScratchNoteWidth, keyScratchNoteFontSize, keyScratchNoteFont, favoriteSymbols, leftHandedLayout, scratchpadVisualStyle) = scratch
+        (keyScratchMode, keyScratchNoteWidth, keyScratchNoteFontSize, keyScratchNoteFont, favoriteSymbols, customWrappers, leftHandedLayout, scratchpadVisualStyle) = scratch
         (defaultLanguage, languages, englishLayout, rememberLanguage, languageMemoryGeneration, invasionAnswer) = language
         (theme, accent, showLongPressHints, appleKeyAppearance) = appearance
         (suggestionsEnabled, nextWordSuggestions, contextualSuggestions) = suggestions
@@ -830,6 +874,7 @@ extension KeyboardPreferences {
         leftHandedLayout = (try? c.decodeIfPresent(Bool.self, forKey: .leftHandedLayout)) ?? leftHandedLayout
         scratchpadVisualStyle = (try? c.decodeIfPresent(ScratchpadVisualStyle.self, forKey: .scratchpadVisualStyle)) ?? scratchpadVisualStyle
         favoriteSymbols = (try? c.decodeIfPresent([String].self, forKey: .favoriteSymbols)) ?? favoriteSymbols
+        customWrappers = (try? c.decodeIfPresent([SelectionWrapper].self, forKey: .customWrappers)) ?? customWrappers
         theme = try c.decodeIfPresent(KeyboardTheme.self, forKey: .theme) ?? theme
         accent = try c.decodeIfPresent(KeyboardAccent.self, forKey: .accent) ?? accent
         showLongPressHints = try c.decodeIfPresent(Bool.self, forKey: .showLongPressHints) ?? showLongPressHints

@@ -416,6 +416,26 @@ final class KeyboardCoreTests: XCTestCase {
         XCTAssertTrue(KeyboardLayout.rows(state: state, needsGlobe: false).flatMap { $0 }.allSatisfy { $0.letterAlternatives.isEmpty })
     }
 
+    func testSelectionWrappersPreserveTextAndMigrateExistingPreferences() throws {
+        XCTAssertEqual(SelectionWrapper.builtIn.first?.wrap("hi"), "“hi”")
+        XCTAssertEqual(SelectionWrapper.builtIn.first { $0.name == "Double asterisks" }?.wrap("hi"), "**hi**")
+        var prefs = KeyboardPreferences()
+        prefs.customWrappers = [
+            .init("Spoiler", "||", "||"),
+            .init("Duplicate", "||", "||"),
+            .init("", "(", ")"),
+            .init("Too long", String(repeating: "*", count: 30), "*")
+        ]
+        let normalized = prefs.validated
+        XCTAssertEqual(normalized.customWrappers, [.init("Spoiler", "||", "||")])
+        let restored = try JSONDecoder().decode(KeyboardPreferences.self,
+                                               from: JSONEncoder().encode(normalized))
+        XCTAssertEqual(restored.customWrappers, normalized.customWrappers)
+        let legacy = try JSONDecoder().decode(KeyboardPreferences.self,
+                                              from: Data(#"{"schemaVersion":2,"keyHeight":65}"#.utf8))
+        XCTAssertEqual(legacy.customWrappers, [])
+    }
+
     func testEnglishLongPressOffersScriptAndBoldItalicForEveryLetter() {
         let preferences = KeyboardPreferences()
         let lowercase = Array("abcdefghijklmnopqrstuvwxyz")

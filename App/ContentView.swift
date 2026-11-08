@@ -607,6 +607,9 @@ private struct KeyScratchExperimentLab: View {
     @State private var draft: KeyboardPreferences
     @State private var testText = ""
     @State private var showSymbolPicker = false
+    @State private var wrapperName = ""
+    @State private var wrapperOpening = ""
+    @State private var wrapperClosing = ""
     @State private var status = "Adjust settings, then Apply and test."
     @FocusState private var testing: Bool
     @Environment(\.dismiss) private var dismiss
@@ -720,6 +723,54 @@ private struct KeyScratchExperimentLab: View {
                     Text("Favorite emoji & Unicode")
                 } footer: {
                     Text("Browse hundreds of emoji and Unicode characters, search by name, or enter characters with the standard iPhone emoji keyboard. Tap Apply and test afterward.")
+                }
+
+                Section {
+                    ForEach(draft.customWrappers.indices, id: \.self) { index in
+                        HStack {
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(draft.customWrappers[index].name)
+                                Text(draft.customWrappers[index].opening + " text " + draft.customWrappers[index].closing)
+                                    .font(.caption.monospaced()).foregroundStyle(.secondary)
+                            }
+                            Spacer()
+                            Button(role: .destructive) {
+                                draft.customWrappers.remove(at: index)
+                            } label: {
+                                Image(systemName: "minus.circle")
+                            }
+                            .accessibilityLabel("Remove " + draft.customWrappers[index].name)
+                        }
+                    }
+                    TextField("Name (for example, Spoiler)", text: $wrapperName)
+                        .textInputAutocapitalization(.words)
+                    HStack {
+                        TextField("Opening text", text: $wrapperOpening)
+                            .textInputAutocapitalization(.never).autocorrectionDisabled()
+                        TextField("Closing text", text: $wrapperClosing)
+                            .textInputAutocapitalization(.never).autocorrectionDisabled()
+                    }
+                    Button {
+                        let pair = SelectionWrapper(wrapperName.trimmingCharacters(in: .whitespacesAndNewlines),
+                                                    wrapperOpening, wrapperClosing)
+                        guard pair.isUsable, draft.customWrappers.count < 12,
+                              !draft.customWrappers.contains(where: {
+                                  $0.opening == pair.opening && $0.closing == pair.closing
+                              }) else { return }
+                        draft.customWrappers.append(pair)
+                        wrapperName = ""
+                        wrapperOpening = ""
+                        wrapperClosing = ""
+                    } label: {
+                        Label("Add delimiter pair", systemImage: "plus.circle")
+                    }
+                    .disabled(!SelectionWrapper(wrapperName.trimmingCharacters(in: .whitespacesAndNewlines),
+                                                wrapperOpening, wrapperClosing).isUsable
+                              || draft.customWrappers.count >= 12)
+                } header: {
+                    Text("Surround selected text")
+                } footer: {
+                    Text("The ★ keyboard panel offers quotes, brackets, asterisks and other pairs. Add up to 12 personal pairs here. Nothing is changed until you choose Apply and test.")
                 }
 
                 Section("Clipboard access") {
