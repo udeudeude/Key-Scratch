@@ -1000,7 +1000,8 @@ final class FavoriteSymbolsPanel: UIView, UICollectionViewDataSource,
         let star = referenceKeyboard?.cells.first { $0.key.action == .favorites }?.hitFrame
         let frame = star ?? CGRect(x: bounds.midX - 24, y: bounds.height - 41,
                                    width: 48, height: 38)
-        exitKey.frame = frame.insetBy(dx: 1, dy: 1)
+        // The entire original ★ touch area is now the cancel target.
+        exitKey.frame = frame
         let clearance = max(36, bounds.height - frame.minY)
         if abs((listBottom?.constant ?? 0) + clearance) > 0.5 {
             listBottom?.constant = -clearance
