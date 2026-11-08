@@ -475,7 +475,7 @@ enum KeyboardLayout {
         if language == .english {
             return StyledEnglishLetters.forms(for: character) + englishAccents(character)
         }
-        switch (language, character) {
+        return switch (language, character) {
         // Other languages retain their own compact, language-specific holds.
         // Only Ukrainian has ґ; Russian and Serbian г must not offer it.
         case (.ukrainian, "г"): ["ґ"]

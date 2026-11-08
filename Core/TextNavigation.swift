@@ -42,6 +42,18 @@ enum TextEdit: Equatable, Sendable {
 }
 
 enum TextNavigation {
+    /// Space-trackpad motion: an initial dead zone prevents accidental jumps,
+    /// short movements favor character precision and long drags cover more text.
+    /// This is geometric only; the host's proxy still owns its actual cursor.
+    static func trackpadSteps(horizontal displacement: Double) -> Int {
+        guard displacement.isFinite else { return 0 }
+        let distance = max(0, abs(displacement) - 6)
+        let fine = min(distance, 60) / 15
+        let accelerated = max(0, distance - 60) / 8
+        let steps = Int(min(500, (fine + accelerated).rounded(.down)))
+        return displacement < 0 ? -steps : steps
+    }
+
     /// The UTF-16 offset for moving the caret `steps` whole characters, negative to the left.
     /// Past the text the host shares, each step counts as one unit, as before.
     static func offset(steps: Int, before: String, after: String) -> Int {

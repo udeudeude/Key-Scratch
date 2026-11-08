@@ -12,6 +12,12 @@ The temporary five-color mode comparison is complete and **the colored modes and
 
 The scratchpad now has a thin neutral border and 6 pt rounded corners matching the keycaps, with a subtle blue active-focus border. The new app icon refers to a **metal key scratching dark car paint**, rather than a computer keyboard key.
 
+## The ★ character palette and selection wrapping
+
+Tap ★ to open a compact three-part keyboard palette: **★ Favorites** (recently used and pinned characters), **Ω Symbols** (categorised Unicode and emoji), and **Wrap** (quotes, parentheses, brackets, braces, asterisks, double asterisks, backticks, guillemets and more). Unicode browsing is directly inside the keyboard; the companion app's searchable catalog is still the place to manage saved favorites.
+
+To wrap selected text, select it in the host app or Key Scratch scratchpad, tap ★ → Wrap, then choose the pair. If nothing is selected, Key Scratch inserts the opening and closing delimiters and attempts to place the caret between them. A host app may restrict caret positioning; it will never delete neighbouring text to compensate. The companion app's Scratchpad & layout screen accepts up to 12 named **custom delimiter pairs**, included after the built-ins. No additional keys are added to the main typing grid.
+
 ## Multiple note pages and send-to-app
 
 The scratchpad now has **three permanent, compact numbered tabs** at the bottom without a +. Pages 4–8, if previously created or added in the full-size companion app, remain accessible through an overflow ⋯ menu. No existing pages are removed; old notebooks with fewer than three pages are padded with empty pages. Each tab has independent text, selection and scroll position when reopened. The companion app's **Scratchpad** editor has corresponding page tabs, add, clear-current-page and delete-page controls.
@@ -95,7 +101,7 @@ Full Access is used for keyboard **UIPasteboard** operations and writing the sha
 - Standalone English lowercase "i" becomes "I" at a word boundary, while "inside" remains lowercase.
 - English long-press accents are available; the popup now appears near the held key. Holding and releasing unchanged types the original letter; horizontal drag chooses accents.
 - First Delete immediately following a glide removes the entire most recently swiped word if the caret still matches; later Deletes use normal character deletion.
-- Press-and-hold Space activates cursor movement, including up/down through the scratchpad's rendered soft-wrapped lines. For text fields in other apps, Apple provides only a text proxy, not their visual line layout: this implementation handles explicit newlines but cannot precisely match all visual line wraps.
+- Press-and-hold Space activates cursor movement, including up/down through the scratchpad's rendered soft-wrapped lines. Small slides use finer 15 pt character steps after a 6 pt dead zone; longer drags accelerate and movement produces subtle selection feedback. For text fields in other apps, Apple provides only a text proxy, not their visual line layout: this implementation handles explicit newlines but cannot precisely match all visual line wraps.
 - An enabled-by-default "iPhone key positions" option puts Shift / #+= at the lower-left of the third row, Delete at its right, and Return in the lower-right control position on every page. Ortholinear's original geometry remains available in the Lab.
 - The scratchpad now applies punctuation spacing and quick-double-space period rules too.
 

@@ -69,6 +69,7 @@ final class KeyboardView: UIControl {
     var onGlide: (([CGPoint]) -> Void)?
     var onGesture: ((KeyboardGesture) -> Void)?
     let suggestionBar = SuggestionBar()
+    private let cursorFeedback = UISelectionFeedbackGenerator()
     let globeButton = FeedbackButton(type: .custom)
     private let dismissButton = FeedbackButton(type: .custom)
     private(set) var cells: [KeyCell] = []
@@ -572,6 +573,7 @@ final class KeyboardView: UIControl {
             repeatDelete(id: id)
         } else if key.action == .space {
             sessions[id]?.cursorMode = true
+            cursorFeedback.prepare()
             setNeedsDisplay()
         } else if key.action == .favorites {
             // A language hold never toggles editing focus on release.
@@ -647,12 +649,16 @@ final class KeyboardView: UIControl {
                 if session.cursorMode {
                     session.timer?.invalidate()
                     session.timer = nil
-                    let horizontal = Int(dx / 12)
-                    let vertical = Int(dy / 20)
+                    let horizontal = TextNavigation.trackpadSteps(horizontal: Double(dx))
+                    let vertical = Int(dy / 22)
                     let xSteps = horizontal - session.cursorSteps
                     let yRows = vertical - session.cursorRows
                     if xSteps != 0 { onCursor?(xSteps) }
                     if yRows != 0 { onCursorVertical?(yRows) }
+                    if xSteps != 0 || yRows != 0 {
+                        cursorFeedback.selectionChanged()
+                        cursorFeedback.prepare()
+                    }
                     session.cursorSteps = horizontal
                     session.cursorRows = vertical
                     sessions[id] = session

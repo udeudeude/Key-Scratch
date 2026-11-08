@@ -2,6 +2,17 @@ import XCTest
 @testable import OrtholinearCore
 
 final class TextNavigationTests: XCTestCase {
+    func testTrackpadPrecisionDeadZoneAndAcceleration() {
+        XCTAssertEqual(TextNavigation.trackpadSteps(horizontal: 0), 0)
+        XCTAssertEqual(TextNavigation.trackpadSteps(horizontal: 12), 0)
+        XCTAssertEqual(TextNavigation.trackpadSteps(horizontal: 21), 1)
+        XCTAssertEqual(TextNavigation.trackpadSteps(horizontal: -21), -1)
+        XCTAssertEqual(TextNavigation.trackpadSteps(horizontal: 66), 4)
+        XCTAssertEqual(TextNavigation.trackpadSteps(horizontal: 146), 14)
+        XCTAssertEqual(TextNavigation.trackpadSteps(horizontal: .infinity), 0)
+        XCTAssertEqual(TextNavigation.trackpadSteps(horizontal: .nan), 0)
+    }
+
     private func edit(_ command: KeyCommand, _ text: String) -> TextEdit? {
         let parts = text.components(separatedBy: "|")
         return TextNavigation.edit(for: command, before: parts[0], after: parts[1])
