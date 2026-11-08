@@ -796,118 +796,177 @@ private extension UIColor {
     }
 }
 
-/// One compact in-keyboard palette. The companion app owns searchable catalog
-/// management; this surface concentrates on fast insertion and selection wrapping.
+/// A lightweight character finder. The ordinary typing keyboard never creates
+/// its catalog or grid until ★ is opened. Collection cells are reused even
+/// when a category contains hundreds of Unicode characters.
 @MainActor
-final class FavoriteSymbolsPanel: UIView {
+final class FavoriteSymbolsPanel: UIView, UICollectionViewDataSource,
+                                   UICollectionViewDelegateFlowLayout {
     var onPick: ((String) -> Void)?
     var onWrap: ((SelectionWrapper) -> Void)?
     var onClose: (() -> Void)?
+    weak var referenceKeyboard: KeyboardView?
 
     private enum Page: Int { case favorites, symbols, wrapping }
-    private static let categories: [(name: String, characters: [String])] = [
-        ("Typography", "… · • ‣ ‧ ′ ″ ‹ › « » “ ” ‘ ’ ‽ ¿ ¡ § ¶ † ‡ № © ® ™ ° ⁂".split(separator: " ").map(String.init)),
-        ("Arrows", "← → ↑ ↓ ↔ ↕ ↖ ↗ ↘ ↙ ⇐ ⇒ ⇔ ⇑ ⇓ ↩ ↪ ↳ ↶ ↷ ⟵ ⟶ ⟷ ➜ ➝ ➞ ➤ ⤴ ⤵".split(separator: " ").map(String.init)),
-        ("Mathematics", "± × ÷ ≠ ≈ ≡ ≤ ≥ ∞ √ ∛ ∑ ∏ ∫ ∂ ∇ ∆ π τ φ θ λ Ω ∈ ∉ ∅ ∩ ∪ ∴ ∵ ∝ ∠ ⊕ ⊗".split(separator: " ").map(String.init)),
-        ("Writing", "☐ ☑ ☒ ✓ ✔ ✗ ✘ ★ ☆ ◆ ◇ ◉ ○ ● □ ■ ▸ ▹ ▪ ▫ ♡ ♥ ⚑ ☞ ☜ ☛ ☟".split(separator: " ").map(String.init)),
-        ("Currency", "$ € £ ¥ ¢ ₹ ₩ ₽ ₴ ₿ ₺ ₫ ₪ ₦ ₱ ฿ ₡ ₵ ₸".split(separator: " ").map(String.init)),
-        ("Music", "♩ ♪ ♫ ♬ ♭ ♮ ♯ 𝄞 𝄢 ♠ ♣ ♥ ♦ ⚀ ⚁ ⚂ ⚃ ⚄ ⚅".split(separator: " ").map(String.init)),
-        ("Science", "° ℃ ℉ µ Å Ω Ω ℏ 𝛼 𝛽 𝛾 𝛿 𝜀 𝜇 𝜋 𝜎 𝜔 ♂ ♀ ⚥ ⚛ ⚗ ⌘ ⌥ ⌫ ⏎".split(separator: " ").map(String.init)),
-        ("Emoji", "😀 😂 😅 🙂 🙃 😉 😍 🤔 🤨 😎 🥹 🥰 🫡 😬 👍 👎 👏 🙌 🙏 🫶 ❤️ 🩷 💙 💚 ✨ 🔥 🎉 ☕ 📌 💡 📝".split(separator: " ").map(String.init))
-    ]
+    private enum Item {
+        case character(CharacterFinderItem)
+        case wrapper(SelectionWrapper)
+    }
 
-    private let heading = UILabel()
-    private let done = UIButton(type: .system)
-    private let modes = UISegmentedControl(items: ["Favorites", "Symbols", "Wrap"])
-    private let hint = UILabel()
+    private let pages = UISegmentedControl(items: ["Favorites", "Symbols", "Wrap"])
+    private let searchButton = UIButton(type: .system)
     private let categoryButton = UIButton(type: .system)
-    private let scroller = UIScrollView()
-    private let grid = UIStackView()
+    private let exitKey = UIButton(type: .system)
+    private let list: UICollectionView
+    private let searchHeader = UIView()
+    private let searchLabel = UILabel()
+    private let clearSearch = UIButton(type: .system)
+    private let showMatches = UIButton(type: .system)
+    private let searchKeys = UIStackView()
+    private var listBottom: NSLayoutConstraint?
+    private var searchBottom: NSLayoutConstraint?
+
     private var page = Page.favorites
     private var categoryIndex = 0
     private var favorites: [String] = []
     private var recent: [String] = []
     private var wrappers: [SelectionWrapper] = []
-    private var displayedColumns = 0
+    private var query = ""
+    private var isEnteringQuery = false
+    private var visible: [Item] = []
 
     override init(frame: CGRect) {
+        let layout = UICollectionViewFlowLayout()
+        layout.minimumInteritemSpacing = 4
+        layout.minimumLineSpacing = 4
+        layout.sectionInset = UIEdgeInsets(top: 3, left: 5, bottom: 3, right: 5)
+        list = UICollectionView(frame: .zero, collectionViewLayout: layout)
         super.init(frame: frame)
         backgroundColor = .secondarySystemBackground
-        layer.borderWidth = 0.5
-        layer.borderColor = UIColor.separator.cgColor
         accessibilityIdentifier = "key-scratch-quick-palette"
 
-        heading.font = .systemFont(ofSize: 13, weight: .semibold)
-        heading.textColor = .label
-        heading.translatesAutoresizingMaskIntoConstraints = false
-        addSubview(heading)
+        pages.selectedSegmentIndex = 0
+        pages.accessibilityIdentifier = "character-palette-sections"
+        pages.addTarget(self, action: #selector(selectPage), for: .valueChanged)
+        pages.translatesAutoresizingMaskIntoConstraints = false
+        addSubview(pages)
 
-        done.setTitle("Done", for: .normal)
-        done.titleLabel?.font = .systemFont(ofSize: 13, weight: .semibold)
-        done.accessibilityLabel = "Close the character palette"
-        done.addAction(UIAction { [weak self] _ in self?.onClose?() }, for: .touchUpInside)
-        done.translatesAutoresizingMaskIntoConstraints = false
-        addSubview(done)
+        searchButton.contentHorizontalAlignment = .left
+        searchButton.titleLabel?.font = .systemFont(ofSize: 12)
+        searchButton.backgroundColor = .tertiarySystemFill
+        searchButton.layer.cornerRadius = 7
+        searchButton.accessibilityIdentifier = "character-palette-search"
+        searchButton.addAction(UIAction { [weak self] _ in self?.startSearch() }, for: .touchUpInside)
+        searchButton.translatesAutoresizingMaskIntoConstraints = false
+        addSubview(searchButton)
 
-        modes.selectedSegmentIndex = 0
-        modes.accessibilityLabel = "Character palette"
-        modes.addTarget(self, action: #selector(changePage), for: .valueChanged)
-        modes.translatesAutoresizingMaskIntoConstraints = false
-        addSubview(modes)
-
-        hint.font = .systemFont(ofSize: 11)
-        hint.textColor = .secondaryLabel
-        hint.adjustsFontSizeToFitWidth = true
-        hint.minimumScaleFactor = 0.8
-        hint.translatesAutoresizingMaskIntoConstraints = false
-        addSubview(hint)
-
-        categoryButton.contentHorizontalAlignment = .left
+        categoryButton.contentHorizontalAlignment = .right
         categoryButton.titleLabel?.font = .systemFont(ofSize: 12, weight: .medium)
         categoryButton.showsMenuAsPrimaryAction = true
+        categoryButton.accessibilityIdentifier = "character-palette-category"
         categoryButton.translatesAutoresizingMaskIntoConstraints = false
         addSubview(categoryButton)
 
-        scroller.showsVerticalScrollIndicator = true
-        scroller.alwaysBounceVertical = false
-        scroller.translatesAutoresizingMaskIntoConstraints = false
-        addSubview(scroller)
-        grid.axis = .vertical
-        grid.distribution = .fill
-        grid.spacing = 4
-        grid.translatesAutoresizingMaskIntoConstraints = false
-        scroller.addSubview(grid)
+        list.backgroundColor = .clear
+        list.showsVerticalScrollIndicator = true
+        list.keyboardDismissMode = .none
+        list.register(CharacterCell.self, forCellWithReuseIdentifier: "glyph")
+        list.dataSource = self
+        list.delegate = self
+        list.accessibilityIdentifier = "character-palette-results"
+        list.translatesAutoresizingMaskIntoConstraints = false
+        addSubview(list)
+
+        // Search uses its OWN little touch keypad: a third-party keyboard
+        // extension must not cause typing to go into its host application's
+        // text field merely to search the picker.
+        searchHeader.translatesAutoresizingMaskIntoConstraints = false
+        addSubview(searchHeader)
+        searchLabel.font = .systemFont(ofSize: 12, weight: .medium)
+        searchLabel.lineBreakMode = .byTruncatingHead
+        searchLabel.accessibilityIdentifier = "character-palette-query"
+        searchLabel.translatesAutoresizingMaskIntoConstraints = false
+        searchHeader.addSubview(searchLabel)
+
+        clearSearch.setTitle("Clear", for: .normal)
+        clearSearch.titleLabel?.font = .systemFont(ofSize: 12)
+        clearSearch.addAction(UIAction { [weak self] _ in
+            self?.query = ""
+            self?.updateSearchLabel()
+        }, for: .touchUpInside)
+        clearSearch.translatesAutoresizingMaskIntoConstraints = false
+        searchHeader.addSubview(clearSearch)
+
+        showMatches.setTitle("Results", for: .normal)
+        showMatches.titleLabel?.font = .systemFont(ofSize: 12, weight: .semibold)
+        showMatches.addAction(UIAction { [weak self] _ in self?.finishSearch() }, for: .touchUpInside)
+        showMatches.translatesAutoresizingMaskIntoConstraints = false
+        searchHeader.addSubview(showMatches)
+
+        searchKeys.axis = .vertical
+        searchKeys.distribution = .fillEqually
+        searchKeys.spacing = 2
+        searchKeys.translatesAutoresizingMaskIntoConstraints = false
+        addSubview(searchKeys)
+        makeSearchKeypad()
+
+        // An actual button overlays the ORIGINAL ★ key's hit rectangle, not
+        // an arbitrary header close button. It never inserts any character.
+        exitKey.setTitle("×", for: .normal)
+        exitKey.titleLabel?.font = .systemFont(ofSize: 25, weight: .medium)
+        exitKey.backgroundColor = .tertiarySystemGroupedBackground
+        exitKey.tintColor = .label
+        exitKey.layer.cornerRadius = 8
+        exitKey.accessibilityLabel = "Close character menu without inserting"
+        exitKey.accessibilityIdentifier = "star-palette-close"
+        exitKey.addAction(UIAction { [weak self] _ in self?.onClose?() }, for: .touchUpInside)
+        addSubview(exitKey)
 
         NSLayoutConstraint.activate([
-            heading.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 10),
-            heading.topAnchor.constraint(equalTo: topAnchor, constant: 3),
-            heading.heightAnchor.constraint(equalToConstant: 25),
-            done.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -7),
-            done.topAnchor.constraint(equalTo: topAnchor, constant: 1),
-            done.widthAnchor.constraint(greaterThanOrEqualToConstant: 44),
-            done.heightAnchor.constraint(equalToConstant: 27),
-            modes.topAnchor.constraint(equalTo: heading.bottomAnchor, constant: 2),
-            modes.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 7),
-            modes.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -7),
-            modes.heightAnchor.constraint(equalToConstant: 30),
-            hint.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 10),
-            hint.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -8),
-            hint.topAnchor.constraint(equalTo: modes.bottomAnchor, constant: 1),
-            hint.heightAnchor.constraint(equalToConstant: 23),
-            categoryButton.leadingAnchor.constraint(equalTo: hint.leadingAnchor),
-            categoryButton.trailingAnchor.constraint(equalTo: hint.trailingAnchor),
-            categoryButton.topAnchor.constraint(equalTo: hint.topAnchor),
-            categoryButton.heightAnchor.constraint(equalToConstant: 23),
-            scroller.topAnchor.constraint(equalTo: hint.bottomAnchor),
-            scroller.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 5),
-            scroller.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -5),
-            scroller.bottomAnchor.constraint(equalTo: bottomAnchor, constant: -3),
-            grid.topAnchor.constraint(equalTo: scroller.contentLayoutGuide.topAnchor),
-            grid.leadingAnchor.constraint(equalTo: scroller.contentLayoutGuide.leadingAnchor),
-            grid.trailingAnchor.constraint(equalTo: scroller.contentLayoutGuide.trailingAnchor),
-            grid.bottomAnchor.constraint(equalTo: scroller.contentLayoutGuide.bottomAnchor),
-            grid.widthAnchor.constraint(equalTo: scroller.frameLayoutGuide.widthAnchor)
+            pages.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 6),
+            pages.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -6),
+            pages.topAnchor.constraint(equalTo: topAnchor, constant: 2),
+            pages.heightAnchor.constraint(equalToConstant: 27),
+            searchButton.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 7),
+            searchButton.topAnchor.constraint(equalTo: pages.bottomAnchor, constant: 3),
+            searchButton.heightAnchor.constraint(equalToConstant: 26),
+            categoryButton.leadingAnchor.constraint(equalTo: searchButton.trailingAnchor, constant: 4),
+            categoryButton.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -6),
+            categoryButton.topAnchor.constraint(equalTo: searchButton.topAnchor),
+            categoryButton.heightAnchor.constraint(equalTo: searchButton.heightAnchor),
+            list.leadingAnchor.constraint(equalTo: leadingAnchor),
+            list.trailingAnchor.constraint(equalTo: trailingAnchor),
+            list.topAnchor.constraint(equalTo: searchButton.bottomAnchor, constant: 4),
+            searchHeader.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 6),
+            searchHeader.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -6),
+            searchHeader.topAnchor.constraint(equalTo: topAnchor),
+            searchHeader.heightAnchor.constraint(equalToConstant: 25),
+            clearSearch.trailingAnchor.constraint(equalTo: showMatches.leadingAnchor, constant: -4),
+            clearSearch.topAnchor.constraint(equalTo: searchHeader.topAnchor),
+            clearSearch.bottomAnchor.constraint(equalTo: searchHeader.bottomAnchor),
+            clearSearch.widthAnchor.constraint(equalToConstant: 42),
+            showMatches.trailingAnchor.constraint(equalTo: searchHeader.trailingAnchor),
+            showMatches.topAnchor.constraint(equalTo: searchHeader.topAnchor),
+            showMatches.bottomAnchor.constraint(equalTo: searchHeader.bottomAnchor),
+            showMatches.widthAnchor.constraint(equalToConstant: 56),
+            searchLabel.leadingAnchor.constraint(equalTo: searchHeader.leadingAnchor, constant: 3),
+            searchLabel.trailingAnchor.constraint(equalTo: clearSearch.leadingAnchor, constant: -4),
+            searchLabel.centerYAnchor.constraint(equalTo: searchHeader.centerYAnchor),
+            searchKeys.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 4),
+            searchKeys.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -4),
+            searchKeys.topAnchor.constraint(equalTo: searchHeader.bottomAnchor, constant: 3)
         ])
+        // One category chooser, hidden outside Symbols. When hidden, search
+        // expands to full width without leaving a blank half of the row.
+        let chooserWidth = categoryButton.widthAnchor.constraint(equalToConstant: 111)
+        chooserWidth.isActive = true
+        let searchWidth = searchButton.trailingAnchor.constraint(equalTo: categoryButton.leadingAnchor, constant: -4)
+        searchWidth.priority = .defaultHigh
+        searchWidth.isActive = true
+        listBottom = list.bottomAnchor.constraint(equalTo: bottomAnchor, constant: -43)
+        searchBottom = searchKeys.bottomAnchor.constraint(equalTo: bottomAnchor, constant: -43)
+        listBottom?.isActive = true
+        searchBottom?.isActive = true
         updatePage()
     }
 
@@ -917,149 +976,219 @@ final class FavoriteSymbolsPanel: UIView {
         self.favorites = favorites
         self.recent = recent
         self.wrappers = wrappers
-        // Reopening the palette should return to the last category or tool,
-        // not force repeated navigation back through Favorites.
-        modes.selectedSegmentIndex = page.rawValue
+        isEnteringQuery = false
+        pages.selectedSegmentIndex = page.rawValue
         updatePage()
     }
 
-    @objc private func changePage() {
-        guard let new = Page(rawValue: modes.selectedSegmentIndex) else { return }
-        page = new
+    override func layoutSubviews() {
+        super.layoutSubviews()
+        // Coordinate spaces are identical: this view fills the KeyboardView.
+        let star = referenceKeyboard?.cells.first { $0.key.action == .favorites }?.hitFrame
+        let frame = star ?? CGRect(x: bounds.midX - 24, y: bounds.height - 41,
+                                   width: 48, height: 38)
+        exitKey.frame = frame.insetBy(dx: 1, dy: 1)
+        let clearance = max(36, bounds.height - frame.minY)
+        if abs((listBottom?.constant ?? 0) + clearance) > 0.5 {
+            listBottom?.constant = -clearance
+            searchBottom?.constant = -clearance
+        }
+        let chooseCategory = page == .symbols && query.isEmpty && !isEnteringQuery
+        categoryButton.isHidden = !chooseCategory
+        let searchWidth = chooseCategory ? max(70, bounds.width - 134) : max(70, bounds.width - 14)
+        if abs(searchButton.bounds.width - searchWidth) > 0.5 {
+            searchButton.widthAnchor.constraint(equalToConstant: searchWidth).isActive = true
+        }
+    }
+
+    @objc private func selectPage() {
+        guard let selected = Page(rawValue: pages.selectedSegmentIndex) else { return }
+        page = selected
         updatePage()
     }
 
     private func updatePage() {
-        heading.text = page == .favorites ? "Your characters"
-            : page == .symbols ? "Symbol library" : "Surround text"
-        hint.text = page == .favorites ? "Recent first · favorites below"
-            : page == .wrapping ? "Selection, or insert a pair at the cursor" : ""
-        hint.isHidden = page == .symbols
-        categoryButton.isHidden = page != .symbols
-        if page == .symbols {
-            categoryButton.setTitle(Self.categories[categoryIndex].name + "  ▾", for: .normal)
-            categoryButton.accessibilityLabel = "Symbol category: " + Self.categories[categoryIndex].name
-            categoryButton.menu = UIMenu(children: Self.categories.enumerated().map { index, category in
-                UIAction(title: category.name, state: index == categoryIndex ? .on : .off) { [weak self] _ in
+        pages.isHidden = isEnteringQuery
+        searchButton.isHidden = isEnteringQuery
+        categoryButton.isHidden = isEnteringQuery || page != .symbols || !query.isEmpty
+        list.isHidden = isEnteringQuery
+        searchHeader.isHidden = !isEnteringQuery
+        searchKeys.isHidden = !isEnteringQuery
+        if isEnteringQuery {
+            updateSearchLabel()
+            return
+        }
+        let searching = !query.isEmpty
+        searchButton.setTitle(searching ? "  ⌕  " + query : "  ⌕  Search characters or Unicode numbers",
+                              for: .normal)
+        searchButton.accessibilityLabel = searching ? "Edit search: " + query : "Search Unicode characters"
+        if page == .symbols && !searching {
+            categoryButton.setTitle(CharacterFinder.categories[categoryIndex].title + " ▾", for: .normal)
+            categoryButton.menu = UIMenu(children: CharacterFinder.categories.enumerated().map { index, group in
+                UIAction(title: group.title, state: index == categoryIndex ? .on : .off) { [weak self] _ in
                     self?.categoryIndex = index
                     self?.updatePage()
                 }
             })
         }
-        displayedColumns = 0
-        setNeedsLayout()
-        layoutIfNeeded()
-    }
-
-    override func layoutSubviews() {
-        super.layoutSubviews()
-        let columns = page == .wrapping ? (bounds.width >= 210 ? 2 : 1)
-            : max(3, min(8, Int(max(0, bounds.width - 10) / 46)))
-        guard columns != displayedColumns else { return }
-        displayedColumns = columns
-        rebuild(columns: columns)
-    }
-
-    private func rebuild(columns: Int) {
-        for child in grid.arrangedSubviews {
-            grid.removeArrangedSubview(child)
-            child.removeFromSuperview()
-        }
         switch page {
         case .favorites:
-            let pinned = favorites.filter { !recent.contains($0) }
-            if !recent.isEmpty { addSection("Recently used", symbols: recent, columns: columns) }
-            if !pinned.isEmpty { addSection("Favorites", symbols: pinned, columns: columns) }
-            if recent.isEmpty && pinned.isEmpty { addEmpty("Add characters in Key Scratch settings.") }
+            var unique = Set<String>()
+            let symbols = (recent + favorites).filter { !$0.isEmpty && unique.insert($0).inserted }
+            visible = symbols.map { symbol in
+                let existing = CharacterFinder.items.first { $0.symbol == symbol }
+                return .character(existing ?? .init(symbol: symbol,
+                                                    name: symbol, category: "Favorites",
+                                                    code: symbol.unicodeScalars.map {
+                                                        "U+" + String($0.value, radix: 16, uppercase: true)
+                                                    }.joined(separator: " ")))
+            }
         case .symbols:
-            addSection(nil, symbols: Self.categories[categoryIndex].characters, columns: columns)
+            visible = (searching ? CharacterFinder.search(query)
+                       : CharacterFinder.symbols(in: CharacterFinder.categories[categoryIndex].title))
+                .map(Item.character)
         case .wrapping:
-            addWrappers(columns: columns)
+            visible = (SelectionWrapper.builtIn + wrappers.filter(\.isUsable)).map(Item.wrapper)
         }
-        scroller.setContentOffset(.zero, animated: false)
+        list.reloadData()
+        list.setContentOffset(.zero, animated: false)
+        (list.collectionViewLayout as? UICollectionViewFlowLayout)?.invalidateLayout()
+        setNeedsLayout()
     }
 
-    private func addSection(_ name: String?, symbols: [String], columns: Int) {
-        if let name { addHeading(name) }
-        for offset in stride(from: 0, to: symbols.count, by: columns) {
-            let row = makeRow()
-            for column in 0..<columns {
-                let index = offset + column
-                if index < symbols.count {
-                    let value = symbols[index]
-                    let button = makeButton()
-                    button.setTitle(value, for: .normal)
-                    button.titleLabel?.font = .systemFont(ofSize: 22)
-                    button.accessibilityLabel = "Insert " + value
-                    button.addAction(UIAction { [weak self] _ in self?.onPick?(value) }, for: .touchUpInside)
-                    row.addArrangedSubview(button)
-                } else {
-                    row.addArrangedSubview(UIView())
-                }
+    private func startSearch() {
+        isEnteringQuery = true
+        updatePage()
+    }
+
+    private func finishSearch() {
+        isEnteringQuery = false
+        page = .symbols
+        pages.selectedSegmentIndex = page.rawValue
+        updatePage()
+    }
+
+    private func updateSearchLabel() {
+        searchLabel.text = query.isEmpty ? "Search: " : "Search: " + query
+        searchLabel.accessibilityLabel = searchLabel.text
+    }
+
+    private func typeSearch(_ key: String) {
+        if key == "⌫" {
+            if !query.isEmpty { query.removeLast() }
+        } else if key == "space" {
+            if query.count < 48 { query.append(" ") }
+        } else if query.count < 48 {
+            query += key.lowercased()
+        }
+        updateSearchLabel()
+    }
+
+    private func makeSearchKeypad() {
+        for rowValues in [
+            "1234567890".map(String.init),
+            "qwertyuiop".map(String.init),
+            "asdfghjkl".map(String.init),
+            "zxcvbnm".map(String.init) + ["space", "⌫"]
+        ] {
+            let row = UIStackView()
+            row.axis = .horizontal
+            row.distribution = .fillEqually
+            row.spacing = 3
+            for value in rowValues {
+                let button = UIButton(type: .system)
+                button.setTitle(value == "space" ? "␣" : value, for: .normal)
+                button.titleLabel?.font = .systemFont(ofSize: 16, weight: .medium)
+                button.tintColor = .label
+                button.backgroundColor = .tertiarySystemGroupedBackground
+                button.layer.cornerRadius = 5
+                button.accessibilityLabel = value == "space" ? "Space" : value == "⌫" ? "Delete search character" : value
+                button.addAction(UIAction { [weak self] _ in self?.typeSearch(value) }, for: .touchUpInside)
+                row.addArrangedSubview(button)
             }
-            row.heightAnchor.constraint(equalToConstant: 42).isActive = true
-            grid.addArrangedSubview(row)
+            searchKeys.addArrangedSubview(row)
         }
     }
 
-    private func addWrappers(columns: Int) {
-        let options = SelectionWrapper.builtIn + wrappers.filter(\.isUsable)
-        for offset in stride(from: 0, to: options.count, by: columns) {
-            let row = makeRow()
-            for column in 0..<columns {
-                let index = offset + column
-                if index < options.count {
-                    let pair = options[index]
-                    let button = makeButton()
-                    var style = UIButton.Configuration.plain()
-                    style.title = pair.opening + " text " + pair.closing
-                    style.subtitle = pair.name
-                    style.titleAlignment = .center
-                    style.baseForegroundColor = .label
-                    button.configuration = style
-                    button.accessibilityLabel = "Surround selection with " + pair.name
-                    button.addAction(UIAction { [weak self] _ in self?.onWrap?(pair) }, for: .touchUpInside)
-                    row.addArrangedSubview(button)
-                } else {
-                    row.addArrangedSubview(UIView())
-                }
-            }
-            row.heightAnchor.constraint(equalToConstant: 47).isActive = true
-            grid.addArrangedSubview(row)
+    func collectionView(_ collectionView: UICollectionView, numberOfItemsInSection section: Int) -> Int {
+        visible.count
+    }
+
+    func collectionView(_ collectionView: UICollectionView, cellForItemAt indexPath: IndexPath)
+        -> UICollectionViewCell {
+        let cell = collectionView.dequeueReusableCell(withReuseIdentifier: "glyph", for: indexPath)
+        guard let glyph = cell as? CharacterCell else { return cell }
+        switch visible[indexPath.item] {
+        case .character(let value):
+            glyph.set(symbol: value.symbol, subtitle: nil)
+            glyph.accessibilityLabel = "Insert " + value.name + ", " + value.code
+        case .wrapper(let pair):
+            glyph.set(symbol: pair.opening + " text " + pair.closing, subtitle: pair.name)
+            glyph.accessibilityLabel = "Surround selection with " + pair.name
+        }
+        return glyph
+    }
+
+    func collectionView(_ collectionView: UICollectionView, didSelectItemAt indexPath: IndexPath) {
+        guard visible.indices.contains(indexPath.item) else { return }
+        switch visible[indexPath.item] {
+        case .character(let value): onPick?(value.symbol)
+        case .wrapper(let value): onWrap?(value)
         }
     }
 
-    private func makeRow() -> UIStackView {
-        let row = UIStackView()
-        row.axis = .horizontal
-        row.spacing = 4
-        row.distribution = .fillEqually
-        return row
+    func collectionView(_ collectionView: UICollectionView, layout collectionViewLayout: UICollectionViewLayout,
+                        sizeForItemAt indexPath: IndexPath) -> CGSize {
+        let wraps = page == .wrapping
+        let count = wraps ? (bounds.width >= 230 ? 2 : 1)
+                          : max(3, min(10, Int(max(0, collectionView.bounds.width - 10) / 45)))
+        let width = floor((max(1, collectionView.bounds.width - 10) - CGFloat(count - 1) * 4)
+                          / CGFloat(count))
+        return CGSize(width: max(1, width), height: wraps ? 48 : 42)
     }
+}
 
-    private func makeButton() -> UIButton {
-        let button = UIButton(type: .system)
-        button.backgroundColor = .tertiarySystemGroupedBackground
-        button.layer.cornerRadius = 8
-        button.tintColor = .label
-        return button
+/// One lightweight reusable cell per VISIBLE glyph rather than a full grid
+/// of UIButton instances for an entire Unicode block.
+private final class CharacterCell: UICollectionViewCell {
+    private let glyph = UILabel()
+    private let caption = UILabel()
+    override init(frame: CGRect) {
+        super.init(frame: frame)
+        contentView.backgroundColor = .tertiarySystemGroupedBackground
+        contentView.layer.cornerRadius = 7
+        glyph.textAlignment = .center
+        glyph.adjustsFontSizeToFitWidth = true
+        glyph.minimumScaleFactor = 0.45
+        caption.textAlignment = .center
+        caption.textColor = .secondaryLabel
+        glyph.translatesAutoresizingMaskIntoConstraints = false
+        caption.translatesAutoresizingMaskIntoConstraints = false
+        contentView.addSubview(glyph)
+        contentView.addSubview(caption)
+        NSLayoutConstraint.activate([
+            glyph.topAnchor.constraint(equalTo: contentView.topAnchor, constant: 1),
+            glyph.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 2),
+            glyph.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -2),
+            glyph.bottomAnchor.constraint(equalTo: caption.topAnchor),
+            caption.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 1),
+            caption.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -1),
+            caption.bottomAnchor.constraint(equalTo: contentView.bottomAnchor, constant: -2),
+            caption.heightAnchor.constraint(equalToConstant: 0)
+        ])
+        isAccessibilityElement = true
+        accessibilityTraits = [.button]
     }
-
-    private func addHeading(_ title: String) {
-        let label = UILabel()
-        label.text = title
-        label.font = .systemFont(ofSize: 11, weight: .semibold)
-        label.textColor = .secondaryLabel
-        label.heightAnchor.constraint(equalToConstant: 19).isActive = true
-        grid.addArrangedSubview(label)
-    }
-
-    private func addEmpty(_ message: String) {
-        let label = UILabel()
-        label.text = message
-        label.textColor = .secondaryLabel
-        label.font = .systemFont(ofSize: 12)
-        label.numberOfLines = 2
-        grid.addArrangedSubview(label)
+    required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
+    func set(symbol: String, subtitle: String?) {
+        glyph.text = symbol
+        glyph.font = .systemFont(ofSize: subtitle == nil ? 23 : 14)
+        caption.text = subtitle
+        caption.isHidden = subtitle == nil
+        // The two-line wrapping cells use their own bottom caption without
+        // adding a permanent label row to ordinary glyph cells.
+        for item in caption.constraints where item.firstAttribute == .height {
+            item.constant = subtitle == nil ? 0 : 13
+        }
     }
 }
