@@ -337,7 +337,11 @@ final class KeyboardViewController: UIInputViewController {
     private func applySuggestion(_ edit: SuggestionEdit, snapshot: SuggestionSnapshot) {
         pendingGlide = nil
         if scratchpad.isEditingNote {
-            _ = scratchpad.apply(edit, offered: snapshot, document: scratchpadDocumentID,
+            var corrected = edit
+            if inputState.language == .english {
+                corrected.text = EnglishPronoun.normalized(edit.text, completeWord: true)
+            }
+            _ = scratchpad.apply(corrected, offered: snapshot, document: scratchpadDocumentID,
                                  language: inputState.language)
             return
         }
@@ -353,8 +357,10 @@ final class KeyboardViewController: UIInputViewController {
             guard textDocumentProxy.documentContextBeforeInput?.hasSuffix(expected.suffix(24)) == true else { return }
         }
         for _ in 0..<edit.deleteCount { textDocumentProxy.deleteBackward() }
-        textDocumentProxy.insertText(edit.text)
-        if edit.text.hasSuffix(" ") {
+        let corrected = inputState.language == .english && !Self.literalTypes.contains(textDocumentProxy.keyboardType ?? .default)
+            ? EnglishPronoun.normalized(edit.text, completeWord: true) : edit.text
+        textDocumentProxy.insertText(corrected)
+        if corrected.hasSuffix(" ") {
             punctuationSpacing.adoptSpace(before: textDocumentProxy.documentContextBeforeInput ?? "", at: ProcessInfo.processInfo.systemUptime)
         }
         updateAutoShift()
@@ -453,7 +459,9 @@ final class KeyboardViewController: UIInputViewController {
     @discardableResult
     private func insertNote(_ value: String) -> String {
         let before = scratchpad.beforeCaret
-        capitalizeStandaloneI(before: before, incoming: value, inNotes: true)
+        if scratchpad.selectedNoteText.isEmpty {
+            capitalizeStandaloneI(before: before, incoming: value, inNotes: true)
+        }
         let prefs = keyboard.preferences
         let typed = inputState.language == .english
             ? EnglishPronoun.normalized(value, before: scratchpad.beforeCaret,
@@ -821,7 +829,7 @@ final class KeyboardViewController: UIInputViewController {
     @discardableResult
     private func insert(_ value: String) -> String {
         if hasSelection { punctuationSpacing.reset() }
-        if !Self.literalTypes.contains(textDocumentProxy.keyboardType ?? .default) {
+        if !hasSelection && !Self.literalTypes.contains(textDocumentProxy.keyboardType ?? .default) {
             capitalizeStandaloneI(before: textDocumentProxy.documentContextBeforeInput ?? "",
                                    incoming: value, inNotes: false)
         }
