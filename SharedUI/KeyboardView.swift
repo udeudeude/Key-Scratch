@@ -29,7 +29,7 @@ final class KeyboardView: UIControl {
         }
     }
     var preferences = KeyboardPreferences() {
-        didSet { if oldValue != preferences { cancelTouches(); setNeedsLayout() } }
+        didSet { if oldValue != preferences { cancelTouches(); refreshActionsMenu(); setNeedsLayout() } }
     }
     var needsGlobe = true {
         didSet { if oldValue != needsGlobe { cancelTouches(); setNeedsLayout() } }
@@ -64,6 +64,7 @@ final class KeyboardView: UIControl {
     var onCursor: ((Int) -> Void)?
     var onCursorVertical: ((Int) -> Void)?
     var onDismiss: (() -> Void)?
+    var onWrap: ((SelectionWrapper) -> Void)?
     /// Long-press the favorites star to cycle enabled languages.
     var onLanguageHold: (() -> Void)?
     var onGlide: (([CGPoint]) -> Void)?
@@ -130,12 +131,13 @@ final class KeyboardView: UIControl {
         globeButton.accessibilityIdentifier = "key-globe"
         globeButton.highlightChanged = { [weak self] in self?.nativeHighlightChanged(.globe) }
         addSubview(globeButton)
-        dismissButton.setImage(UIImage(systemName: "keyboard.chevron.compact.down"), for: .normal)
+        dismissButton.setImage(UIImage(systemName: "ellipsis"), for: .normal)
         dismissButton.tintColor = palette.secondary
-        dismissButton.accessibilityLabel = "Dismiss keyboard"
+        dismissButton.accessibilityLabel = "More keyboard actions"
         dismissButton.accessibilityIdentifier = "key-header-dismiss"
         dismissButton.highlightChanged = { [weak self] in self?.nativeHighlightChanged(.dismiss) }
-        dismissButton.addAction(UIAction { [weak self] _ in self?.onDismiss?() }, for: .touchUpInside)
+        dismissButton.showsMenuAsPrimaryAction = true
+        refreshActionsMenu()
         addSubview(dismissButton)
         addSubview(suggestionBar)
         // Strip punctuation types like its key, so automatic spacing still applies.
@@ -172,6 +174,22 @@ final class KeyboardView: UIControl {
     private func refresh() {
         setNeedsLayout()
         setNeedsDisplay()
+    }
+
+    private func refreshActionsMenu() {
+        let pairs = SelectionWrapper.builtIn + preferences.customWrappers.filter(\.isUsable)
+        let submenu = UIMenu(title: "Surround selection", image: UIImage(systemName: "curlybraces"),
+                             children: pairs.map { pair in
+            UIAction(title: pair.name, subtitle: pair.opening + " text " + pair.closing) {
+                [weak self] _ in self?.onWrap?(pair)
+            }
+        })
+        dismissButton.menu = UIMenu(children: [
+            submenu,
+            UIAction(title: "Dismiss Keyboard", image: UIImage(systemName: "keyboard.chevron.compact.down")) {
+                [weak self] _ in self?.onDismiss?()
+            }
+        ])
     }
 
     private func updateChrome() {
@@ -514,7 +532,7 @@ final class KeyboardView: UIControl {
                      in: CGRect(x: frame.minX, y: frame.midY + 5, width: frame.width, height: 13),
                      font: .systemFont(ofSize: 10, weight: .semibold), color: color)
         case .dismiss:
-            drawSymbol("keyboard.chevron.compact.down", in: frame, size: 21, color: color)
+            drawSymbol("ellipsis", in: frame, size: 21, color: color)
         case .favorites:
             // Draw the contextual "Notes" or "App" label via normal key text.
             return false
@@ -803,17 +821,12 @@ private extension UIColor {
 final class FavoriteSymbolsPanel: UIView, UICollectionViewDataSource,
                                    UICollectionViewDelegateFlowLayout {
     var onPick: ((String) -> Void)?
-    var onWrap: ((SelectionWrapper) -> Void)?
     var onClose: (() -> Void)?
     weak var referenceKeyboard: KeyboardView?
 
-    private enum Page: Int { case favorites, symbols, wrapping }
-    private enum Item {
-        case character(CharacterFinderItem)
-        case wrapper(SelectionWrapper)
-    }
+    private enum Page: Int { case favorites, symbols }
 
-    private let pages = UISegmentedControl(items: ["Favorites", "Symbols", "Wrap"])
+    private let pages = UISegmentedControl(items: ["Favorites", "Symbols"])
     private let searchButton = UIButton(type: .system)
     private let categoryButton = UIButton(type: .system)
     private let exitKey = UIButton(type: .system)
@@ -832,10 +845,9 @@ final class FavoriteSymbolsPanel: UIView, UICollectionViewDataSource,
     private var categoryIndex = 0
     private var favorites: [String] = []
     private var recent: [String] = []
-    private var wrappers: [SelectionWrapper] = []
     private var query = ""
     private var isEnteringQuery = false
-    private var visible: [Item] = []
+    private var visible: [CharacterFinderItem] = []
 
     override init(frame: CGRect) {
         let layout = UICollectionViewFlowLayout()
@@ -985,10 +997,9 @@ final class FavoriteSymbolsPanel: UIView, UICollectionViewDataSource,
 
     required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
 
-    func configure(favorites: [String], recent: [String], wrappers: [SelectionWrapper]) {
+    func configure(favorites: [String], recent: [String]) {
         self.favorites = favorites
         self.recent = recent
-        self.wrappers = wrappers
         isEnteringQuery = false
         pages.selectedSegmentIndex = page.rawValue
         updatePage()
@@ -1049,25 +1060,20 @@ final class FavoriteSymbolsPanel: UIView, UICollectionViewDataSource,
             var unique = Set<String>()
             let symbols = (recent + favorites).filter { !$0.isEmpty && unique.insert($0).inserted }
             visible = symbols.map { symbol in
-                let existing = CharacterFinder.items.first { $0.symbol == symbol }
-                return .character(existing ?? .init(symbol: symbol,
-                                                    name: symbol, category: "Favorites",
-                                                    code: symbol.unicodeScalars.map {
-                                                        "U+" + String($0.value, radix: 16, uppercase: true)
-                                                    }.joined(separator: " ")))
+                CharacterFinder.items.first { $0.symbol == symbol }
+                    ?? .init(symbol: symbol, name: symbol, category: "Favorites",
+                             code: symbol.unicodeScalars.map {
+                                 "U+" + String($0.value, radix: 16, uppercase: true)
+                             }.joined(separator: " "))
             }
         case .symbols:
-            visible = (searching ? CharacterFinder.search(query)
-                       : CharacterFinder.symbols(in: CharacterFinder.categories[categoryIndex].title))
-                .map(Item.character)
-        case .wrapping:
-            visible = (SelectionWrapper.builtIn + wrappers.filter(\.isUsable)).map(Item.wrapper)
+            visible = searching ? CharacterFinder.search(query)
+                : CharacterFinder.symbols(in: CharacterFinder.categories[categoryIndex].title)
         }
         list.reloadData()
         emptyMessage.text = page == .favorites ? "No favorites yet. Add some in settings."
-            : page == .symbols ? (searching ? "No matching characters. Try a shorter name."
-                                            : "No characters in this category.")
-            : "No wrapping options."
+            : (searching ? "No matching characters. Try a shorter name."
+                         : "No characters in this category.")
         emptyMessage.isHidden = !visible.isEmpty
         list.setContentOffset(.zero, animated: false)
         (list.collectionViewLayout as? UICollectionViewFlowLayout)?.invalidateLayout()
@@ -1135,33 +1141,23 @@ final class FavoriteSymbolsPanel: UIView, UICollectionViewDataSource,
         -> UICollectionViewCell {
         let cell = collectionView.dequeueReusableCell(withReuseIdentifier: "glyph", for: indexPath)
         guard let glyph = cell as? CharacterCell else { return cell }
-        switch visible[indexPath.item] {
-        case .character(let value):
-            glyph.set(symbol: value.symbol, subtitle: nil)
-            glyph.accessibilityLabel = "Insert " + value.name + ", " + value.code
-        case .wrapper(let pair):
-            glyph.set(symbol: pair.opening + " text " + pair.closing, subtitle: pair.name)
-            glyph.accessibilityLabel = "Surround selection with " + pair.name
-        }
+        let value = visible[indexPath.item]
+        glyph.set(symbol: value.symbol, subtitle: nil)
+        glyph.accessibilityLabel = "Insert " + value.name + ", " + value.code
         return glyph
     }
 
     func collectionView(_ collectionView: UICollectionView, didSelectItemAt indexPath: IndexPath) {
         guard visible.indices.contains(indexPath.item) else { return }
-        switch visible[indexPath.item] {
-        case .character(let value): onPick?(value.symbol)
-        case .wrapper(let value): onWrap?(value)
-        }
+        onPick?(visible[indexPath.item].symbol)
     }
 
     func collectionView(_ collectionView: UICollectionView, layout collectionViewLayout: UICollectionViewLayout,
                         sizeForItemAt indexPath: IndexPath) -> CGSize {
-        let wraps = page == .wrapping
-        let count = wraps ? (bounds.width >= 230 ? 2 : 1)
-                          : max(3, min(10, Int(max(0, collectionView.bounds.width - 10) / 45)))
+        let count = max(3, min(10, Int(max(0, collectionView.bounds.width - 10) / 45)))
         let width = floor((max(1, collectionView.bounds.width - 10) - CGFloat(count - 1) * 4)
                           / CGFloat(count))
-        return CGSize(width: max(1, width), height: wraps ? 48 : 42)
+        return CGSize(width: max(1, width), height: 42)
     }
 }
 
