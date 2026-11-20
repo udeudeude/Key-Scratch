@@ -19,7 +19,10 @@ final class SuggestionBar: UIView {
     var onWrap: ((SelectionWrapper) -> Void)?
     /// Delimiters are supplied by KeyboardView. The suggestion-row ⋯ is the
     /// existing keyboard actions menu, including Dismiss keyboard.
-    var wrappers: [SelectionWrapper] = SelectionWrapper.builtIn
+    var wrappers: [SelectionWrapper] = SelectionWrapper.builtIn {
+        didSet { if oldValue != wrappers { rebuildWrapMenu() } }
+    }
+    private var cachedWrapMenu: UIMenu?
     /// Shown between words, in stable positions, so a period is one tap away.
     var punctuation: [String] = [] {
         didSet { if oldValue != punctuation { rebuildPunctuation() } }
@@ -65,6 +68,7 @@ final class SuggestionBar: UIView {
         more.accessibilityIdentifier = "suggestion-options"
         more.showsMenuAsPrimaryAction = true
         addSubview(more)
+        rebuildWrapMenu()
     }
     required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
 
@@ -101,6 +105,18 @@ final class SuggestionBar: UIView {
             button.layer.borderColor = palette.border.cgColor
             button.layer.borderWidth = palette.borderWidth
         }
+    }
+
+    /// The ⋯ menu is refreshed frequently while typing. Cache its nested
+    /// delimiter actions so ordinary keystrokes never allocate 12–24 UIActions.
+    private func rebuildWrapMenu() {
+        cachedWrapMenu = UIMenu(title: "Surround selection",
+                                image: UIImage(systemName: "curlybraces"),
+                                children: wrappers.map { pair in
+            UIAction(title: pair.name, subtitle: pair.opening + " text " + pair.closing) {
+                [weak self] _ in self?.onWrap?(pair)
+            }
+        })
     }
 
     private func rebuildPunctuation() {
@@ -184,13 +200,7 @@ final class SuggestionBar: UIView {
             actions.append(UIMenu(title: "Forget a taught word", children: words))
             actions.append(UIMenu(title: "Clear taught words…", children: [UIAction(title: "Clear words for this language", attributes: .destructive) { [weak self] _ in self?.onClear?() }]))
         }
-        actions.append(UIMenu(title: "Surround selection",
-                              image: UIImage(systemName: "curlybraces"),
-                              children: wrappers.map { pair in
-            UIAction(title: pair.name, subtitle: pair.opening + " text " + pair.closing) {
-                [weak self] _ in self?.onWrap?(pair)
-            }
-        }))
+        if let cachedWrapMenu { actions.append(cachedWrapMenu) }
         actions.append(UIAction(title: "Dismiss keyboard", image: UIImage(systemName: "keyboard.chevron.compact.down")) { [weak self] _ in self?.onDismiss?() })
         more.menu = UIMenu(title: "Words stay on this device", children: actions)
     }
