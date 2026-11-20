@@ -36,6 +36,8 @@ struct SuggestionSettings: View {
                 NavigationLink("Dictionary credits") { DictionaryCreditsView() }
             }
         }
+        .scrollContentBackground(.hidden)
+        .background(CompanionStyle.background)
         .navigationTitle("Suggestions")
         .navigationBarTitleDisplayMode(.inline)
     }
