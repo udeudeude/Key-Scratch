@@ -306,12 +306,14 @@ final class PreviewContainer: UIView, UITextViewDelegate {
         guard let start = editor.position(from: editor.beginningOfDocument, offset: range.location),
               let end = editor.position(from: start, offset: range.length),
               let selection = editor.textRange(from: start, to: end) else { return }
-        editor.replace(selection, withText: edit.text)
-        if let caret = editor.position(from: editor.beginningOfDocument, offset: range.location + edit.text.utf16.count) {
+        let corrected = state.language == .english
+            ? EnglishPronoun.normalized(edit.text, completeWord: true) : edit.text
+        editor.replace(selection, withText: corrected)
+        if let caret = editor.position(from: editor.beginningOfDocument, offset: range.location + corrected.utf16.count) {
             editor.selectedTextRange = editor.textRange(from: caret, to: caret)
         }
         placeholder.isHidden = !editor.text.isEmpty
-        if edit.text.hasSuffix(" ") { punctuationSpacing.adoptSpace(before: textBeforeCaret, at: ProcessInfo.processInfo.systemUptime) }
+        if corrected.hasSuffix(" ") { punctuationSpacing.adoptSpace(before: textBeforeCaret, at: ProcessInfo.processInfo.systemUptime) }
         updateAutoShift()
         keyboard.inputState = state
     }
