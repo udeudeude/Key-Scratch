@@ -2,6 +2,32 @@ import XCTest
 @testable import OrtholinearCore
 
 final class PunctuationSpacingTests: XCTestCase {
+
+    func testEnglishPronounCapitalizationAcrossTypingPaths() {
+        for punctuation in [" ", "\n", ".", ",", "!", "?", ";", ":", "…", "'", "’", "ʼ"] {
+            XCTAssertTrue(EnglishPronoun.finishesPriorI(before: "he said i", incoming: punctuation))
+        }
+        XCTAssertFalse(EnglishPronoun.finishesPriorI(before: "ski", incoming: " "))
+        XCTAssertFalse(EnglishPronoun.finishesPriorI(before: "i", incoming: "n"))
+        XCTAssertFalse(EnglishPronoun.finishesPriorI(before: "i", incoming: "ns"))
+        for pair in [("i'm", "I'm"), ("i’ll", "I’ll"), ("iʼd", "Iʼd"),
+                     ("i'd", "I'd"), ("i'll", "I'll"), ("i've", "I've"),
+                     ("i're", "I're"), ("i ", "I "), ("i?", "I?"),
+                     ("i", "I"), ("i’m here", "I’m here"),
+                     ("we're here i think", "we're here I think")] {
+            XCTAssertEqual(EnglishPronoun.normalized(pair.0, completeWord: true), pair.1)
+        }
+        for word in ["inside", "ski", "indigo", "initiative", "iPhone", "pi", "ibid", "i_science"] {
+            XCTAssertEqual(EnglishPronoun.normalized(word, completeWord: true), word)
+        }
+        XCTAssertEqual(EnglishPronoun.normalized("i", completeWord: false), "i")
+        XCTAssertEqual(EnglishPronoun.normalized("i'm", before: "s", completeWord: true), "i'm")
+        XCTAssertEqual(SuggestionText.cased("i'm", like: "i'm", language: .english), "I'm")
+        XCTAssertEqual(SuggestionText.cased("i'll", like: "i'll", language: .english), "I'll")
+        XCTAssertEqual(SuggestionText.cased("i'd", like: "i'd", language: .english), "I'd")
+        XCTAssertEqual(SuggestionText.cased("i'm", like: "i'm", language: .ukrainian), "iʼm")
+    }
+
     private func type(_ keys: [String], initial: String = "", enabled: Bool = true) -> String {
         var spacing = PunctuationSpacing()
         var text = initial
