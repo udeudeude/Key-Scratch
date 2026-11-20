@@ -12,13 +12,11 @@ The temporary five-color mode comparison is complete and **the colored modes and
 
 The scratchpad now has a thin neutral border and 6 pt rounded corners matching the keycaps, with a subtle blue active-focus border. The new app icon refers to a **metal key scratching dark car paint**, rather than a computer keyboard key.
 
-## The ★ character finder
+## ★ characters and the top-right … menu
 
-Tap ★ for a lightweight finder with **Favorites**, **Symbols**, and **Wrap**. Favorites offers recently inserted and saved characters. Symbols has a broad offline catalog of arrows, mathematics, typography, shapes, technical signs, currency, numbers, mathematical lettering, phonetics, Greek and other letters, music, braille, and emoji. Pick a category and scroll. The catalog is loaded lazily only when ★ opens, and its scrolling grid reuses cells.
+★ opens a character finder with **Favorites** and **Symbols** and local Unicode search. The × key occupies exactly the former ★ key's position and closes the picker without inserting anything.
 
-Tap the **search line** to type a name with the built-in miniature search keypad. This search does not type into the host text field. Tap **Results** to see matches for phrases like `therefore`, `arrow right` or `mathematical script small x`, or type a hexadecimal code such as `u2192` or `u+2192`. Tap the search line again to refine it, or **Clear** on the keypad to search afresh. Wrap offers quotes, parentheses, brackets, braces, asterisks, Markdown delimiters and up to twelve custom pairs from the companion app.
-
-**Close without inserting:** the × key replaces ★ in **the exact original key position** at the bottom of the keyboard, in portrait and landscape. Tapping × closes ★ without changing the document or its selection. Inserting a character or wrapping text closes the panel automatically. The in-app preview uses the same interface. This is a substantial curated Unicode repertoire rather than all Unicode or Apple's proprietary emoji features; invisible modifiers and control characters are omitted.
+**Wrap** has moved into the keyboard's **top-right … menu**, alongside **Dismiss Keyboard**. Choose Surround selection, then a built-in or custom delimiter pair to wrap selected text (or insert a pair with the caret inside). Up to 12 custom pairs can be configured in the companion app. The in-app preview offers this menu too.
 
 ## Multiple note pages and send-to-app
 
