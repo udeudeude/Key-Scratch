@@ -5,189 +5,297 @@ import ImageIO
 private let accent = Color(uiColor: .systemBlue)
 private let paper = Color(uiColor: .systemGroupedBackground)
 
+/// Companion interface only. KeyboardView and its published preferences remain
+/// responsible for the actual keyboard's appearance and interaction.
+private enum CompanionStyle {
+    static let background = Color(uiColor: .systemGroupedBackground)
+    static let card = Color(uiColor: .secondarySystemGroupedBackground)
+    static let ink = Color.primary
+    static let muted = Color.secondary
+    static let line = Color.primary.opacity(0.09)
+    static let accent = Color(uiColor: .systemIndigo)
+    static let radius: CGFloat = 21
+}
+
 struct ContentView: View {
-    /// The app's own copy keeps every extra on; the published copy is what the edition allows.
     @State private var preferences = { var loaded = PreferenceStore.load(); loaded.extrasEnabled = true; return loaded }()
     @State private var showGeometry = false
     @State private var showSetup = false
     @State private var showSystemTest = false
     @State private var showKeyScratchLab = false
     @State private var showFullNotes = false
+    @State private var showCharacterLibrary = false
     @State private var saveError: String?
     @State private var triedGestures: Set<KeyboardGesture> = []
+    @State private var showGestureGuide = false
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 26) {
-                HStack(spacing: 10) {
-                    Image("KeyScratchIcon")
-                        .resizable()
-                        .interpolation(.high)
-                        .frame(width: 36, height: 36)
-                        .clipShape(RoundedRectangle(cornerRadius: 9))
-                        .accessibilityLabel("Key Scratch car-key icon")
-                    Text("Key Scratch").font(.system(size: 23, weight: .bold))
-                    Spacer()
-                    Text(languageBadge).font(.system(size: 10, weight: .semibold, design: .monospaced))
-                        .padding(.horizontal, 10).padding(.vertical, 7)
-                        .overlay(Capsule().stroke(.primary.opacity(0.18)))
-                    Button { showGeometry = true } label: {
-                        Label("Settings", systemImage: "slider.horizontal.3")
-                            .font(.system(size: 12, weight: .semibold)).frame(minHeight: 40)
-                    }.accessibilityLabel("Customize keyboard").accessibilityIdentifier("customize-keyboard")
+        NavigationStack {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 22) {
+                    masthead
+                    introduction
+                    workspaces
+                    keyboardWorkbench
+                    bottomActions
+                    footer
                 }
-                .padding(.top, 12)
-
-                Button { showKeyScratchLab = true } label: {
-                    HStack(spacing: 12) {
-                        Image(systemName: "rectangle.split.2x1")
-                            .font(.title3)
-                            .frame(width: 30)
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text("Scratchpad & layout")
-                                .font(.system(size: 17, weight: .semibold))
-                                .foregroundStyle(.primary)
-                            Text("Adjust notes, key spacing and landscape layout")
-                                .font(.system(size: 12))
-                                .foregroundStyle(.secondary)
-                        }
-                        Spacer(minLength: 0)
-                        Image(systemName: "chevron.right")
-                            .foregroundStyle(.secondary)
-                    }
-                    .padding(14)
-                    .background(.primary.opacity(0.065), in: RoundedRectangle(cornerRadius: 13))
-                }
-                .buttonStyle(.plain)
-                .accessibilityIdentifier("key-scratch-layout-settings")
-
-                Button { showFullNotes = true } label: {
-                    HStack(spacing: 12) {
-                        Image(systemName: "note.text")
-                            .font(.title3)
-                            .frame(width: 30)
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text("Scratchpad")
-                                .font(.system(size: 17, weight: .semibold))
-                                .foregroundStyle(.primary)
-                            Text("Edit your keyboard notes full-size, copy, or export")
-                                .font(.system(size: 12))
-                                .foregroundStyle(.secondary)
-                        }
-                        Spacer(minLength: 0)
-                        Image(systemName: "chevron.right")
-                            .foregroundStyle(.secondary)
-                    }
-                    .padding(14)
-                    .background(.primary.opacity(0.065), in: RoundedRectangle(cornerRadius: 13))
-                }
-                .buttonStyle(.plain)
-                .accessibilityIdentifier("open-key-scratch-notes")
-
-                VStack(alignment: .leading, spacing: 12) {
-                    Text("Notes alongside\nyour keyboard.")
-                        .font(.system(size: 43, weight: .medium, design: .rounded)).tracking(-2)
-                        .lineSpacing(-5).fixedSize(horizontal: false, vertical: true)
-                    Text("Swipe naturally while keeping your notes visible beside the keyboard.")
-                        .font(.system(size: 16)).foregroundStyle(.secondary).lineSpacing(4)
-                }
-
-                HStack(spacing: 8) {
-                    Label("Private typing", systemImage: "lock.shield")
-                    Text("·")
-                    Text("No tracking")
-                    Text("·")
-                    Text("Local notes")
-                }
-                .font(.system(size: 11, weight: .medium)).foregroundStyle(accent)
-
-                VStack(alignment: .leading, spacing: 12) {
-                    HStack {
-                        Text("KEYBOARD PREVIEW").font(.system(size: 10, weight: .semibold, design: .monospaced)).tracking(2)
-                        Spacer()
-                        Button("Clear") { NotificationCenter.default.post(name: .clearKeyboardPreview, object: nil) }
-                            .font(.system(size: 12, weight: .medium)).accessibilityIdentifier("clear-preview")
-                    }
-                    PreviewSurface(preferences: KeyboardPublisher.published(preferences),
-                                   isActive: !showGeometry && !showSetup && !showSystemTest) { gesture in
-                        triedGestures.insert(gesture)
-                    }
-                        .frame(height: 100 + preferences.keyboardHeight)
-                        .clipShape(RoundedRectangle(cornerRadius: 12))
-                        .overlay(RoundedRectangle(cornerRadius: 12).stroke(.primary.opacity(0.08)))
-                    GestureChecklist(preferences: preferences, tried: triedGestures)
-                }
-
-                VStack(spacing: 10) {
-                    Button { showSetup = true } label: {
-                        HStack { Text("Enable keyboard"); Spacer(); Image(systemName: "arrow.up.right") }
-                            .font(.system(size: 14, weight: .semibold)).padding(17)
-                            .foregroundStyle(.white).background(accent, in: RoundedRectangle(cornerRadius: 12))
-                    }.accessibilityIdentifier("enable-keyboard")
-                    Button { showGeometry = true } label: {
-                        HStack(spacing: 12) {
-                            Image(systemName: "slider.horizontal.3").font(.title3)
-                            VStack(alignment: .leading, spacing: 4) {
-                                Text("Keyboard settings").font(.system(size: 15, weight: .semibold))
-                                Text("Themes, layout and typing").font(.system(size: 12)).foregroundStyle(.secondary)
-                            }
-                            Spacer()
-                            Image(systemName: "chevron.right").font(.caption.weight(.semibold))
-                        }.padding(17).frame(maxWidth: .infinity)
-                            .background(.primary.opacity(0.07), in: RoundedRectangle(cornerRadius: 12))
-                    }.accessibilityLabel("Keyboard settings, themes, layout and typing").accessibilityIdentifier("adjust-geometry")
-                }
-
-                VStack(spacing: 0) {
-                    detailRow("01", title: "Familiar keyboard geometry.", subtitle: "iPhone-like key positions with adjustable height and note width.")
-                    Divider().padding(.vertical, 17)
-                    detailRow("02", title: "Your note, always visible.", subtitle: "Keep a reference in sight while composing text in another app.")
-                    Divider().padding(.vertical, 17)
-                    detailRow("03", title: "Notes remain on-device.", subtitle: "Full Access enables the clipboard and the companion app's shared note.")
-                }
-                .padding(20).background(.primary.opacity(0.035), in: RoundedRectangle(cornerRadius: 14))
-
-                Button("Test the installed system keyboard") { showSystemTest = true }
-                    .font(.system(size: 13, weight: .medium)).accessibilityIdentifier("system-test")
-                HStack(spacing: 20) {
-                    Link("Privacy policy", destination: URL(string: "https://github.com/udeudeude/Key-Scratch/blob/feature/scratchpad-first-pass/PRIVACY.md")!)
-                    Link("Source and feedback", destination: URL(string: "https://github.com/udeudeude/Key-Scratch/issues")!)
-                }
-                .font(.system(size: 13, weight: .medium))
-                Text("KEY SCRATCH / LOCAL NOTES")
-                    .font(.system(size: 9, weight: .medium, design: .monospaced)).tracking(1.5)
-                    .foregroundStyle(.tertiary).padding(.bottom, 20)
+                .padding(.horizontal, 20)
+                .padding(.top, 14)
+                .padding(.bottom, 28)
+                .frame(maxWidth: 740)
+                .frame(maxWidth: .infinity)
             }
-            .padding(.horizontal, 22).frame(maxWidth: 680)
-            .frame(maxWidth: .infinity)
+            .background(CompanionStyle.background.ignoresSafeArea())
+            .toolbar(.hidden, for: .navigationBar)
         }
-        .background(paper).tint(accent)
+        .tint(CompanionStyle.accent)
         .sheet(isPresented: $showGeometry) { GeometrySettings(preferences: $preferences) }
         .sheet(isPresented: $showSetup) { SetupView() }
         .sheet(isPresented: $showSystemTest) { SystemKeyboardTest() }
         .sheet(isPresented: $showKeyScratchLab) { KeyScratchExperimentLab(preferences: $preferences) }
         .sheet(isPresented: $showFullNotes) { KeyScratchFullNotes() }
+        .sheet(isPresented: $showCharacterLibrary) {
+            FavoriteSymbolPicker(favorites: $preferences.favoriteSymbols)
+        }
         .onChange(of: preferences) { _, value in
             do { try KeyboardPublisher.publish(value) }
-            catch { saveError = "The preview was updated, but settings could not be shared with the extension. Check that both targets use the same App Group and signing team." }
+            catch {
+                saveError = "Your changes appeared in the preview but could not be shared with the keyboard. Check App Group signing."
+            }
         }
         .onReceive(NotificationCenter.default.publisher(for: ProHooks.accessChanged)) { _ in
             try? KeyboardPublisher.publish(preferences)
         }
-        .alert("Settings weren’t saved", isPresented: Binding(get: { saveError != nil }, set: { if !$0 { saveError = nil } })) {
+        .alert("Settings weren’t saved", isPresented: Binding(get: { saveError != nil },
+            set: { if !$0 { saveError = nil } })) {
             Button("OK", role: .cancel) { saveError = nil }
         } message: { Text(saveError ?? "") }
     }
 
-    private func detailRow(_ index: String, title: String, subtitle: String) -> some View {
-        HStack(alignment: .top, spacing: 16) {
-            Text(index).font(.system(size: 11, design: .monospaced)).foregroundStyle(accent).padding(.top, 3)
-            VStack(alignment: .leading, spacing: 5) {
-                Text(title).font(.system(size: 15, weight: .semibold))
-                Text(subtitle).font(.system(size: 12)).foregroundStyle(.secondary).lineSpacing(3)
+    private var masthead: some View {
+        HStack(spacing: 10) {
+            Image("KeyScratchIcon")
+                .resizable().interpolation(.high)
+                .frame(width: 39, height: 39)
+                .clipShape(RoundedRectangle(cornerRadius: 11, style: .continuous))
+                .accessibilityLabel("Key Scratch icon")
+            VStack(alignment: .leading, spacing: 1) {
+                Text("Key Scratch")
+                    .font(.system(size: 19, weight: .bold, design: .rounded))
+                Text("THE KEYBOARD COMPANION")
+                    .font(.system(size: 9, weight: .semibold, design: .monospaced))
+                    .tracking(1.25).foregroundStyle(.secondary)
             }
-            Spacer(minLength: 0)
+            Spacer(minLength: 4)
+            Button { showGeometry = true } label: {
+                Image(systemName: "slider.horizontal.3")
+                    .font(.system(size: 17, weight: .medium))
+                    .frame(width: 43, height: 43)
+                    .background(CompanionStyle.card, in: Circle())
+            }
+            .accessibilityLabel("Customize keyboard")
+            .accessibilityIdentifier("customize-keyboard")
         }
+    }
+
+    private var introduction: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 8) {
+                Circle().fill(Color.green).frame(width: 6, height: 6)
+                    .accessibilityHidden(true)
+                Text("LOCAL FIRST  /  READY TO TYPE")
+                    .font(.system(size: 10, weight: .medium, design: .monospaced))
+                    .tracking(1.05).foregroundStyle(.secondary)
+            }
+            Text("A better place\nto type.")
+                .font(.system(size: 39, weight: .semibold, design: .serif))
+                .tracking(-1.7).lineSpacing(-3)
+                .minimumScaleFactor(0.8)
+                .accessibilityAddTraits(.isHeader)
+            Text("Keep a thought close, put unusual characters at your fingertips, and make the keyboard your own.")
+                .font(.system(size: 15))
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+                .lineSpacing(3)
+        }
+        .padding(.top, 10)
+    }
+
+    private var workspaces: some View {
+        VStack(spacing: 11) {
+            Button { showFullNotes = true } label: {
+                HStack(alignment: .center, spacing: 15) {
+                    Image(systemName: "square.and.pencil")
+                        .font(.system(size: 27, weight: .light))
+                        .frame(width: 52, height: 52)
+                        .background(CompanionStyle.accent.opacity(0.1),
+                                    in: RoundedRectangle(cornerRadius: 15))
+                        .foregroundStyle(CompanionStyle.accent)
+                    VStack(alignment: .leading, spacing: 5) {
+                        Text("Scratchpad")
+                            .font(.system(size: 21, weight: .semibold, design: .serif))
+                        Text("Your pages, ready for editing and export")
+                            .font(.system(size: 12)).foregroundStyle(.secondary)
+                    }
+                    Spacer(minLength: 2)
+                    Image(systemName: "arrow.up.right")
+                        .font(.system(size: 14, weight: .semibold)).foregroundStyle(.secondary)
+                }
+                .padding(17).frame(maxWidth: .infinity, alignment: .leading)
+                .background(CompanionStyle.card, in: RoundedRectangle(cornerRadius: CompanionStyle.radius))
+            }
+            .accessibilityIdentifier("open-key-scratch-notes")
+            HStack(spacing: 11) {
+                destinationTile(title: "Keyboard", subtitle: "Layout · language", systemImage: "keyboard",
+                                identifier: "adjust-geometry") { showGeometry = true }
+                destinationTile(title: "Characters", subtitle: "Symbols · favorites", systemImage: "star.square",
+                                identifier: "open-character-library") { showCharacterLibrary = true }
+            }
+            Button { showKeyScratchLab = true } label: {
+                HStack(spacing: 12) {
+                    Image(systemName: "rectangle.split.2x1")
+                        .font(.system(size: 17, weight: .medium))
+                        .frame(width: 30)
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text("Scratchpad & layout")
+                            .font(.system(size: 14, weight: .semibold))
+                        Text("Note width, key spacing, landscape, personal wrapping pairs")
+                            .font(.system(size: 12)).foregroundStyle(.secondary)
+                            .multilineTextAlignment(.leading)
+                    }
+                    Spacer(minLength: 2)
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 11, weight: .bold)).foregroundStyle(.secondary)
+                }
+                .padding(.vertical, 14).padding(.horizontal, 16)
+                .background(CompanionStyle.card, in: RoundedRectangle(cornerRadius: 15))
+            }
+            .accessibilityIdentifier("key-scratch-layout-settings")
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func destinationTile(title: String, subtitle: String, systemImage: String,
+                                 identifier: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            VStack(alignment: .leading, spacing: 11) {
+                Image(systemName: systemImage)
+                    .font(.system(size: 21, weight: .medium))
+                    .foregroundStyle(CompanionStyle.accent)
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(title).font(.system(size: 17, weight: .semibold))
+                    Text(subtitle).font(.system(size: 11)).foregroundStyle(.secondary)
+                        .lineLimit(2)
+                }
+                HStack {
+                    Text("OPEN").font(.system(size: 9, weight: .semibold, design: .monospaced))
+                        .tracking(0.8).foregroundStyle(CompanionStyle.accent)
+                    Spacer()
+                    Image(systemName: "arrow.up.right")
+                        .font(.system(size: 12, weight: .semibold)).foregroundStyle(.secondary)
+                }
+            }
+            .frame(maxWidth: .infinity, minHeight: 111, alignment: .leading)
+            .padding(16)
+            .background(CompanionStyle.card, in: RoundedRectangle(cornerRadius: CompanionStyle.radius))
+        }
+        .accessibilityIdentifier(identifier)
+    }
+
+    private var keyboardWorkbench: some View {
+        VStack(alignment: .leading, spacing: 13) {
+            HStack(alignment: .firstTextBaseline) {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("THE WORKBENCH")
+                        .font(.system(size: 10, weight: .semibold, design: .monospaced))
+                        .tracking(1.3).foregroundStyle(.secondary)
+                    Text("Try your keyboard")
+                        .font(.system(size: 23, weight: .semibold, design: .serif))
+                }
+                Spacer()
+                Button("Clear") {
+                    NotificationCenter.default.post(name: .clearKeyboardPreview, object: nil)
+                }
+                .font(.system(size: 13, weight: .semibold))
+                .accessibilityIdentifier("clear-preview")
+            }
+            PreviewSurface(preferences: KeyboardPublisher.published(preferences),
+                           isActive: !showGeometry && !showSetup && !showSystemTest &&
+                               !showFullNotes && !showCharacterLibrary) { gesture in
+                triedGestures.insert(gesture)
+            }
+                .frame(height: 100 + preferences.keyboardHeight)
+                .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                .overlay(RoundedRectangle(cornerRadius: 12).strokeBorder(CompanionStyle.line))
+                .accessibilityIdentifier("interactive-keyboard-workbench")
+            Button {
+                withAnimation(.easeInOut(duration: 0.2)) { showGestureGuide.toggle() }
+            } label: {
+                HStack {
+                    Label("Gesture reference", systemImage: "hand.point.up.left")
+                    Spacer()
+                    Image(systemName: showGestureGuide ? "chevron.up" : "chevron.down")
+                }
+                .font(.system(size: 13, weight: .medium))
+                .foregroundStyle(.secondary)
+            }
+            .accessibilityIdentifier("gesture-reference")
+            if showGestureGuide {
+                GestureChecklist(preferences: preferences, tried: triedGestures)
+            }
+        }
+        .padding(16)
+        .background(CompanionStyle.card, in: RoundedRectangle(cornerRadius: CompanionStyle.radius))
+    }
+
+    private var bottomActions: some View {
+        VStack(alignment: .leading, spacing: 13) {
+            Button { showSetup = true } label: {
+                HStack {
+                    Label("Install & enable Key Scratch", systemImage: "checkmark.circle")
+                        .font(.system(size: 14, weight: .semibold))
+                    Spacer()
+                    Image(systemName: "arrow.up.right")
+                }
+                .padding(.horizontal, 17).frame(height: 51)
+                .foregroundStyle(.white)
+                .background(CompanionStyle.accent, in: RoundedRectangle(cornerRadius: 15))
+            }
+            .accessibilityIdentifier("enable-keyboard")
+            Button { showSystemTest = true } label: {
+                HStack {
+                    Label("Test the installed system keyboard", systemImage: "checkmark.shield")
+                        .font(.system(size: 14, weight: .medium))
+                    Spacer()
+                    Image(systemName: "chevron.right")
+                }
+                .padding(.horizontal, 15).frame(height: 48)
+                .background(CompanionStyle.card, in: RoundedRectangle(cornerRadius: 15))
+            }
+            .accessibilityIdentifier("system-test")
+        }
+    }
+
+    private var footer: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Rectangle().fill(CompanionStyle.line).frame(height: 1)
+            HStack {
+                Label("Your words stay on this device", systemImage: "lock.shield")
+                Spacer()
+                Text(languageBadge).lineLimit(1)
+            }
+            .font(.system(size: 11, weight: .medium, design: .monospaced))
+            .foregroundStyle(.secondary)
+            HStack(spacing: 20) {
+                Link("Privacy", destination: URL(string:
+                     "https://github.com/udeudeude/Key-Scratch/blob/feature/scratchpad-first-pass/PRIVACY.md")!)
+                Link("Source & feedback", destination: URL(string:
+                     "https://github.com/udeudeude/Key-Scratch/issues")!)
+            }
+            .font(.system(size: 12, weight: .medium))
+        }
+        .padding(.top, 7)
     }
 
     private var languageBadge: String {
