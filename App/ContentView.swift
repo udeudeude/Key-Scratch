@@ -7,7 +7,7 @@ private let paper = Color(uiColor: .systemGroupedBackground)
 
 /// Companion interface only. KeyboardView and its published preferences remain
 /// responsible for the actual keyboard's appearance and interaction.
-private enum CompanionStyle {
+enum CompanionStyle {
     static let background = Color(uiColor: .systemGroupedBackground)
     static let card = Color(uiColor: .secondarySystemGroupedBackground)
     static let ink = Color.primary
@@ -374,7 +374,7 @@ struct GeometrySettings: View {
                     }
                 }
             }
-            .background(Color(uiColor: .systemGroupedBackground))
+            .background(CompanionStyle.background)
             .navigationTitle("Keyboard settings")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() } } }
@@ -387,7 +387,7 @@ struct GeometrySettings: View {
             }
             .sheet(isPresented: $showAppearance) { AppearanceSettings(preferences: $preferences) }
         }
-        .tint(accent)
+        .tint(CompanionStyle.accent)
         .onChange(of: preferences) { _, value in
             do { try KeyboardPublisher.publish(value) }
             catch { saveError = true }
@@ -437,14 +437,26 @@ struct GeometrySettings: View {
                 .padding(.horizontal, 8)
         }
         .padding(.top, 12).padding(.bottom, 8)
-        .background(.regularMaterial)
+        .background(CompanionStyle.card)
         // Not Divider: beside the form in landscape it would turn vertical, through the preview.
         .overlay(alignment: .top) { Rectangle().fill(Color(uiColor: .separator)).frame(height: 0.5) }
     }
 
     private var controls: some View {
         Form {
-            Section("Languages") {
+            Section {
+                VStack(alignment: .leading, spacing: 5) {
+                    Text("MAKE IT YOURS")
+                        .font(.system(size: 10, weight: .semibold, design: .monospaced))
+                        .tracking(1.1).foregroundStyle(CompanionStyle.accent)
+                    Text("Arrange. Refine. Type.")
+                        .font(.system(size: 24, weight: .semibold, design: .serif))
+                    Text("Every change appears in the live preview. Your installed keyboard uses these same settings.")
+                        .font(.system(size: 12)).foregroundStyle(.secondary)
+                }
+                .padding(.vertical, 8)
+            }
+            Section("Languages & layouts") {
                 NavigationLink(value: SettingsPage.languages) {
                     Label {
                         VStack(alignment: .leading, spacing: 4) {
@@ -465,7 +477,7 @@ struct GeometrySettings: View {
             if let proRows = ProHooks.settingsRows {
                 Section("Additional features") { proRows($preferences) }
             }
-            Section("Appearance") {
+            Section("Look & feel") {
                 Button { showAppearance = true } label: {
                     HStack(spacing: 12) {
                         Image(systemName: "paintpalette.fill").font(.title3)
@@ -479,7 +491,7 @@ struct GeometrySettings: View {
                 }
                 .accessibilityIdentifier("theme-settings")
             }
-            Section("Suggestions") {
+            Section("Words & corrections") {
                 NavigationLink(value: SettingsPage.suggestions) {
                     Label {
                         VStack(alignment: .leading, spacing: 4) {
@@ -502,7 +514,7 @@ struct GeometrySettings: View {
                 }
                 Text(activePreset?.detail ?? "Your custom geometry")
                     .font(.caption).foregroundStyle(.secondary)
-            } header: { Label("Layout · Presets", systemImage: "square.grid.3x3") }
+            } header: { Label("Starting points", systemImage: "square.grid.3x3") }
             Section {
                 slider("Key height", value: $preferences.keyHeight, range: 36...88)
                 slider("Control row height", value: $preferences.controlHeight, range: 36...72)
@@ -517,7 +529,7 @@ struct GeometrySettings: View {
                     Slider(value: $preferences.actionKeyWidth, in: 1.25...3.5, step: 0.05)
                         .accessibilityLabel("Return and Delete width")
                 }
-            } header: { Label("Layout · Size", systemImage: "textformat.size") } footer: {
+            } header: { Label("Dimensions", systemImage: "textformat.size") } footer: {
                 Text("Size letters and controls separately. The preview updates as you drag.")
             }
             Section {
@@ -525,7 +537,7 @@ struct GeometrySettings: View {
                 slider("Row spacing", value: $preferences.rowSpacing, range: 0...12)
                 Toggle("Fill gaps between keys", isOn: $preferences.fillGaps)
                     .accessibilityIdentifier("fill-gaps")
-            } header: { Label("Layout · Spacing", systemImage: "arrow.left.and.right") } footer: {
+            } header: { Label("Spacing", systemImage: "arrow.left.and.right") } footer: {
                 Text("Fill gaps keeps the visual spacing while extending touch targets to meet. Turn it off to make only the visible keys respond.")
             }
             Section {
@@ -539,7 +551,7 @@ struct GeometrySettings: View {
                 Toggle("iPhone key positions", isOn: $preferences.iphoneKeyPositions)
                     .accessibilityIdentifier("iphone-key-positions")
                     .accessibilityIdentifier("show-header")
-            } header: { Label("Layout · Controls", systemImage: "rectangle.bottomthird.inset.filled") } footer: {
+            } header: { Label("Key positions & controls", systemImage: "rectangle.bottomthird.inset.filled") } footer: {
                 Text("Hide the header to leave more room for letters.")
             }
             Section {
@@ -552,7 +564,7 @@ struct GeometrySettings: View {
                     Toggle("ї on long-press і", isOn: $preferences.yiOnLongPress)
                         .accessibilityIdentifier("yi-on-long-press")
                 }
-            } header: { Label("Letters · Optional keys", systemImage: "character.cursor.ibeam") } footer: {
+            } header: { Label("Optional characters", systemImage: "character.cursor.ibeam") } footer: {
                 Text("Punctuation remains available under 123." +
                      (preferences.validated.languages.contains(.ukrainian)
                          ? " Ukrainian: the ї option puts it on long-press і."
@@ -567,7 +579,7 @@ struct GeometrySettings: View {
                     }.pickerStyle(.segmented)
                 }
                 .accessibilityIdentifier("digit-access")
-            } header: { Label("Letters · Digits", systemImage: "number") } footer: {
+            } header: { Label("Number access", systemImage: "number") } footer: {
                 Text(digitFooter)
             }
             Section {
@@ -588,6 +600,8 @@ struct GeometrySettings: View {
                 Text("Settings save on this device. Dismiss and reopen the system keyboard to apply changes. Hold the ★ key to switch between enabled languages.")
             }
         }
+        .scrollContentBackground(.hidden)
+        .background(CompanionStyle.background)
         .accessibilityIdentifier("geometry-controls")
     }
 
@@ -1079,9 +1093,19 @@ private struct KeyScratchFullNotes: View {
     var body: some View {
         NavigationStack {
             VStack(alignment: .leading, spacing: 12) {
-                Text("Your pages appear beside the keyboard. Tap a tab to switch.")
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
+                HStack(alignment: .firstTextBaseline) {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("YOUR SCRATCHPAD")
+                            .font(.system(size: 10, weight: .semibold, design: .monospaced))
+                            .tracking(1.2).foregroundStyle(CompanionStyle.accent)
+                        Text("Pages")
+                            .font(.system(size: 27, weight: .semibold, design: .serif))
+                    }
+                    Spacer()
+                    Label("Saved locally", systemImage: "checkmark.circle")
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundStyle(.secondary)
+                }
 
                 HStack(spacing: 7) {
                     ScrollView(.horizontal, showsIndicators: false) {
@@ -1094,8 +1118,8 @@ private struct KeyScratchFullNotes: View {
                                     .padding(.horizontal, 12)
                                     .padding(.vertical, 7)
                                     .background(notebook.selectedID == page.id
-                                        ? Color.accentColor.opacity(0.16) : Color.secondary.opacity(0.07),
-                                        in: RoundedRectangle(cornerRadius: 9))
+                                        ? CompanionStyle.accent.opacity(0.15) : CompanionStyle.card,
+                                        in: RoundedRectangle(cornerRadius: 11))
                                     .accessibilityIdentifier("full-scratchpad-page-\(index + 1)")
                             }
                         }
@@ -1179,16 +1203,20 @@ private struct KeyScratchFullNotes: View {
                         .foregroundStyle(.secondary)
                 }
 
-                Text("To paste a picture here: copy it in Photos, then tap Paste image. The picture is saved separately from this page's text.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                if !notebook.selectedPage.images.isEmpty {
+                    Text("Images are attached to this page, separately from its text.")
+                        .font(.caption).foregroundStyle(.secondary)
+                }
 
                 TextEditor(text: editableNote)
                     .focused($focused)
-                    .font(.system(size: 16))
+                    .font(.system(size: 17))
                     .scrollContentBackground(.hidden)
-                    .padding(7)
-                    .background(.secondary.opacity(0.08), in: RoundedRectangle(cornerRadius: 12))
+                    .padding(12)
+                    .background(CompanionStyle.card,
+                                in: RoundedRectangle(cornerRadius: CompanionStyle.radius))
+                    .overlay(RoundedRectangle(cornerRadius: CompanionStyle.radius)
+                        .strokeBorder(CompanionStyle.line, lineWidth: 1))
                     .accessibilityIdentifier("full-scratchpad-editor")
                     .disabled(!loaded)
 
@@ -1223,11 +1251,11 @@ private struct KeyScratchFullNotes: View {
                 }
                 .buttonStyle(.bordered)
 
-                Text("Select, Cut, Copy or Paste using the normal iPhone edit menu. Edits are saved locally to the active page. The keyboard's bottom tabs switch between those same pages.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                Text("Edits save to the selected local page. Use the standard text selection menu for Cut, Copy and Paste.")
+                    .font(.system(size: 11)).foregroundStyle(.secondary)
             }
-            .padding()
+            .padding(16)
+            .background(CompanionStyle.background)
             .navigationTitle("Scratchpad")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
