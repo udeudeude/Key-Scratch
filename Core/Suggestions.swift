@@ -124,8 +124,8 @@ enum SuggestionText {
         else if original.first?.isUppercase == true { result = word.prefix(1).uppercased() + word.dropFirst() }
         if original.contains("’") { result = result.replacingOccurrences(of: "'", with: "’") }
         else if original.contains("ʼ") || language == .ukrainian { result = result.replacingOccurrences(of: "'", with: "ʼ") }
-        if language == .english && result == "i" { return "I" }
-        return result
+        return language == .english
+            ? EnglishPronoun.normalized(result, completeWord: true) : result
     }
 }
 
