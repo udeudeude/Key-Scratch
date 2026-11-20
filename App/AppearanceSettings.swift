@@ -20,8 +20,8 @@ struct AppearanceSettings: View {
                     }
                 }
             }
-            .background(Color(uiColor: .systemGroupedBackground))
-            .navigationTitle("Theme and colors")
+            .background(CompanionStyle.background)
+            .navigationTitle("Appearance")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar { ToolbarItem(placement: .confirmationAction) {
                 Button("Done") { dismiss() }.accessibilityIdentifier("appearance-done")
@@ -86,7 +86,10 @@ struct AppearanceSettings: View {
             } header: { Label("Key hints", systemImage: "character.bubble") } footer: {
                 Text("Hold a letter for accented alternatives. Small digits on the top row indicate downward-flick shortcuts.")
             }
-        }.accessibilityIdentifier("appearance-controls")
+        }
+        .scrollContentBackground(.hidden)
+        .background(CompanionStyle.background)
+        .accessibilityIdentifier("appearance-controls")
     }
 
     private func themeCard(_ theme: KeyboardTheme) -> some View {
