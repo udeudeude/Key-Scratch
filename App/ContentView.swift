@@ -770,7 +770,7 @@ private struct KeyScratchExperimentLab: View {
                 } header: {
                     Text("Surround selected text")
                 } footer: {
-                    Text("The ★ keyboard panel offers quotes, brackets, asterisks and other pairs. Add up to 12 personal pairs here. Nothing is changed until you choose Apply and test.")
+                    Text("The top-right … keyboard menu offers Surround selection with quotes, brackets, asterisks and up to 12 custom pairs. Changes take effect after Apply and test.")
                 }
 
                 Section("Clipboard access") {
