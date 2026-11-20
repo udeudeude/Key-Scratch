@@ -29,7 +29,13 @@ final class KeyboardView: UIControl {
         }
     }
     var preferences = KeyboardPreferences() {
-        didSet { if oldValue != preferences { cancelTouches(); refreshActionsMenu(); setNeedsLayout() } }
+        didSet {
+            if oldValue != preferences {
+                cancelTouches()
+                suggestionBar.wrappers = SelectionWrapper.builtIn + preferences.customWrappers.filter(\.isUsable)
+                setNeedsLayout()
+            }
+        }
     }
     var needsGlobe = true {
         didSet { if oldValue != needsGlobe { cancelTouches(); setNeedsLayout() } }
@@ -131,13 +137,12 @@ final class KeyboardView: UIControl {
         globeButton.accessibilityIdentifier = "key-globe"
         globeButton.highlightChanged = { [weak self] in self?.nativeHighlightChanged(.globe) }
         addSubview(globeButton)
-        dismissButton.setImage(UIImage(systemName: "ellipsis"), for: .normal)
+        dismissButton.setImage(UIImage(systemName: "keyboard.chevron.compact.down"), for: .normal)
         dismissButton.tintColor = palette.secondary
-        dismissButton.accessibilityLabel = "More keyboard actions"
+        dismissButton.accessibilityLabel = "Dismiss keyboard"
         dismissButton.accessibilityIdentifier = "key-header-dismiss"
         dismissButton.highlightChanged = { [weak self] in self?.nativeHighlightChanged(.dismiss) }
-        dismissButton.showsMenuAsPrimaryAction = true
-        refreshActionsMenu()
+        dismissButton.addAction(UIAction { [weak self] _ in self?.onDismiss?() }, for: .touchUpInside)
         addSubview(dismissButton)
         addSubview(suggestionBar)
         // Strip punctuation types like its key, so automatic spacing still applies.
@@ -174,22 +179,6 @@ final class KeyboardView: UIControl {
     private func refresh() {
         setNeedsLayout()
         setNeedsDisplay()
-    }
-
-    private func refreshActionsMenu() {
-        let pairs = SelectionWrapper.builtIn + preferences.customWrappers.filter(\.isUsable)
-        let submenu = UIMenu(title: "Surround selection", image: UIImage(systemName: "curlybraces"),
-                             children: pairs.map { pair in
-            UIAction(title: pair.name, subtitle: pair.opening + " text " + pair.closing) {
-                [weak self] _ in self?.onWrap?(pair)
-            }
-        })
-        dismissButton.menu = UIMenu(children: [
-            submenu,
-            UIAction(title: "Dismiss Keyboard", image: UIImage(systemName: "keyboard.chevron.compact.down")) {
-                [weak self] _ in self?.onDismiss?()
-            }
-        ])
     }
 
     private func updateChrome() {
@@ -532,7 +521,7 @@ final class KeyboardView: UIControl {
                      in: CGRect(x: frame.minX, y: frame.midY + 5, width: frame.width, height: 13),
                      font: .systemFont(ofSize: 10, weight: .semibold), color: color)
         case .dismiss:
-            drawSymbol("ellipsis", in: frame, size: 21, color: color)
+            drawSymbol("keyboard.chevron.compact.down", in: frame, size: 21, color: color)
         case .favorites:
             // Draw the contextual "Notes" or "App" label via normal key text.
             return false

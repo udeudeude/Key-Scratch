@@ -949,7 +949,7 @@ private struct KeyScratchExperimentLab: View {
                 } header: {
                     Text("Surround selected text")
                 } footer: {
-                    Text("The top-right … keyboard menu offers Surround selection with quotes, brackets, asterisks and up to 12 custom pairs. Changes take effect after Apply and test.")
+                    Text("The suggestion-row ⋯ menu offers Surround selection with quotes, brackets, asterisks and up to 12 custom pairs. Changes take effect after Apply and test.")
                 }
 
                 Section("Clipboard access") {
@@ -1481,7 +1481,7 @@ private struct KeyScratchFullNotes: View {
 private struct FavoriteSymbolPicker: View {
     @Environment(\.dismiss) private var dismiss
     @Binding var favorites: [String]
-    @State private var group = "Typography"
+    @State private var group = "All"
     @State private var query = ""
     @State private var manual = ""
     @State private var message = ""
@@ -1492,7 +1492,11 @@ private struct FavoriteSymbolPicker: View {
         if !query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
             return CharacterFinder.search(query, limit: 500)
         }
-        if group == "All" { return Array(CharacterFinder.items.prefix(500)) }
+        if group == "All" {
+            return CharacterFinder.categories.flatMap { category in
+                Array(CharacterFinder.symbols(in: category.title).prefix(36))
+            }
+        }
         return CharacterFinder.symbols(in: group)
     }
 
@@ -1581,7 +1585,7 @@ private struct FavoriteSymbolPicker: View {
                         .autocorrectionDisabled()
                         .accessibilityIdentifier("search-unicode-catalog")
                     Picker("Category", selection: $group) {
-                        Text("All (first 500)").tag("All")
+                        Text("All categories").tag("All")
                         ForEach(CharacterFinder.categories, id: \.title) { category in
                             Text(category.title).tag(category.title)
                         }

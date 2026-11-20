@@ -12,11 +12,11 @@ The temporary five-color mode comparison is complete and **the colored modes and
 
 The scratchpad now has a thin neutral border and 6 pt rounded corners matching the keycaps, with a subtle blue active-focus border. The new app icon refers to a **metal key scratching dark car paint**, rather than a computer keyboard key.
 
-## ★ characters and the top-right … menu
+## ★ characters and the suggestion-row ⋯ menu
 
 ★ opens a character finder with **Favorites** and **Symbols** and local Unicode search. The × key occupies exactly the former ★ key's position and closes the picker without inserting anything.
 
-**Wrap** has moved into the keyboard's **top-right … menu**, alongside **Dismiss Keyboard**. Choose Surround selection, then a built-in or custom delimiter pair to wrap selected text (or insert a pair with the caret inside). Up to 12 custom pairs can be configured in the companion app. The in-app preview offers this menu too.
+**Wrap** has moved into the existing **suggestion-row ⋯ menu**, alongside **Dismiss keyboard**, Teach, and Forget. The top-right header button continues to dismiss the keyboard directly. Choose Surround selection, then a built-in or custom delimiter pair to wrap selected text (or insert a pair with the caret inside). Up to 12 custom pairs can be configured in the companion app. The in-app preview offers this menu too.
 
 ## Multiple note pages and send-to-app
 

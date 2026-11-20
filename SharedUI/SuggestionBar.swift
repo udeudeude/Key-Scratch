@@ -16,6 +16,10 @@ final class SuggestionBar: UIView {
     var onForget: ((String) -> Void)?
     var onClear: (() -> Void)?
     var onDismiss: (() -> Void)?
+    var onWrap: ((SelectionWrapper) -> Void)?
+    /// Delimiters are supplied by KeyboardView. The suggestion-row ⋯ is the
+    /// existing keyboard actions menu, including Dismiss keyboard.
+    var wrappers: [SelectionWrapper] = SelectionWrapper.builtIn
     /// Shown between words, in stable positions, so a period is one tap away.
     var punctuation: [String] = [] {
         didSet { if oldValue != punctuation { rebuildPunctuation() } }
@@ -180,6 +184,13 @@ final class SuggestionBar: UIView {
             actions.append(UIMenu(title: "Forget a taught word", children: words))
             actions.append(UIMenu(title: "Clear taught words…", children: [UIAction(title: "Clear words for this language", attributes: .destructive) { [weak self] _ in self?.onClear?() }]))
         }
+        actions.append(UIMenu(title: "Surround selection",
+                              image: UIImage(systemName: "curlybraces"),
+                              children: wrappers.map { pair in
+            UIAction(title: pair.name, subtitle: pair.opening + " text " + pair.closing) {
+                [weak self] _ in self?.onWrap?(pair)
+            }
+        }))
         actions.append(UIAction(title: "Dismiss keyboard", image: UIImage(systemName: "keyboard.chevron.compact.down")) { [weak self] _ in self?.onDismiss?() })
         more.menu = UIMenu(title: "Words stay on this device", children: actions)
     }
@@ -384,6 +395,7 @@ final class SuggestionCoordinator {
             TaughtWordStore.save([], language: language); self.refresh(force: true)
         }
         keyboard.suggestionBar.onDismiss = { [weak keyboard] in keyboard?.onDismiss?() }
+        keyboard.suggestionBar.onWrap = { [weak keyboard] in keyboard?.onWrap?($0) }
         keyboard.onGlide = { [weak self] points in self?.glide(points) }
     }
 
