@@ -634,31 +634,88 @@ struct GeometrySettings: View {
 
 struct SetupView: View {
     @Environment(\.dismiss) private var dismiss
+
     var body: some View {
         NavigationStack {
-            List {
-                Section {
-                    Label("Open Settings → General → Keyboard", systemImage: "1.circle")
-                    Label("Choose Keyboards → Add New Keyboard", systemImage: "2.circle")
-                    Label("Select Key Scratch", systemImage: "3.circle")
-                    Label("In any text field, use the globe to switch to Key Scratch", systemImage: "4.circle")
-                } header: { Text("A one-time setup") } footer: {
-                    Text("For notes Copy/Paste and sharing the scratchpad with this app, select Key Scratch under Settings → General → Keyboard → Keyboards and enable Allow Full Access. No internet connection or account is needed.")
-                }
-                Section {
-                    Button("Open Settings") {
-                        if let url = URL(string: UIApplication.openSettingsURLString) { UIApplication.shared.open(url) }
+            ScrollView {
+                VStack(alignment: .leading, spacing: 22) {
+                    VStack(alignment: .leading, spacing: 11) {
+                        Text("GET STARTED")
+                            .font(.system(size: 11, weight: .semibold, design: .monospaced))
+                            .tracking(1.4).foregroundStyle(CompanionStyle.accent)
+                        Text("A few taps.\nThen it's yours.")
+                            .font(.system(size: 32, weight: .semibold, design: .serif))
+                            .tracking(-1.2)
+                        Text("Key Scratch works in almost any app that accepts a third-party keyboard. Setup happens once in iPhone Settings.")
+                            .font(.system(size: 14)).foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
                     }
-                } footer: { Text("If Settings opens the app page, return to the main Settings list and follow the steps above.") }
-                Section("Where it works") {
-                    Text("Use it in apps that allow third-party keyboards. iOS uses its own keyboard for passwords and phone-pad fields. Some apps disable third-party keyboards entirely.")
-                    Text("Suggestions change a word only when you tap one. Sentences start with a capital where the text field asks for it. Capitals, suggestions, glide typing and punctuation spacing can each be turned off in settings.")
+                    VStack(spacing: 0) {
+                        step(1, title: "Open Keyboard settings",
+                             detail: "Settings → General → Keyboard")
+                        Divider().padding(.leading, 57)
+                        step(2, title: "Add a keyboard",
+                             detail: "Keyboards → Add New Keyboard")
+                        Divider().padding(.leading, 57)
+                        step(3, title: "Select Key Scratch",
+                             detail: "It appears under third-party keyboards.")
+                        Divider().padding(.leading, 57)
+                        step(4, title: "Start typing",
+                             detail: "In any text field, hold the globe and choose Key Scratch.")
+                    }
+                    .background(CompanionStyle.card,
+                                in: RoundedRectangle(cornerRadius: CompanionStyle.radius))
+                    Button {
+                        if let url = URL(string: UIApplication.openSettingsURLString) {
+                            UIApplication.shared.open(url)
+                        }
+                    } label: {
+                        HStack {
+                            Label("Open Settings", systemImage: "gearshape")
+                            Spacer()
+                            Image(systemName: "arrow.up.right")
+                        }
+                        .font(.system(size: 15, weight: .semibold))
+                        .padding(.horizontal, 18).frame(height: 54)
+                        .foregroundStyle(.white)
+                        .background(CompanionStyle.accent,
+                                    in: RoundedRectangle(cornerRadius: 15))
+                    }
+                    VStack(alignment: .leading, spacing: 8) {
+                        Label("Optional: Allow Full Access", systemImage: "lock.shield")
+                            .font(.system(size: 14, weight: .semibold))
+                        Text("Enable this in Key Scratch's keyboard settings for clipboard features and sharing local scratchpad pages with the companion app. Typing itself does not require it.")
+                            .font(.system(size: 13)).foregroundStyle(.secondary)
+                        Text("Password and phone-number fields use Apple's system keyboard. No account or internet connection is required.")
+                            .font(.system(size: 12)).foregroundStyle(.secondary)
+                    }
+                    .padding(18)
+                    .background(CompanionStyle.card,
+                                in: RoundedRectangle(cornerRadius: CompanionStyle.radius))
                 }
+                .padding(20).frame(maxWidth: 620).frame(maxWidth: .infinity)
             }
-            .navigationTitle("Meet your new keyboard")
+            .background(CompanionStyle.background.ignoresSafeArea())
+            .navigationTitle("Set up Key Scratch")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() } } }
-        }.tint(accent)
+        }
+        .tint(CompanionStyle.accent)
+    }
+
+    private func step(_ index: Int, title: String, detail: String) -> some View {
+        HStack(alignment: .top, spacing: 14) {
+            Text(String(format: "%02d", index))
+                .font(.system(size: 14, weight: .semibold, design: .monospaced))
+                .foregroundStyle(CompanionStyle.accent)
+                .frame(width: 29, alignment: .leading)
+            VStack(alignment: .leading, spacing: 4) {
+                Text(title).font(.system(size: 16, weight: .semibold))
+                Text(detail).font(.system(size: 12)).foregroundStyle(.secondary)
+            }
+            Spacer(minLength: 1)
+        }
+        .padding(17)
     }
 }
 
