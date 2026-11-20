@@ -264,7 +264,8 @@ final class PreviewContainer: UIView, UITextViewDelegate {
         guard isActive, state.page == .letters else { return nil }
         applyingSuggestion = true
         defer { applyingSuggestion = false }
-        var text = word
+        var text = state.language == .english
+            ? EnglishPronoun.normalized(word, completeWord: true) : word
         switch state.shift {
         case .once: text = word.prefix(1).uppercased() + word.dropFirst(); state.shift = .off; autoShifted = false
         case .locked: text = word.uppercased()
@@ -396,7 +397,15 @@ final class PreviewContainer: UIView, UITextViewDelegate {
         let selection = editor.selectedRange
         if selection.length > 0 { punctuationSpacing.reset() }
         let context = (editor.text as NSString).substring(to: selection.location)
-        let edit = punctuationSpacing.edit(for: value, before: context, enabled: keyboard.preferences.autoSpacePunctuation,
+        if state.language == .english,
+           EnglishPronoun.finishesPriorI(before: context, incoming: value), selection.length == 0 {
+            editor.deleteBackward()
+            editor.insertText("I")
+        }
+        let updatedContext = textBeforeCaret
+        let typed = state.language == .english
+            ? EnglishPronoun.normalized(value, before: updatedContext, completeWord: value.count > 1) : value
+        let edit = punctuationSpacing.edit(for: typed, before: updatedContext, enabled: keyboard.preferences.autoSpacePunctuation,
                                            doubleSpacePeriod: keyboard.preferences.doubleSpacePeriod,
                                            at: ProcessInfo.processInfo.systemUptime,
                                            shortcutStarts: keyboard.preferences.shownExpansions.shortcutStarts)
