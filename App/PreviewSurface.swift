@@ -118,7 +118,7 @@ final class PreviewContainer: UIView, UITextViewDelegate {
             self.placeholder.isHidden = !self.editor.text.isEmpty
             self.suggestions.refresh()
         }
-        favoritesPanel.onWrap = { [weak self] pair in
+        keyboard.onWrap = { [weak self] pair in
             guard let self, pair.isUsable else { return }
             self.favoritesPanel.isHidden = true
             self.punctuationSpacing.reset()
@@ -346,7 +346,7 @@ final class PreviewContainer: UIView, UITextViewDelegate {
             } else { state.page = KeyboardLayout.page(after: state.page, preferences: keyboard.preferences) }
         case .favorites:
             favoritesPanel.configure(favorites: keyboard.preferences.favoriteSymbols,
-                                     recent: [], wrappers: keyboard.preferences.customWrappers)
+                                     recent: [])
             favoritesPanel.isHidden.toggle()
         case .page: state.page = state.page == .letters ? .numbers : .letters
         case .layers: state.page = KeyboardLayout.firstLayerPage(keyboard.preferences) ?? .letters
