@@ -369,7 +369,8 @@ final class KeyboardViewController: UIInputViewController {
         guard isViewLoaded, inputState.page == .letters else { return nil }
         applyingSuggestion = true
         defer { applyingSuggestion = false }
-        var text = inputState.language == .english && word == "i" ? "I" : word
+        var text = inputState.language == .english
+            ? EnglishPronoun.normalized(word, completeWord: true) : word
         switch inputState.shift {
         case .once:
             text = text.prefix(1).uppercased() + text.dropFirst()
@@ -437,11 +438,8 @@ final class KeyboardViewController: UIInputViewController {
     /// Delay replacement until the following delimiter so "inside" remains
     /// lowercase while the user types it one character at a time.
     private func capitalizeStandaloneI(before: String, incoming: String, inNotes: Bool) {
-        guard inputState.language == .english, before.last == "i",
-              incoming == " " || incoming == "\n" || incoming == "'" || incoming == "’"
-                  || incoming == "." || incoming == "," || incoming == "!" || incoming == "?" else { return }
-        let previous = before.dropLast().last
-        guard !(previous.map { $0.isLetter || $0.isNumber } ?? false) else { return }
+        guard inputState.language == .english,
+              EnglishPronoun.finishesPriorI(before: before, incoming: incoming) else { return }
         if inNotes {
             scratchpad.replaceBeforeCaret(characters: 1, with: "I")
         } else {
@@ -457,7 +455,10 @@ final class KeyboardViewController: UIInputViewController {
         let before = scratchpad.beforeCaret
         capitalizeStandaloneI(before: before, incoming: value, inNotes: true)
         let prefs = keyboard.preferences
-        let edit = noteSpacing.edit(for: value, before: scratchpad.beforeCaret,
+        let typed = inputState.language == .english
+            ? EnglishPronoun.normalized(value, before: scratchpad.beforeCaret,
+                                        completeWord: value.count > 1) : value
+        let edit = noteSpacing.edit(for: typed, before: scratchpad.beforeCaret,
                                     enabled: prefs.autoSpacePunctuation,
                                     doubleSpacePeriod: prefs.doubleSpacePeriod,
                                     at: ProcessInfo.processInfo.systemUptime,
@@ -826,7 +827,10 @@ final class KeyboardViewController: UIInputViewController {
         }
         let literal = Self.literalTypes.contains(textDocumentProxy.keyboardType ?? .default)
         let preferences = keyboard.preferences
-        let edit = punctuationSpacing.edit(for: value, before: textDocumentProxy.documentContextBeforeInput,
+        let typed = !literal && inputState.language == .english
+            ? EnglishPronoun.normalized(value, before: textDocumentProxy.documentContextBeforeInput ?? "",
+                                        completeWord: value.count > 1) : value
+        let edit = punctuationSpacing.edit(for: typed, before: textDocumentProxy.documentContextBeforeInput,
                                            enabled: preferences.autoSpacePunctuation && !literal,
                                            doubleSpacePeriod: preferences.doubleSpacePeriod && !literal,
                                            at: ProcessInfo.processInfo.systemUptime,
