@@ -56,7 +56,7 @@ final class KeyboardViewController: UIInputViewController {
         ])
         favoritePad.onClose = { [weak self] in self?.favoritePad.isHidden = true }
         favoritePad.onPick = { [weak self] character in self?.insertFavorite(character) }
-        favoritePad.onWrap = { [weak self] pair in self?.surroundSelection(with: pair) }
+        keyboard.onWrap = { [weak self] pair in self?.surroundSelection(with: pair) }
         scratchpad.translatesAutoresizingMaskIntoConstraints = false
         view.addSubview(scratchpad)
         scratchpadWidth = scratchpad.widthAnchor.constraint(equalToConstant: 0)
@@ -756,8 +756,7 @@ final class KeyboardViewController: UIInputViewController {
             // Tapping the scratchpad and a host field already selects the
             // text destination, so this control now opens one-tap characters.
             favoritePad.configure(favorites: keyboard.preferences.favoriteSymbols,
-                                  recent: FavoriteSymbolsHistory.recent(),
-                                  wrappers: keyboard.preferences.customWrappers)
+                                  recent: FavoriteSymbolsHistory.recent())
             favoritePad.isHidden.toggle()
         case .language:
             inputState.language = keyboard.preferences.language(after: inputState.language)
