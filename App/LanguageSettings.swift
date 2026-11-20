@@ -17,7 +17,7 @@ struct LanguageSettings: View {
                     .accessibilityIdentifier("language-\(language.rawValue)")
                 }
             } header: { Text("Languages") } footer: {
-                Text("Hold the Notes/App key to switch among enabled languages. The globe key switches iOS keyboards, including Apple's Emoji keyboard. English and Ukrainian include bundled glide dictionaries; other language layouts use on-device iOS spelling.")
+                Text("Hold the ★ key to switch among enabled languages. The globe key switches iOS keyboards, including Apple's Emoji keyboard. English and Ukrainian include bundled glide dictionaries; other language layouts use on-device iOS spelling.")
             }
             Section {
                 Picker("English layout", selection: $preferences.englishLayout) {
@@ -44,6 +44,8 @@ struct LanguageSettings: View {
                 Text("Message, search, email and web address fields each reopen in the language you last used in that kind of field. Email and web address fields start in a Latin layout; other new fields continue in your last language. iOS doesn’t tell keyboards which app, window or chat they’re in, so this memory is shared by all apps. The keyboard keeps it on this device, as field types and language names, never text. Forgetting, or changing the starting language, starts over from the starting language.")
             }
         }
+        .scrollContentBackground(.hidden)
+        .background(CompanionStyle.background)
         .accessibilityIdentifier("language-controls")
         .navigationTitle("Languages")
         .navigationBarTitleDisplayMode(.inline)
