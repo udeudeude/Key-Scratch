@@ -537,18 +537,18 @@ final class KeyboardCoreTests: XCTestCase {
         XCTAssertEqual(keys.first { $0.action == .text("ь") }?.alternatives, ["ъ"])
     }
 
-    func testNumberHoldsExposeDegreesFractionsSuperscriptsAndSubscripts() {
+    func testNumberHoldsExposeOrdinalsDegreesFractionsSuperscriptsAndSubscripts() {
         let expected: [String: [String]] = [
-            "0": ["°", "⅒", "⁰", "₀"],
-            "1": ["¹", "₁"],
-            "2": ["½", "²", "₂"],
-            "3": ["⅓", "⅔", "³", "₃"],
-            "4": ["¼", "¾", "⁴", "₄"],
-            "5": ["⅕", "⅖", "⅗", "⅘", "⁵", "₅"],
-            "6": ["⅙", "⅚", "⁶", "₆"],
-            "7": ["⅐", "⁷", "₇"],
-            "8": ["⅛", "⅜", "⅝", "⅞", "⁸", "₈"],
-            "9": ["⅑", "⁹", "₉"]
+            "0": ["°", "⅒", "⁰", "₀", "0th"],
+            "1": ["¹", "₁", "1st"],
+            "2": ["½", "²", "₂", "2nd"],
+            "3": ["⅓", "⅔", "³", "₃", "3rd"],
+            "4": ["¼", "¾", "⁴", "₄", "4th"],
+            "5": ["⅕", "⅖", "⅗", "⅘", "⁵", "₅", "5th"],
+            "6": ["⅙", "⅚", "⁶", "₆", "6th"],
+            "7": ["⅐", "⁷", "₇", "7th"],
+            "8": ["⅛", "⅜", "⅝", "⅞", "⁸", "₈", "8th"],
+            "9": ["⅑", "⁹", "₉", "9th"]
         ]
 
         for language in KeyboardLanguage.allCases {
@@ -576,6 +576,9 @@ final class KeyboardCoreTests: XCTestCase {
         for (digit, holds) in expected {
             XCTAssertEqual(Set(holds).count, holds.count, "No duplicate holds on \(digit)")
             XCTAssertFalse(holds.contains(digit), "The ordinary digit stays the tap action")
+            XCTAssertEqual(holds.last, digit + (["1": "st", "2": "nd", "3": "rd"][digit] ?? "th"),
+                           "The ordinal belongs at the end of the hold choices")
+            XCTAssertLessThanOrEqual(holds.count, 7, "Digit popups should remain on one row")
         }
         XCTAssertEqual(Key(action: .text("3"), letterAlternatives: ["⅔"]).alternatives, ["⅔"],
                        "Explicit custom alternatives still override built-in numeric holds")
