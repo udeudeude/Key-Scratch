@@ -32,6 +32,24 @@ final class KeyboardUITests: XCTestCase {
     }
 
     @MainActor
+    func testNotebookCreationAndTabReturn() throws {
+        let app = XCUIApplication()
+        app.launchArguments = ["-no-keyboard-tips"]
+        app.launch()
+        XCUIDevice.shared.orientation = .portrait
+        if app.buttons["Start a blank notebook"].waitForExistence(timeout: 3) {
+            app.buttons["Start a blank notebook"].tap()
+            app.buttons["Create blank notebook"].tap()
+        }
+        XCTAssertTrue(app.textViews["full-scratchpad-editor"].waitForExistence(timeout: 6),
+                      "The notebook editor should work even before installing the keyboard")
+        app.tabBars.buttons["Keyboard"].tap()
+        XCTAssertTrue(app.buttons["clear-preview"].waitForExistence(timeout: 5))
+        app.tabBars.buttons["Notes"].tap()
+        XCTAssertTrue(app.textViews["full-scratchpad-editor"].waitForExistence(timeout: 5))
+    }
+
+    @MainActor
     func testSuggestionOnlyTypingTeachingAndSettings() throws {
         let app = XCUIApplication()
         app.launchArguments = ["-suggestion-ui-tests", "-no-auto-capitals", "-no-keyboard-tips",

@@ -4,13 +4,23 @@ A fork of Ortholinear that adds a note panel beside its offline swipe keyboard. 
 
 ## Current design
 
-The temporary five-color mode comparison is complete and **the colored modes and latency badge are removed**. The normal keyboard uses the responsive dedicated swipe worker, live suggestions and one adjustable split. Older color-mode preferences automatically migrate to the standard layout. The companion app now has a straightforward **Scratchpad & layout** settings screen instead of the Experiment Lab.
+The temporary five-color mode comparison is complete and **the colored modes and latency badge are removed**. The normal keyboard uses the responsive dedicated swipe worker, live suggestions and one adjustable split. Older color-mode preferences automatically migrate to the standard layout. The companion app is organized around **Notes**, **Characters**, and **Keyboard** workspaces. It opens to the actual notebook rather than the keyboard test drive. Keyboard geometry is under an Advanced control; note placement, surface and custom Surround pairs are under Scratchpad options.
 
 **Portrait:** notes on the left at 30% width by default; the setting remains adjustable. The right-hand keyboard keeps the same geometry and tappable hit targets.
 
 **Landscape:** rows are reduced to at most 34 pt, the bottom controls to 32 pt, and the suggestion strip to 30 pt, with 2 pt visual row spacing and no extra header. This yields an approximately **172 pt** keyboard, about 17% shorter than the previous 208 pt landscape layout, without disabling predictions. The keyboard is positioned at the **right edge of the keyboard extension**, at a usable width of about 390–430 pt. Every remaining point of the extension's width belongs to the scratchpad at left and center. This never overwrites portrait settings. Apple's own globe and microphone controls may occupy reserved areas outside the extension; third-party keyboards cannot move those system controls.
 
 The scratchpad now has a thin neutral border and 6 pt rounded corners matching the keycaps, with a subtle blue active-focus border. The new app icon refers to a **metal key scratching dark car paint**, rather than a computer keyboard key.
+
+## Companion app: Notes, Characters, Keyboard
+
+**Notes** is the opening screen. It edits the same three-to-eight pages the keyboard uses, including image attachments and Copy/Share. The app never silently creates a blank notebook over an extension-only legacy note. On first use, either open the installed keyboard to migrate older notes or explicitly choose **Start a blank notebook**. Notes reload shared pages on return from another app when the editor is not active.
+
+**Characters** manages the symbols pinned to the keyboard's ★ menu, with offline browsing and search. It no longer requires entering a keyboard layout screen first.
+
+**Keyboard** contains the live test drive and links to keyboard settings, scratchpad options, installation instructions and a test with the actual installed keyboard. It is a utility screen, not the app's landing page. Advanced key geometry is collapsed for normal use, and restoring keyboard defaults requires confirmation and preserves the personal character shelf, Surround pairs and note appearance.
+
+The containing app has its own warm-paper, dark-ink and terracotta visual language. These are companion-only colors; keyboard themes are independent. Historical fork and licensing attribution remain in the repository and legal documents rather than shaping the interface.
 
 ## ★ characters and the suggestion-row ⋯ menu
 
@@ -20,7 +30,7 @@ The scratchpad now has a thin neutral border and 6 pt rounded corners matching t
 
 ## Multiple note pages and send-to-app
 
-The scratchpad now has **three permanent, compact numbered tabs** at the bottom without a +. Pages 4–8, if previously created or added in the full-size companion app, remain accessible through an overflow ⋯ menu. No existing pages are removed; old notebooks with fewer than three pages are padded with empty pages. Each tab has independent text, selection and scroll position when reopened. The companion app's **Scratchpad** editor has corresponding page tabs, add, clear-current-page and delete-page controls.
+The scratchpad now has **three permanent, compact numbered tabs** at the bottom without a +. Pages 4–8, if previously created or added in the full-size companion app, remain accessible through an overflow ⋯ menu. No existing pages are removed; old notebooks with fewer than three pages are padded with empty pages. Each tab has independent text, selection and scroll position when reopened. The companion app's **Notes** editor has corresponding page tabs, add, clear-current-page and delete-page controls.
 
 On first use of the new notebook, the previous one-page note is preserved verbatim as **page 1**. The original note remains in legacy storage as a fallback rather than being destructively migrated. The new notebook is saved to the existing private App Group, with each edit updating only its own page so notes in other pages are not overwritten.
 
@@ -102,7 +112,7 @@ Full Access is used for keyboard **UIPasteboard** operations and writing the sha
 - English long-press accents and mathematical script/italic letterforms are available; the popup now appears near the held key. More than seven options use a two-row popup to avoid excessively narrow choices on iPhone. Holding and releasing unchanged types the original letter; drag across the popup to choose a variant.
 - First Delete immediately following a glide removes the entire most recently swiped word if the caret still matches; later Deletes use normal character deletion.
 - Press-and-hold Space activates cursor movement, including up/down through the scratchpad's rendered soft-wrapped lines. Small slides use finer 15 pt character steps after a 6 pt dead zone; longer drags accelerate and movement produces subtle selection feedback. For text fields in other apps, Apple provides only a text proxy, not their visual line layout: this implementation handles explicit newlines but cannot precisely match all visual line wraps.
-- An enabled-by-default "iPhone key positions" option puts Shift / #+= at the lower-left of the third row, Delete at its right, and Return in the lower-right control position on every page. Ortholinear's original geometry remains available in the Lab.
+- An enabled-by-default "iPhone key positions" option puts Shift / #+= at the lower-left of the third row, Delete at its right, and Return in the lower-right control position on every page. The compact preset and adjustable key geometry remain under Keyboard → Settings → Advanced key controls.
 - The scratchpad now applies punctuation spacing and quick-double-space period rules too.
 
 ## Updating the existing signed Xcode checkout

@@ -3,12 +3,16 @@
 The simulator verifies layout and interaction. Signing and installation have also been verified on an iPhone 15 Pro; physical-device interaction and memory profiling remain separate checks.
 
 - Run on a signed iPhone and iPad with the shared App Group enabled on both targets.
-- Enable Ortholinear in Settings with no Full Access. Type Ukrainian, English, numbers, and punctuation in Notes, Safari, Messages, and the app's system test fields.
+- Verify the companion opens to Notes, then navigate Characters and Keyboard. Test new-notebook confirmation, legacy note migration, page switching, image import and persistence after app switching.
+- Ensure the keyboard preview and advanced geometry controls are accessible from Keyboard without consuming the Notes editor's space. Confirm keyboard reset does not erase favorites, custom Surround pairs, text expansions or note appearance.
+- Verify the keyboard is not automatically shown when the companion opens to Notes, that Characters has searchable Unicode and editable favorites, and that the warm paper/dark mode contrast remains legible.
+- Confirm VoiceOver labels and Dynamic Type do not truncate tab labels, note controls or the installed-keyboard setup instructions.
+- Enable Key Scratch in Settings with no Full Access. Type Ukrainian, English, numbers, and punctuation in Notes, Safari, Messages, and the app's system test fields.
 - Change presets, letter and control-row heights, letter size, Return/Delete width, Shift position, punctuation, apostrophe, header, spacing, gap-filling and starting language in the containing app. Dismiss and reopen the extension; verify every setting applies. Confirm settings survive terminating both processes.
 - Exercise each usable edge and gutter; rapidly alternate two thumbs; slide from one key to another before release.
 - Hold Delete for progressively longer periods; verify it starts precisely, speeds up smoothly, and resets to the slow rate on each new hold. Slide away, release outside, switch apps, and rotate during the hold. Confirm repeating stops immediately.
 - Enable ї on long-press і. Confirm ї disappears from the top row, a tap types і, a hold types ї, and Shift + hold І types Ї. Turn the option off to restore the separate ї key.
-- Choose every theme from Settings → Appearance → Theme and colors. Verify theme/accent persistence in the actual extension, long-press hints, light/dark Automatic behavior, High Contrast, and Reduce Motion.
+- Choose every theme from Keyboard → Keyboard settings → Appearance. Verify theme/accent persistence in the actual extension, long-press hints, light/dark Automatic behavior, High Contrast, and Reduce Motion.
 - Adjust size and row/column spacing sliders while watching the persistent preview; verify the controls stay in place as the keyboard changes. Switch UA/EN and rotate to landscape.
 - Double-tap shift; type several letters; unlock. Single shift should affect one letter, including Ukrainian ґ/ї/і/є.
 - Hold punctuation and select each ribbon option; release outside to cancel.

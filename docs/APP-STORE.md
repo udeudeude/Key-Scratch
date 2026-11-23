@@ -1,4 +1,11 @@
-# App Store listing
+# Historical App Store listing for Ortholinear
+
+> This is an upstream publishing and version-history record, **not** the
+> current Key Scratch product listing or release checklist. Retained for
+> attribution and preservation; do not use its text, screenshots or purchase
+> identifiers when publishing Key Scratch.
+
+## Archived listing
 
 - Name: Ortholinear Keyboard
 - Subtitle: Big keys. Ukrainian + English
