@@ -1418,16 +1418,17 @@ private struct FavoriteSymbolPicker: View {
     @State private var manual = ""
     @State private var message = ""
     @State private var confirmClear = false
-    private let columns = Array(repeating: GridItem(.flexible(), spacing: 7), count: 6)
+    private let columns = [GridItem(.adaptive(minimum: 48, maximum: 80), spacing: 8)]
 
     private var visible: [CharacterFinderItem] {
         if !query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
             return CharacterFinder.search(query, limit: 500)
         }
         if group == "All" {
+            var seen = Set<String>()
             return CharacterFinder.categories.flatMap { category in
                 Array(CharacterFinder.symbols(in: category.title).prefix(36))
-            }
+            }.filter { seen.insert($0.symbol).inserted }
         }
         return CharacterFinder.symbols(in: group)
     }
@@ -1553,6 +1554,12 @@ private struct FavoriteSymbolPicker: View {
                             }
                             .buttonStyle(.plain)
                             .accessibilityLabel("\(candidate.name): \(candidate.symbol), \(chosen ? "remove" : "add")")
+                            .contextMenu {
+                                Button("Copy character", systemImage: "doc.on.doc") {
+                                    UIPasteboard.general.string = candidate.symbol
+                                    message = "Copied \(candidate.symbol)"
+                                }
+                            }
                         }
                     }
                     if visible.isEmpty {
