@@ -39,7 +39,7 @@ targets:
         OrtholinearAppGroup: $(ORTHOLINEAR_APP_GROUP)
         UTExportedTypeDeclarations:
           - UTTypeIdentifier: com.varyvoda.ortholinear.layout
-            UTTypeDescription: Ortholinear layout
+            UTTypeDescription: Key Scratch keyboard layout
             UTTypeConformsTo: [public.json]
             UTTypeTagSpecification:
               public.filename-extension: [ortholayout]

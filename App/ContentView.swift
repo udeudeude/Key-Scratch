@@ -178,7 +178,7 @@ struct ContentView: View {
                         .accessibilityIdentifier("enable-keyboard")
                         Button { showSystemTest = true } label: {
                             Label("Test the installed keyboard in a real text field",
-                                  systemImage: "rectangle.and.pencil.and.ellipsis")
+                                  systemImage: "text.cursor")
                                 .font(.system(size: 14, weight: .medium))
                                 .frame(maxWidth: .infinity, alignment: .leading)
                                 .padding(.vertical, 7)
@@ -456,7 +456,7 @@ struct GeometrySettings: View {
                     withAnimation(.easeInOut(duration: 0.18)) { showAdvanced.toggle() }
                 } label: {
                     HStack(spacing: 12) {
-                        Image(systemName: "square.grid.3x3.topleft.filled")
+                        Image(systemName: "square.grid.3x3")
                             .font(.system(size: 18)).foregroundStyle(CompanionStyle.accent)
                         VStack(alignment: .leading, spacing: 3) {
                             Text("Advanced key controls")
