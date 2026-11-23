@@ -1116,14 +1116,14 @@ enum KeyboardPreset: String, CaseIterable, Identifiable {
         switch self {
         case .bigLetters: "Big letters"
         case .balanced: "Balanced"
-        case .original: "Original grid"
+        case .original: "Compact"
         }
     }
     var detail: String {
         switch self {
         case .bigLetters: "72 pt letters · large Return and Delete"
         case .balanced: "60 pt letters · a little more space for your text"
-        case .original: "The original 48 pt grid, with punctuation and header"
+        case .original: "Compact 48 pt keys, punctuation and an optional header"
         }
     }
     var preferences: KeyboardPreferences {

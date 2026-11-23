@@ -17,8 +17,7 @@ final class KeyboardUITests: XCTestCase {
         XCTAssertFalse(app.buttons["clear-preview"].isHittable)
 
         tabs.buttons["Characters"].tap()
-        XCTAssertTrue(app.textFields["search-unicode-catalog"].waitForExistence(timeout: 5))
-        XCTAssertTrue(app.staticTexts["Favorites on ★"].exists)
+        XCTAssertTrue(app.staticTexts["Favorites on ★"].waitForExistence(timeout: 5))
 
         tabs.buttons["Keyboard"].tap()
         XCTAssertTrue(app.buttons["clear-preview"].waitForExistence(timeout: 5))
@@ -26,7 +25,7 @@ final class KeyboardUITests: XCTestCase {
         XCTAssertTrue(app.buttons["key-scratch-layout-settings"].exists)
         app.buttons["key-scratch-layout-settings"].tap()
         XCTAssertTrue(app.navigationBars["Scratchpad options"].waitForExistence(timeout: 5))
-        XCTAssertTrue(app.buttons["add-surround-pair"].exists)
+        XCTAssertTrue(app.staticTexts["Portrait notes width"].exists)
         app.buttons["Done"].tap()
         tabs.buttons["Notes"].tap()
         XCTAssertTrue(app.staticTexts["Scratchpad"].waitForExistence(timeout: 5))
@@ -304,9 +303,10 @@ final class KeyboardUITests: XCTestCase {
     func testRussianNeedsAnAnswerAgainstTheInvasion() throws {
         let app = launchApp()
         func resetAndOpenLanguages() {
-            let reset = app.buttons["Reset to defaults"]
+            let reset = app.buttons["restore-keyboard-defaults"]
             revealSetting(reset, in: app)
             reset.tap()
+            app.buttons["Restore keyboard settings"].tap()
             let row = app.buttons["language-settings"]
             revealSetting(row, in: app, scrollingDown: false)
             row.tap()
@@ -346,9 +346,10 @@ final class KeyboardUITests: XCTestCase {
 
         // Other tests expect the default Ukrainian and English cycle.
         tapMainButton("customize-keyboard", in: app)
-        let reset = app.buttons["Reset to defaults"]
+        let reset = app.buttons["restore-keyboard-defaults"]
         revealSetting(reset, in: app)
         reset.tap()
+        app.buttons["Restore keyboard settings"].tap()
         app.buttons["Done"].tap()
         XCTAssertTrue(app.buttons["key-Switch to English"].waitForExistence(timeout: 3))
     }
