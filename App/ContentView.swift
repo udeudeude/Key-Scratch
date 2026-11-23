@@ -776,6 +776,37 @@ private struct ScratchpadPreferences: View {
     @State private var opening = ""
     @State private var closing = ""
 
+    private var sampleFont: Font {
+        let size = CGFloat(preferences.keyScratchNoteFontSize)
+        if preferences.scratchpadVisualStyle != .standard {
+            return .custom("CourierNewPSMT", size: size)
+        }
+        switch preferences.keyScratchNoteFont {
+        case .text: return .system(size: size)
+        case .rounded: return .system(size: size, design: .rounded)
+        case .serif: return .system(size: size, design: .serif)
+        case .monospaced: return .system(size: size, design: .monospaced)
+        }
+    }
+
+    private var sampleInk: Color {
+        switch preferences.scratchpadVisualStyle {
+        case .standard: return .primary
+        case .phosphorGreen: return Color(red: 0.47, green: 0.94, blue: 0.44)
+        case .amber: return Color(red: 1, green: 0.73, blue: 0.22)
+        case .composite: return Color(white: 0.95)
+        }
+    }
+
+    private var sampleGlass: Color {
+        switch preferences.scratchpadVisualStyle {
+        case .standard: return Color(uiColor: .secondarySystemBackground)
+        case .phosphorGreen: return Color(red: 0.004, green: 0.016, blue: 0.004)
+        case .amber: return Color(red: 0.016, green: 0.008, blue: 0)
+        case .composite: return Color(red: 0.008, green: 0.008, blue: 0.016)
+        }
+    }
+
     private var prospectivePair: SelectionWrapper {
         SelectionWrapper(pairName.trimmingCharacters(in: .whitespacesAndNewlines), opening, closing)
     }
@@ -830,13 +861,11 @@ private struct ScratchpadPreferences: View {
                     }
                     .accessibilityIdentifier("scratchpad-visual-style")
                     Text("A quick note, a useful address, or a line of symbols.")
-                        .font(.system(size: CGFloat(preferences.keyScratchNoteFontSize) + 2,
-                                      design: .monospaced))
-                        .foregroundStyle(preferences.scratchpadVisualStyle == .standard
-                                         ? Color.primary : CompanionStyle.accent)
+                        .font(sampleFont)
+                        .foregroundStyle(sampleInk)
                         .padding(12)
                         .frame(maxWidth: .infinity, minHeight: 56, alignment: .leading)
-                        .background(CompanionStyle.card,
+                        .background(sampleGlass,
                                     in: RoundedRectangle(cornerRadius: 10))
                 } header: {
                     Label("Note appearance", systemImage: "textformat")
