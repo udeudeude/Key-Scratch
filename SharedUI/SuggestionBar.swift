@@ -209,6 +209,9 @@ final class SuggestionBar: UIView {
             button.addAction(UIAction(identifier: .init("accept")) { [weak self] _ in self?.onSelect?(suggestion) }, for: .touchUpInside)
         }
         var actions: [UIMenuElement] = []
+        // Editing and dismissal are primary; vocabulary management follows.
+        if let cachedWrapMenu { actions.append(cachedWrapMenu) }
+        actions.append(UIAction(title: "Dismiss keyboard", image: UIImage(systemName: "keyboard.chevron.compact.down")) { [weak self] _ in self?.onDismiss?() })
         if let word, SuggestionText.isWord(word) {
             let exists = learned.contains { SuggestionText.normalize($0) == SuggestionText.normalize(word) }
             actions.append(UIAction(title: exists ? "Forget “\(word)”" : "Teach “\(word)”",
@@ -251,8 +254,6 @@ final class SuggestionBar: UIView {
                 }
             ]))
         }
-        if let cachedWrapMenu { actions.append(cachedWrapMenu) }
-        actions.append(UIAction(title: "Dismiss keyboard", image: UIImage(systemName: "keyboard.chevron.compact.down")) { [weak self] _ in self?.onDismiss?() })
         more.menu = UIMenu(title: "Words stay on this device", children: actions)
     }
 }
