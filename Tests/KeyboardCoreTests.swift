@@ -444,6 +444,13 @@ final class KeyboardCoreTests: XCTestCase {
             "\"hi\"", "'hi'", "*hi*", "**hi**", "(hi)", "[hi]", "{hi}"
         ])
         XCTAssertEqual(SelectionWrapper.builtIn.first { $0.name == "Double quotes" }?.wrap("hi"), "“hi”")
+        // UIKit positions count UTF-16 code units rather than grapheme clusters.
+        // A multi-code-point custom delimiter must leave the caret inside the pair.
+        let emojiPair = SelectionWrapper("Family", "🧪", "👨‍👩‍👧‍👦")
+        XCTAssertTrue(emojiPair.isUsable)
+        XCTAssertEqual(emojiPair.closing.count, 1)
+        XCTAssertEqual(emojiPair.caretOffsetAfterEmptyInsertion, -11)
+        XCTAssertEqual(SelectionWrapper.builtIn.first?.caretOffsetAfterEmptyInsertion, -1)
         var prefs = KeyboardPreferences()
         prefs.customWrappers = [
             .init("Spoiler", "||", "||"),

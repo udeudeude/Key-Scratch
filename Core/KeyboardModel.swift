@@ -829,6 +829,10 @@ struct SelectionWrapper: Codable, Equatable, Hashable, Sendable {
 
     func wrap(_ text: String) -> String { opening + text + closing }
 
+    /// Text-position offsets in UIKit are measured in UTF-16 code units.
+    /// A custom closing delimiter can be one Character but several units.
+    var caretOffsetAfterEmptyInsertion: Int { -(closing as NSString).length }
+
     static let builtIn: [Self] = [
         // Keep the most frequently used text/Markdown pairs at the top
         // of the suggestion-row ⋯ → Surround selection submenu.

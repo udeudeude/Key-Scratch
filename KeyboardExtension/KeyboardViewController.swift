@@ -487,12 +487,12 @@ final class KeyboardViewController: UIInputViewController {
         if scratchpad.isEditingNote {
             let selected = scratchpad.selectedNoteText
             scratchpad.type(pair.wrap(selected))
-            if selected.isEmpty { scratchpad.moveCaret(steps: -pair.closing.count) }
+            if selected.isEmpty { scratchpad.moveCaret(steps: pair.caretOffsetAfterEmptyInsertion) }
         } else {
             let selected = textDocumentProxy.selectedText ?? ""
             textDocumentProxy.insertText(pair.wrap(selected))
             if selected.isEmpty {
-                textDocumentProxy.adjustTextPosition(byCharacterOffset: -(pair.closing as NSString).length)
+                textDocumentProxy.adjustTextPosition(byCharacterOffset: pair.caretOffsetAfterEmptyInsertion)
             }
         }
         updateAutoShift()
