@@ -15,6 +15,9 @@ final class SuggestionBar: UIView {
     var onTeach: ((String) -> Void)?
     var onForget: ((String) -> Void)?
     var onClear: (() -> Void)?
+    var onHide: ((String, KeyboardLanguage?) -> Void)?
+    var onRestore: ((String) -> Void)?
+    var onClearHidden: (() -> Void)?
     var onDismiss: (() -> Void)?
     var onWrap: ((SelectionWrapper) -> Void)?
     /// Delimiters are supplied by KeyboardView. The suggestion-row ⋯ is the
@@ -155,7 +158,8 @@ final class SuggestionBar: UIView {
 
     /// Words when there are any; otherwise a message, a tip, or punctuation, in that order.
     /// Next words leave room for . , ? so ending a sentence stays one tap.
-    func show(_ suggestions: [WordSuggestion], word: String?, learned: [String], message: String? = nil, tip: KeyboardTip? = nil) {
+    func show(_ suggestions: [WordSuggestion], word: String?, learned: [String],
+              message: String? = nil, tip: KeyboardTip? = nil, hidden: [String] = []) {
         let idle = suggestions.isEmpty && message == nil
         let between = !suggestions.isEmpty && suggestions.allSatisfy { $0.kind == .nextWord }
         let suggestions = between ? Array(suggestions.prefix(2)) : suggestions
@@ -200,6 +204,38 @@ final class SuggestionBar: UIView {
             actions.append(UIMenu(title: "Forget a taught word", children: words))
             actions.append(UIMenu(title: "Clear taught words…", children: [UIAction(title: "Clear words for this language", attributes: .destructive) { [weak self] _ in self?.onClear?() }]))
         }
+        let hiddenNames = Set(hidden.map(SuggestionText.normalize))
+        if let word, SuggestionText.isWord(word), !hiddenNames.contains(SuggestionText.normalize(word)) {
+            actions.append(UIAction(title: "Hide “\(word)” from suggestions",
+                                    image: UIImage(systemName: "eye.slash")) { [weak self] _ in
+                self?.onHide?(word, nil)
+            })
+        }
+        var seen = Set<String>()
+        let offeredWords = suggestions.filter {
+            $0.kind != .replacement && !hiddenNames.contains(SuggestionText.normalize($0.word))
+                && seen.insert("\($0.language?.rawValue ?? ""):\(SuggestionText.normalize($0.word))").inserted
+        }
+        if !offeredWords.isEmpty {
+            actions.append(UIMenu(title: "Hide suggested word", image: UIImage(systemName: "eye.slash"),
+                                  children: offeredWords.map { suggestion in
+                UIAction(title: suggestion.word) { [weak self] _ in
+                    self?.onHide?(suggestion.word, suggestion.language)
+                }
+            }))
+        }
+        if !hidden.isEmpty {
+            actions.append(UIMenu(title: "Restore hidden word",
+                                  image: UIImage(systemName: "arrow.uturn.backward"),
+                                  children: hidden.sorted().map { word in
+                UIAction(title: word) { [weak self] _ in self?.onRestore?(word) }
+            }))
+            actions.append(UIMenu(title: "Clear hidden words…", children: [
+                UIAction(title: "Restore all personally hidden words", attributes: .destructive) {
+                    [weak self] _ in self?.onClearHidden?()
+                }
+            ]))
+        }
         if let cachedWrapMenu { actions.append(cachedWrapMenu) }
         actions.append(UIAction(title: "Dismiss keyboard", image: UIImage(systemName: "keyboard.chevron.compact.down")) { [weak self] _ in self?.onDismiss?() })
         more.menu = UIMenu(title: "Words stay on this device", children: actions)
@@ -208,6 +244,32 @@ final class SuggestionBar: UIView {
 
 /// Intentionally uses this process's own defaults. The keyboard can write here
 /// without Full Access; it never attempts to write the shared App Group file.
+@MainActor
+enum HiddenWordStore {
+    static let limit = 200
+    private static func key(_ language: KeyboardLanguage) -> String {
+        "hidden-words-\(language.rawValue)"
+    }
+    static func words(_ language: KeyboardLanguage) -> [String] {
+        var seen = Set<String>()
+        return (UserDefaults.standard.stringArray(forKey: key(language)) ?? [])
+            .map(SuggestionText.normalize)
+            .filter {
+                SuggestionText.isWord($0) && SuggestionText.belongs($0, to: language)
+                    && seen.insert($0).inserted
+            }
+            .prefix(limit).map { $0 }
+    }
+    static func save(_ words: [String], language: KeyboardLanguage) {
+        var seen = Set<String>()
+        let normalized = words.map(SuggestionText.normalize).filter {
+            SuggestionText.isWord($0) && SuggestionText.belongs($0, to: language)
+                && seen.insert($0).inserted
+        }
+        UserDefaults.standard.set(Array(normalized.prefix(limit)), forKey: key(language))
+    }
+}
+
 @MainActor
 enum TaughtWordStore {
     static let limit = 200
