@@ -1494,6 +1494,40 @@ private struct FavoriteSymbolPicker: View {
                         }
                     }
                     .pickerStyle(.menu)
+                    DisclosureGroup("Enter a character not in the catalog") {
+                        VStack(alignment: .leading, spacing: 7) {
+                            Text("Add a character")
+                                .font(.system(size: 15, weight: .semibold))
+                            HStack {
+                                TextField("Type or paste a symbol", text: $manual)
+                                    .textInputAutocapitalization(.never)
+                                    .autocorrectionDisabled()
+                                    .font(.system(size: 20))
+                                    .submitLabel(.done)
+                                    .onSubmit(addEntered)
+                                    .accessibilityIdentifier("unicode-favorite-entry")
+                                Button("Add", action: addEntered)
+                                    .buttonStyle(.borderedProminent)
+                                    .disabled(manual.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                            }
+                            Text("Paste a symbol, or use Apple's emoji keyboard. Separate multiple items with spaces.")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                            Button {
+                                if let value = UIPasteboard.general.string {
+                                    manual = value
+                                    addEntered()
+                                } else {
+                                    message = "Clipboard contains no text symbols."
+                                }
+                            } label: {
+                                Label("Add symbols from clipboard", systemImage: "doc.on.clipboard")
+                            }
+                            .font(.subheadline)
+                        }
+
+                    }
+                    .font(.system(size: 14, weight: .medium))
                     HStack {
                         Text(query.isEmpty ? (group == "All" ? "Browse characters" : group) : "Search results")
                             .font(.system(size: 17, weight: .semibold, design: .serif))
@@ -1535,41 +1569,6 @@ private struct FavoriteSymbolPicker: View {
                     if visible.isEmpty {
                         ContentUnavailableView.search(text: query)
                     }
-                    Divider()
-                    DisclosureGroup("Enter a character not in the catalog") {
-                        VStack(alignment: .leading, spacing: 7) {
-                            Text("Add a character")
-                                .font(.system(size: 15, weight: .semibold))
-                            HStack {
-                                TextField("Type or paste a symbol", text: $manual)
-                                    .textInputAutocapitalization(.never)
-                                    .autocorrectionDisabled()
-                                    .font(.system(size: 20))
-                                    .submitLabel(.done)
-                                    .onSubmit(addEntered)
-                                    .accessibilityIdentifier("unicode-favorite-entry")
-                                Button("Add", action: addEntered)
-                                    .buttonStyle(.borderedProminent)
-                                    .disabled(manual.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-                            }
-                            Text("Paste a symbol, or use Apple's emoji keyboard. Separate multiple items with spaces.")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                            Button {
-                                if let value = UIPasteboard.general.string {
-                                    manual = value
-                                    addEntered()
-                                } else {
-                                    message = "Clipboard contains no text symbols."
-                                }
-                            } label: {
-                                Label("Add symbols from clipboard", systemImage: "doc.on.clipboard")
-                            }
-                            .font(.subheadline)
-                        }
-
-                    }
-                    .font(.system(size: 14, weight: .medium))
                     if !message.isEmpty {
                         Text(message)
                             .font(.caption)
