@@ -315,7 +315,8 @@ private actor SuggestionWorker {
     }
 
     func suggest(snapshot: SuggestionSnapshot, learned: [String], supplementary: SupplementaryWords, preferences: KeyboardPreferences, width: Double,
-                 alternate: KeyboardLanguage?) throws -> SuggestionResponse {
+                 alternate: KeyboardLanguage?, hidden: Set<String>,
+                 alternateHidden: Set<String>) throws -> SuggestionResponse {
         try Task.checkCancellation()
         let engine = try engine(snapshot.language)
         try Task.checkCancellation()
@@ -325,7 +326,8 @@ private actor SuggestionWorker {
         #endif
         let geometry = SuggestionGeometry(language: snapshot.language, preferences: preferences, width: width)
         var words = engine.suggest(target: target, language: snapshot.language, learned: learned, geometry: geometry,
-                                   nextWords: preferences.nextWordSuggestions, useContext: preferences.contextualSuggestions)
+                                   nextWords: preferences.nextWordSuggestions, useContext: preferences.contextualSuggestions,
+                                   hidden: hidden)
         let query = SuggestionText.normalize(target.word)
         // Only a word nothing in this language starts with; a half-typed word always has completions.
         if let alternate, !target.selected, target.rightCount == 0, query.count >= 4,
@@ -333,7 +335,8 @@ private actor SuggestionWorker {
            !learned.contains(where: { SuggestionText.normalize($0).hasPrefix(query) }) {
             let other = try self.engine(alternate)
             let otherGeometry = SuggestionGeometry(language: alternate, preferences: preferences, width: width)
-            if let word = LayoutRecovery.recover(target.word, from: geometry, to: otherGeometry, lexicon: other.lexicon) {
+            if let word = LayoutRecovery.recover(target.word, from: geometry, to: otherGeometry, lexicon: other.lexicon),
+               !SuggestionExclusions.excluded(language: alternate, learned: [], hidden: alternateHidden).contains(word) {
                 let cased = SuggestionText.cased(word, like: target.word, language: alternate)
                 words = [WordSuggestion(word: cased, kind: .correction, language: alternate)] + words.prefix(2)
             }
@@ -360,11 +363,11 @@ private actor SuggestionWorker {
     }
 
     func glide(_ points: [CGPoint], language: KeyboardLanguage, learned: [String], context: [String],
-               preferences: KeyboardPreferences, width: Double) throws -> [WordSuggestion] {
+               preferences: KeyboardPreferences, width: Double, hidden: Set<String>) throws -> [WordSuggestion] {
         let engine = try engine(language)
         let geometry = SuggestionGeometry(language: language, preferences: preferences, width: width)
         return engine.glide(points, language: language, learned: learned, geometry: geometry,
-                            context: preferences.contextualSuggestions ? context : [])
+                            context: preferences.contextualSuggestions ? context : [], hidden: hidden)
     }
 
     func unload() { engines.removeAll() }
@@ -383,7 +386,8 @@ private actor FastGlideWorker {
     }
 
     func glide(_ points: [CGPoint], language: KeyboardLanguage, learned: [String],
-               context: [String], preferences: KeyboardPreferences, width: Double) throws -> [WordSuggestion] {
+               context: [String], preferences: KeyboardPreferences, width: Double,
+               hidden: Set<String>) throws -> [WordSuggestion] {
         try Task.checkCancellation()
         prepare(language)
         guard let engine = cachedEngine, cachedLanguage == language else {
@@ -392,7 +396,7 @@ private actor FastGlideWorker {
         let geometry = SuggestionGeometry(language: language, preferences: preferences, width: width)
         try Task.checkCancellation()
         return engine.glide(points, language: language, learned: learned, geometry: geometry,
-                            context: preferences.contextualSuggestions ? context : [])
+                            context: preferences.contextualSuggestions ? context : [], hidden: hidden)
     }
 
     func release() {
@@ -462,6 +466,14 @@ final class SuggestionCoordinator {
         }
         keyboard.suggestionBar.onTeach = { [weak self] word in self?.teach(word) }
         keyboard.suggestionBar.onForget = { [weak self] word in self?.forget(word) }
+        keyboard.suggestionBar.onHide = { [weak self] word, language in self?.hide(word, language: language) }
+        keyboard.suggestionBar.onRestore = { [weak self] word in self?.restore(word) }
+        keyboard.suggestionBar.onClearHidden = { [weak self] in
+            guard let self, let language = self.snapshot?()?.language else { return }
+            HiddenWordStore.save([], language: language)
+            self.glideOffer = nil
+            self.refresh(force: true)
+        }
         keyboard.suggestionBar.onClear = { [weak self] in
             guard let self, let language = self.snapshot?()?.language else { return }
             TaughtWordStore.save([], language: language); self.refresh(force: true)
@@ -545,7 +557,8 @@ final class SuggestionCoordinator {
                 guard force || requested != current else { return }
                 suspend()
                 requested = current; offered = current; self.preferences = preferences
-                keyboard.suggestionBar.show(offer.words, word: nil, learned: TaughtWordStore.words(current.language))
+                keyboard.suggestionBar.show(offer.words, word: nil, learned: TaughtWordStore.words(current.language),
+                                            hidden: HiddenWordStore.words(current.language))
                 return
             }
             glideOffer = nil
@@ -554,6 +567,7 @@ final class SuggestionCoordinator {
         suspend()
         requested = current; self.preferences = preferences
         let learned = TaughtWordStore.words(current.language)
+        let hidden = HiddenWordStore.words(current.language)
         let word = current.target?.word
         let teachable = word.flatMap { SuggestionText.belongs($0, to: current.language) ? $0 : nil }
         let tip = tip(for: current, preferences: preferences)
@@ -566,28 +580,32 @@ final class SuggestionCoordinator {
                 guard let self, token == self.generation, self.snapshot?() == current, let keyboard = self.keyboard else { return }
                 let geometry = SuggestionGeometry(language: current.language, preferences: preferences, width: width)
                 let words = current.target.map {
-                    supplementary.merged(into: SystemSuggestions.suggest(target: $0, language: current.language, learned: learned, geometry: geometry),
+                    supplementary.merged(into: SystemSuggestions.suggest(target: $0, language: current.language, learned: learned,
+                                              geometry: geometry, hidden: Set(hidden)),
                                          target: $0, language: current.language)
                 } ?? []
                 self.offered = current
-                keyboard.suggestionBar.show(words, word: teachable, learned: learned, tip: tip)
+                keyboard.suggestionBar.show(words, word: teachable, learned: learned, tip: tip, hidden: hidden)
             }
             return
         }
         let alternate = alternate(to: current.language, preferences: preferences)
+        let alternateHidden = alternate.map { Set(HiddenWordStore.words($0)) } ?? []
         task = Task { [weak self, worker] in
             do {
                 try await Task.sleep(for: .milliseconds(30))
-                let result = try await worker.suggest(snapshot: current, learned: learned, supplementary: supplementary, preferences: preferences,
-                                                      width: width, alternate: alternate)
+                let result = try await worker.suggest(snapshot: current, learned: learned, supplementary: supplementary,
+                                                      preferences: preferences, width: width, alternate: alternate,
+                                                      hidden: Set(hidden), alternateHidden: alternateHidden)
                 try Task.checkCancellation()
                 guard let self, token == self.generation, self.snapshot?() == current else { return }
                 self.offered = current
                 self.keyboard?.suggestionBar.accessibilityValue = result.diagnostics
-                self.keyboard?.suggestionBar.show(result.words, word: teachable, learned: learned, tip: tip)
+                self.keyboard?.suggestionBar.show(result.words, word: teachable, learned: learned, tip: tip, hidden: hidden)
             } catch is CancellationError { } catch {
                 guard let self, token == self.generation else { return }
-                self.keyboard?.suggestionBar.show([], word: teachable, learned: learned, message: "Suggestions unavailable")
+                self.keyboard?.suggestionBar.show([], word: teachable, learned: learned,
+                                                  message: "Suggestions unavailable", hidden: hidden)
             }
         }
     }
@@ -596,6 +614,7 @@ final class SuggestionCoordinator {
         cancelGlide()
         guard let keyboard, let current = glideContext?(), current.language.dictionaryCode != nil else { return }
         let learned = TaughtWordStore.words(current.language)
+        let hidden = Set(HiddenWordStore.words(current.language))
         let preferences = keyboard.preferences, width = keyboard.bounds.width
         suspend()
         glideOffer = nil
@@ -606,13 +625,13 @@ final class SuggestionCoordinator {
             if preferences.keyScratchMode.usesDedicatedGlide {
                 words = try? await fastGlideWorker.glide(points, language: current.language,
                                                          learned: learned, context: context,
-                                                         preferences: preferences, width: width)
+                                                         preferences: preferences, width: width, hidden: hidden)
             } else {
                 // Blue reference mode intentionally preserves Ortholinear's
                 // original serialized dictionary/suggestion worker.
                 words = try? await worker.glide(points, language: current.language,
                                                 learned: learned, context: context,
-                                                preferences: preferences, width: width)
+                                                preferences: preferences, width: width, hidden: hidden)
             }
             guard !Task.isCancelled, let self, self.glideContext?() == current,
                   let best = words?.first,
@@ -641,7 +660,42 @@ final class SuggestionCoordinator {
             keyboard?.suggestionBar.show([], word: nil, learned: words, message: "Word list full · forget a word first")
             return
         }
-        words.append(word); TaughtWordStore.save(words, language: current.language); refresh(force: true)
+        words.append(word); TaughtWordStore.save(words, language: current.language)
+        // An explicit Teach action opts a word back in.
+        HiddenWordStore.save(HiddenWordStore.words(current.language).filter {
+            SuggestionText.normalize($0) != SuggestionText.normalize(word)
+        }, language: current.language)
+        refresh(force: true)
+    }
+    private func hide(_ word: String, language selectedLanguage: KeyboardLanguage?) {
+        guard let current = snapshot?(), SuggestionText.isWord(word) else { return }
+        let language = selectedLanguage ?? current.language
+        guard SuggestionText.belongs(word, to: language) else { return }
+        var hidden = HiddenWordStore.words(language)
+        let normalized = SuggestionText.normalize(word)
+        guard !hidden.contains(normalized) else { return }
+        guard hidden.count < HiddenWordStore.limit else {
+            keyboard?.suggestionBar.show([], word: nil, learned: TaughtWordStore.words(current.language),
+                                         message: "Hidden list full · restore a word first",
+                                         hidden: HiddenWordStore.words(current.language))
+            return
+        }
+        hidden.append(normalized)
+        HiddenWordStore.save(hidden, language: language)
+        TaughtWordStore.save(TaughtWordStore.words(language).filter {
+            SuggestionText.normalize($0) != normalized
+        }, language: language)
+        glideOffer = nil
+        cancelGlide()
+        refresh(force: true)
+    }
+    private func restore(_ word: String) {
+        guard let language = snapshot?()?.language else { return }
+        HiddenWordStore.save(HiddenWordStore.words(language).filter {
+            SuggestionText.normalize($0) != SuggestionText.normalize(word)
+        }, language: language)
+        glideOffer = nil
+        refresh(force: true)
     }
     private func forget(_ word: String) {
         guard let language = snapshot?()?.language else { return }
