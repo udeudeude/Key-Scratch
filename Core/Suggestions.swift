@@ -129,6 +129,39 @@ enum SuggestionText {
     }
 }
 
+
+/// A conservative, exact-word filter for automatic suggestions, never for
+/// typing. Teaching a word deliberately overrides the default exclusions;
+/// personally hidden words always take precedence over taught vocabulary.
+enum SuggestionExclusions {
+    private static let english: Set<String> = [
+        "arse", "arsehole", "ass", "asshole", "bastard", "bitch", "bitches",
+        "bollocks", "bullshit", "cock", "crap", "cunt", "damn", "dick",
+        "dickhead", "douche", "douchebag", "fuck", "fucked", "fucker",
+        "fuckers", "fucking", "fucks", "motherfucker", "motherfucking",
+        "piss", "pissed", "pissing", "prick", "pussy", "shit", "shits",
+        "shitty", "slut", "sluts", "twat", "wanker", "whore", "whores"
+    ]
+    private static let ukrainian: Set<String> = [
+        "бля", "блядь", "гівно", "єбати", "їбати", "пізда",
+        "пизда", "пиздець", "срака", "сука", "хуй", "хуя", "хує", "хуйня"
+    ]
+    static func defaultWords(for language: KeyboardLanguage) -> Set<String> {
+        switch language {
+        case .english: english
+        case .ukrainian: ukrainian
+        default: []
+        }
+    }
+    static func excluded(language: KeyboardLanguage, learned: [String],
+                         hidden: Set<String> = []) -> Set<String> {
+        var blocked = defaultWords(for: language)
+        blocked.subtract(learned.map(SuggestionText.normalize))
+        blocked.formUnion(hidden.map(SuggestionText.normalize))
+        return blocked
+    }
+}
+
 /// The same prefix-delete hash is used by the reproducible asset builder.
 /// Collisions only add candidates; full edit distance always verifies them.
 enum SuggestionHash {
@@ -300,16 +333,18 @@ struct SuggestionEngine: Sendable {
     let lexicon: SuggestionLexicon
     let context: SuggestionContextModel?
     func suggest(target: SuggestionTarget, language: KeyboardLanguage, learned: [String],
-                 geometry: SuggestionGeometry?, nextWords: Bool, useContext: Bool) -> [WordSuggestion] {
+                 geometry: SuggestionGeometry?, nextWords: Bool, useContext: Bool,
+                 hidden: Set<String> = []) -> [WordSuggestion] {
         let query = SuggestionText.normalize(target.word)
         guard query.isEmpty || SuggestionText.belongs(query, to: language) else { return [] }
+        let excluded = SuggestionExclusions.excluded(language: language, learned: learned, hidden: hidden)
         let following = useContext ? context?.following(target.context) ?? [] : []
         let contextual = Dictionary(following.map { ($0.word, $0.frequency) }, uniquingKeysWith: max)
         if query.isEmpty {
             guard nextWords, !target.context.isEmpty else { return [] }
             let candidates = following.map(\.word) + lexicon.completions("").map { lexicon.words[$0].word }
             var seen = Set<String>()
-            return candidates.filter { seen.insert($0).inserted }.prefix(3).map {
+            return candidates.filter { !excluded.contains(SuggestionText.normalize($0)) && seen.insert($0).inserted }.prefix(3).map {
                 .init(word: SuggestionText.cased($0, like: "", language: language), kind: .nextWord)
             }
         }
@@ -330,7 +365,7 @@ struct SuggestionEngine: Sendable {
         }
         var scored: [(String, Double, WordSuggestion.Kind)] = []
         func consider(_ word: String, frequency: Int, taught: Bool) {
-            guard word != query else { return }
+            guard word != query, !excluded.contains(word) else { return }
             let apostropheOnly = word.contains("'") && word.replacingOccurrences(of: "'", with: "") == bare
             let completion = word.hasPrefix(query) && !target.selected && target.rightCount == 0
             let distance = completion || apostropheOnly ? 0 : SuggestionDistance.evaluate(query, word, geometry: nil)
@@ -361,10 +396,14 @@ struct SuggestionEngine: Sendable {
     }
     /// Words for a glide trace in `geometry`'s coordinates, best first.
     func glide(_ points: [CGPoint], language: KeyboardLanguage, learned: [String],
-               geometry: SuggestionGeometry, context: [String] = [], limit: Int = 4) -> [WordSuggestion] {
+               geometry: SuggestionGeometry, context: [String] = [], limit: Int = 4,
+               hidden: Set<String> = []) -> [WordSuggestion] {
         let following = Dictionary(self.context?.following(context).map { ($0.word, $0.frequency) } ?? [], uniquingKeysWith: max)
+        let excluded = SuggestionExclusions.excluded(language: language, learned: learned, hidden: hidden)
         // Taught words with letters the layout lacks never match a trace.
-        return GlideDecoder(lexicon: lexicon, geometry: geometry).decode(points, learned: learned, following: following, limit: limit).map {
+        return GlideDecoder(lexicon: lexicon, geometry: geometry).decode(
+            points, learned: learned, following: following, limit: limit, excluded: excluded
+        ).map {
             .init(word: SuggestionText.cased($0, like: "", language: language), kind: .correction)
         }
     }

@@ -15,7 +15,8 @@ enum SystemSuggestions {
     }
 
     static func suggest(target: SuggestionTarget, language: KeyboardLanguage, learned: [String],
-                        geometry: SuggestionGeometry) -> [WordSuggestion] {
+                        geometry: SuggestionGeometry, hidden: Set<String> = []) -> [WordSuggestion] {
+        let excluded = SuggestionExclusions.excluded(language: language, learned: learned, hidden: hidden)
         let word = target.word
         guard !word.isEmpty, let code = checkerLanguage(for: language) else { return [] }
         let query = SuggestionText.normalize(word)
@@ -24,7 +25,8 @@ enum SystemSuggestions {
             || learned.contains { SuggestionText.normalize($0) == query }
         let usable: (String) -> Bool = { candidate in
             let normalized = SuggestionText.normalize(candidate)
-            return normalized != query && SuggestionText.isWord(candidate) && SuggestionText.belongs(candidate, to: language)
+            return normalized != query && !excluded.contains(normalized)
+                && SuggestionText.isWord(candidate) && SuggestionText.belongs(candidate, to: language)
         }
         var results: [WordSuggestion] = []
         if !known || target.selected || target.rightCount > 0 {

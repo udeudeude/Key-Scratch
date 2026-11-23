@@ -93,12 +93,14 @@ struct GlideDecoder: Sendable {
         return path
     }
 
-    func decode(_ points: [CGPoint], learned: [String] = [], following: [String: Int] = [:], limit: Int = 4) -> [String] {
-        rank(points, learned: learned, following: following, limit: limit).map(\.word)
+    func decode(_ points: [CGPoint], learned: [String] = [], following: [String: Int] = [:],
+                limit: Int = 4, excluded: Set<String> = []) -> [String] {
+        rank(points, learned: learned, following: following, limit: limit, excluded: excluded).map(\.word)
     }
 
     /// `following` holds how often each word follows the previous ones, from the context model.
-    func rank(_ points: [CGPoint], learned: [String] = [], following: [String: Int] = [:], limit: Int = 4) -> [Candidate] {
+    func rank(_ points: [CGPoint], learned: [String] = [], following: [String: Int] = [:],
+              limit: Int = 4, excluded: Set<String> = []) -> [Candidate] {
         guard limit > 0, !keys.isEmpty else { return [] }
         var trace: [SIMD2<Double>] = []
         trace.reserveCapacity(points.count)
@@ -195,6 +197,7 @@ struct GlideDecoder: Sendable {
                 visited += 1
                 if visited & 255 == 0 && Task.isCancelled { return [] }
                 let entry = lexicon.words[id]
+                guard !excluded.contains(entry.word) else { continue }
                 if var value = score(entry.word, frequency: entry.frequency) {
                     if let count = following[entry.word] { value += log1p(Double(count)) * weights.context }
                     best[entry.word] = max(best[entry.word] ?? -.infinity, value)
@@ -203,7 +206,7 @@ struct GlideDecoder: Sendable {
         }
         for word in learned {
             let normalized = SuggestionText.normalize(word)
-            guard SuggestionText.isWord(normalized),
+            guard SuggestionText.isWord(normalized), !excluded.contains(normalized),
                   let value = score(normalized, frequency: Self.learnedFrequency) else { continue }
             best[normalized] = max(best[normalized] ?? -.infinity, value)
         }

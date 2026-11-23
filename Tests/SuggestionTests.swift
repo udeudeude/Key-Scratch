@@ -144,6 +144,42 @@ final class SuggestionTests: XCTestCase {
         let next = try XCTUnwrap(snapshot("thank you ").target)
         XCTAssertTrue(engine.suggest(target: next, language: .english, learned: [], geometry: nil, nextWords: false, useContext: true).isEmpty)
     }
+    func testHiddenWordsAndBuiltInVulgarityFilter() throws {
+        let defaults = SuggestionExclusions.excluded(language: .english, learned: [])
+        XCTAssertTrue(defaults.contains("shit"))
+        XCTAssertTrue(defaults.contains("fuck"))
+        XCTAssertTrue(defaults.contains("bitch"))
+        XCTAssertFalse(defaults.contains("class"), "Filtering must match whole words")
+        XCTAssertFalse(defaults.contains("assessment"))
+        XCTAssertFalse(defaults.contains("hello"))
+        XCTAssertFalse(SuggestionExclusions.defaultWords(for: .german).contains("shit"))
+        XCTAssertTrue(SuggestionExclusions.defaultWords(for: .ukrainian).contains("блядь"))
+        let taught = SuggestionExclusions.excluded(language: .english, learned: ["SHIT"])
+        XCTAssertFalse(taught.contains("shit"), "Explicit teaching overrides default exclusions")
+        let hidden = SuggestionExclusions.excluded(language: .english, learned: ["SHIT"],
+                                                  hidden: ["SHIT", "Hello"])
+        XCTAssertTrue(hidden.contains("shit"), "Personally hidden words override teaching")
+        XCTAssertTrue(hidden.contains("hello"))
+        let engine = try SuggestionResources.engine(language: .english)
+        let target = try XCTUnwrap(snapshot("shi").target)
+        let normal = engine.suggest(target: target, language: .english, learned: [],
+                                    geometry: nil, nextWords: true, useContext: false)
+        XCTAssertFalse(normal.contains { SuggestionText.normalize($0.word) == "shit" })
+        let optedIn = engine.suggest(target: target, language: .english, learned: ["shit"],
+                                     geometry: nil, nextWords: true, useContext: false)
+        XCTAssertTrue(optedIn.contains { SuggestionText.normalize($0.word) == "shit" })
+        let suppressed = engine.suggest(target: target, language: .english, learned: ["shit"],
+                                        geometry: nil, nextWords: true, useContext: false, hidden: ["shit"])
+        XCTAssertFalse(suppressed.contains { SuggestionText.normalize($0.word) == "shit" })
+        let hello = try XCTUnwrap(snapshot("hell").target)
+        let withHidden = engine.suggest(target: hello, language: .english, learned: [],
+                                        geometry: nil, nextWords: true, useContext: false, hidden: ["hello"])
+        XCTAssertFalse(withHidden.contains { SuggestionText.normalize($0.word) == "hello" })
+        let ordinary = engine.suggest(target: hello, language: .english, learned: [],
+                                      geometry: nil, nextWords: true, useContext: false)
+        XCTAssertTrue(ordinary.contains { SuggestionText.normalize($0.word) == "hello" })
+    }
+
     func testCorrectionBenchmark() throws {
         let cases: [(KeyboardLanguage, [(String, String)])] = [
             (.english, [("teh","the"),("hellp","hello"),("worls","world"),("keybaord","keyboard"),("thnaks","thanks"),
