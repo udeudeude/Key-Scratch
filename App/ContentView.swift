@@ -729,289 +729,167 @@ struct SystemKeyboardTest: View {
 }
 
 
-/// One everyday split keyboard, not the old color-coded A/B experiment.
-private struct KeyScratchExperimentLab: View {
+/// Companion-only preferences for the notebook beside the keyboard.
+/// Changes publish immediately, through ContentView, without a second Apply step.
+private struct ScratchpadPreferences: View {
     @Binding var preferences: KeyboardPreferences
-    @State private var draft: KeyboardPreferences
-    @State private var testText = ""
-    @State private var showSymbolPicker = false
-    @State private var wrapperName = ""
-    @State private var wrapperOpening = ""
-    @State private var wrapperClosing = ""
-    @State private var status = "Adjust settings, then Apply and test."
-    @FocusState private var testing: Bool
     @Environment(\.dismiss) private var dismiss
+    @State private var pairName = ""
+    @State private var opening = ""
+    @State private var closing = ""
 
-    init(preferences: Binding<KeyboardPreferences>) {
-        _preferences = preferences
-        _draft = State(initialValue: PreferenceStore.normalized(preferences.wrappedValue))
+    private var prospectivePair: SelectionWrapper {
+        SelectionWrapper(pairName.trimmingCharacters(in: .whitespacesAndNewlines), opening, closing)
+    }
+    private var canAddPair: Bool {
+        let pair = prospectivePair
+        return pair.isUsable && preferences.customWrappers.count < 12
+            && !preferences.customWrappers.contains {
+                $0.opening == pair.opening && $0.closing == pair.closing
+            }
     }
 
     var body: some View {
         NavigationStack {
             Form {
                 Section {
+                    VStack(alignment: .leading, spacing: 8) {
+                        HStack {
+                            Text("Portrait notes width")
+                            Spacer()
+                            Text("\(Int(preferences.keyScratchNoteWidth * 100))%")
+                                .monospacedDigit().foregroundStyle(.secondary)
+                        }
+                        Slider(value: $preferences.keyScratchNoteWidth, in: 0.18...0.42, step: 0.02)
+                            .accessibilityLabel("Portrait notes width")
+                    }
+                    Toggle("Put keyboard on the left", isOn: $preferences.leftHandedLayout)
+                        .accessibilityIdentifier("left-handed-keyboard-layout")
+                } header: {
+                    Label("Placement", systemImage: "rectangle.split.2x1")
+                } footer: {
+                    Text("In landscape, the notes use the available space beside a compact keyboard. In portrait, adjust their share here.")
+                }
+
+                Section {
                     HStack {
-                        Text("Notes width in portrait")
+                        Text("Text size")
                         Spacer()
-                        Text("\(Int(draft.keyScratchNoteWidth * 100))%")
+                        Text("\(Int(preferences.keyScratchNoteFontSize)) pt")
                             .monospacedDigit().foregroundStyle(.secondary)
                     }
-                    Slider(value: $draft.keyScratchNoteWidth, in: 0.18...0.42, step: 0.02)
-                        .accessibilityLabel("Portrait notes width")
-                    HStack {
-                        Text("Note text size")
-                        Spacer()
-                        Text("\(Int(draft.keyScratchNoteFontSize)) pt")
-                            .monospacedDigit().foregroundStyle(.secondary)
-                    }
-                    Slider(value: $draft.keyScratchNoteFontSize, in: 9...16, step: 1)
-                    Picker("Note typeface", selection: $draft.keyScratchNoteFont) {
+                    Slider(value: $preferences.keyScratchNoteFontSize, in: 9...16, step: 1)
+                        .accessibilityLabel("Scratchpad text size")
+                    Picker("Typeface", selection: $preferences.keyScratchNoteFont) {
                         ForEach(KeyScratchNoteFont.allCases) { font in
                             Text(font.title).tag(font)
                         }
                     }
-                    Toggle("Left-handed layout", isOn: $draft.leftHandedLayout)
-                        .accessibilityIdentifier("left-handed-keyboard-layout")
-                    Picker("Scratchpad appearance", selection: $draft.scratchpadVisualStyle) {
+                    Picker("Note surface", selection: $preferences.scratchpadVisualStyle) {
                         ForEach(ScratchpadVisualStyle.allCases) { style in
                             Text(style.title).tag(style)
                         }
                     }
                     .accessibilityIdentifier("scratchpad-visual-style")
-                    if draft.scratchpadVisualStyle != .standard {
-                        Text("KEY SCRATCH / FIELD NOTES\nThe universe is still there. ✓")
-                            .font(.custom("CourierNewPSMT", size: 12))
-                            .foregroundStyle(terminalInk)
-                            .frame(maxWidth: .infinity, minHeight: 74, alignment: .leading)
-                            .padding(.horizontal, 12)
-                            .background(terminalGlass, in: RoundedRectangle(cornerRadius: 7))
-                            .overlay {
-                                RoundedRectangle(cornerRadius: 7)
-                                    .strokeBorder(terminalInk.opacity(0.32), lineWidth: 0.7)
-                            }
-                            .accessibilityLabel("Preview of terminal scratchpad appearance")
-                    }
+                    Text("A quick note, a useful address, or a line of symbols.")
+                        .font(.system(size: CGFloat(preferences.keyScratchNoteFontSize) + 2,
+                                      design: .monospaced))
+                        .foregroundStyle(preferences.scratchpadVisualStyle == .standard
+                                         ? Color.primary : CompanionStyle.accent)
+                        .padding(12)
+                        .frame(maxWidth: .infinity, minHeight: 56, alignment: .leading)
+                        .background(CompanionStyle.card,
+                                    in: RoundedRectangle(cornerRadius: 10))
                 } header: {
-                    Text("Scratchpad")
+                    Label("Note appearance", systemImage: "textformat")
                 } footer: {
-                    Text("Standard: notes left, keys right. Left-handed: keys left, notes right, in portrait and landscape. Terminal styles adapt the green, amber and composite-television visuals of Temporarily Leave the Universe without running a web browser.")
-                }
-
-                Section {
-                    adjustment("Letter row", value: $draft.keyHeight, bounds: 36...88)
-                    adjustment("Control row", value: $draft.controlHeight, bounds: 36...72)
-                    adjustment("Row spacing", value: $draft.rowSpacing, bounds: 0...12)
-                    adjustment("Column spacing", value: $draft.columnSpacing, bounds: 0...8)
-                } header: {
-                    Text("Keyboard size")
-                } footer: {
-                    Text("Landscape uses shorter keys and tighter gaps automatically. The entire area between visible keys remains tappable while Fill Gaps is enabled.")
-                }
-
-                Section("Layout") {
-                    Toggle("iPhone key positions", isOn: $draft.iphoneKeyPositions)
-                    Toggle("Fill invisible key gaps", isOn: $draft.fillGaps)
-                    Toggle("Show tiny key hints", isOn: $draft.showLongPressHints)
+                    Text("These choices change the small scratchpad inside the keyboard, not the full-size editor here.")
                 }
 
                 Section {
                     HStack {
-                        Text("Your favorites")
+                        Text("Custom pairs")
                         Spacer()
-                        Text("\(draft.favoriteSymbols.count)/48")
-                            .monospacedDigit()
-                            .foregroundStyle(.secondary)
+                        Text("\(preferences.customWrappers.count)/12")
+                            .monospacedDigit().foregroundStyle(.secondary)
                     }
-                    if draft.favoriteSymbols.isEmpty {
-                        Text("No favorites yet. Add them from the symbol browser or iPhone's emoji keyboard.")
-                            .font(.subheadline)
-                            .foregroundStyle(.secondary)
-                    } else {
-                        ScrollView(.horizontal, showsIndicators: false) {
-                            HStack(spacing: 7) {
-                                ForEach(draft.favoriteSymbols.indices, id: \.self) { index in
-                                    Text(draft.favoriteSymbols[index])
-                                        .font(.system(size: 22))
-                                        .frame(minWidth: 38, minHeight: 38)
-                                        .background(Color.secondary.opacity(0.10),
-                                                    in: RoundedRectangle(cornerRadius: 7))
-                                }
-                            }
-                        }
-                    }
-                    Button {
-                        showSymbolPicker = true
-                    } label: {
-                        Label("Browse & manage favorites", systemImage: "square.grid.3x3")
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                    }
-                    .accessibilityIdentifier("browse-favorite-symbols")
-                } header: {
-                    Text("Favorite emoji & Unicode")
-                } footer: {
-                    Text("Browse hundreds of emoji and Unicode characters, search by name, or enter characters with the standard iPhone emoji keyboard. Tap Apply and test afterward.")
-                }
-
-                Section {
-                    ForEach(draft.customWrappers.indices, id: \.self) { index in
-                        HStack {
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text(draft.customWrappers[index].name)
-                                Text(draft.customWrappers[index].opening + " text " + draft.customWrappers[index].closing)
-                                    .font(.caption.monospaced()).foregroundStyle(.secondary)
+                    ForEach(preferences.customWrappers.indices, id: \.self) { index in
+                        HStack(spacing: 12) {
+                            VStack(alignment: .leading, spacing: 3) {
+                                Text(preferences.customWrappers[index].name)
+                                    .font(.body.weight(.medium))
+                                Text(preferences.customWrappers[index].opening + " text "
+                                     + preferences.customWrappers[index].closing)
+                                    .font(.footnote.monospaced())
+                                    .foregroundStyle(.secondary)
                             }
                             Spacer()
                             Button(role: .destructive) {
-                                draft.customWrappers.remove(at: index)
+                                preferences.customWrappers.remove(at: index)
                             } label: {
                                 Image(systemName: "minus.circle")
                             }
-                            .accessibilityLabel("Remove " + draft.customWrappers[index].name)
+                            .accessibilityLabel("Remove " + preferences.customWrappers[index].name)
                         }
                     }
-                    TextField("Name (for example, Spoiler)", text: $wrapperName)
+                    TextField("Name, for example Spoiler", text: $pairName)
                         .textInputAutocapitalization(.words)
-                    HStack {
-                        TextField("Opening text", text: $wrapperOpening)
+                    HStack(spacing: 12) {
+                        TextField("Before", text: $opening)
                             .textInputAutocapitalization(.never).autocorrectionDisabled()
-                        TextField("Closing text", text: $wrapperClosing)
+                        TextField("After", text: $closing)
                             .textInputAutocapitalization(.never).autocorrectionDisabled()
                     }
                     Button {
-                        let pair = SelectionWrapper(wrapperName.trimmingCharacters(in: .whitespacesAndNewlines),
-                                                    wrapperOpening, wrapperClosing)
-                        guard pair.isUsable, draft.customWrappers.count < 12,
-                              !draft.customWrappers.contains(where: {
-                                  $0.opening == pair.opening && $0.closing == pair.closing
-                              }) else { return }
-                        draft.customWrappers.append(pair)
-                        wrapperName = ""
-                        wrapperOpening = ""
-                        wrapperClosing = ""
+                        guard canAddPair else { return }
+                        preferences.customWrappers.append(prospectivePair)
+                        pairName = ""
+                        opening = ""
+                        closing = ""
                     } label: {
-                        Label("Add delimiter pair", systemImage: "plus.circle")
+                        Label("Add Surround pair", systemImage: "plus.circle.fill")
                     }
-                    .disabled(!SelectionWrapper(wrapperName.trimmingCharacters(in: .whitespacesAndNewlines),
-                                                wrapperOpening, wrapperClosing).isUsable
-                              || draft.customWrappers.count >= 12)
+                    .disabled(!canAddPair)
+                    .accessibilityIdentifier("add-surround-pair")
                 } header: {
-                    Text("Surround selected text")
+                    Label("Surround text", systemImage: "curlybraces")
                 } footer: {
-                    Text("The suggestion-row ⋯ menu offers Surround selection with quotes, brackets, asterisks and up to 12 custom pairs. Changes take effect after Apply and test.")
+                    Text("The keyboard's ⋯ menu has quotes, brackets and Markdown marks. Add personal opening and closing text here. Tap a pair in Surround selection to enclose selected text.")
                 }
 
-                Section("Clipboard access") {
-                    Text("Allow Full Access enables Copy and Paste in the keyboard and lets the containing app share your local scratchpad. Key Scratch does not transmit your text.")
-                        .font(.caption).foregroundStyle(.secondary)
+                Section {
+                    Label("Pages and pictures live in Notes.", systemImage: "note.text")
+                    Text("Copy and Paste in the keyboard require its optional Full Access permission. You do not need it to type.")
+                        .foregroundStyle(.secondary)
                     Button {
-                        if let url = URL(string: UIApplication.openSettingsURLString) {
-                            UIApplication.shared.open(url)
-                        }
+                        guard let url = URL(string: UIApplication.openSettingsURLString) else { return }
+                        UIApplication.shared.open(url)
                     } label: {
-                        Label("Open iOS Settings", systemImage: "gear")
+                        Label("Open iPhone Settings", systemImage: "gearshape")
                     }
-                    Text("General → Keyboard → Keyboards → Key Scratch → Allow Full Access")
-                        .font(.caption).foregroundStyle(.secondary)
-                }
-
-                Section("Try it immediately") {
-                    Button {
-                        let next = PreferenceStore.normalized(draft)
-                        do {
-                            try KeyboardPublisher.publish(next)
-                            preferences = next
-                            status = "Applied. Switch away from Key Scratch and back with the globe to reload."
-                            testing = true
-                        } catch {
-                            status = "Settings could not be shared. Check App Group signing."
-                        }
-                    } label: {
-                        Label("Apply and test", systemImage: "checkmark.circle")
-                            .fontWeight(.semibold)
-                            .frame(maxWidth: .infinity)
-                    }
-                    .buttonStyle(.borderedProminent)
-                    .accessibilityIdentifier("apply-key-scratch-layout")
-
-                    Button {
-                        let setup = PreferenceStore.normalized(draft)
-                        UIPasteboard.general.string = [
-                            "Key Scratch layout",
-                            "Portrait notes: \(Int(setup.keyScratchNoteWidth * 100))%",
-                            "Landscape: compact keyboard right, notes fill remainder",
-                            "Note: \(setup.keyScratchNoteFont.title), \(Int(setup.keyScratchNoteFontSize)) pt",
-                            "Left-handed: \(setup.leftHandedLayout)",
-                            "Scratchpad appearance: \(setup.scratchpadVisualStyle.title)",
-                            "Letters: \(Int(setup.keyHeight)) pt; controls: \(Int(setup.controlHeight)) pt",
-                            "Gaps: \(Int(setup.rowSpacing)) pt rows, \(Int(setup.columnSpacing)) pt columns",
-                            "Fill gaps: \(setup.fillGaps); hints: \(setup.showLongPressHints)"
-                        ].joined(separator: "\n")
-                        status = "Settings copied."
-                    } label: {
-                        Label("Copy settings", systemImage: "doc.on.doc")
-                    }
-                    Text(status).font(.caption).foregroundStyle(.secondary)
-                    TextEditor(text: $testText)
-                        .focused($testing)
-                        .frame(height: 100)
-                        .accessibilityIdentifier("layout-test-text-editor")
-                    Text("This uses the installed keyboard, not a mockup.")
-                        .font(.caption).foregroundStyle(.secondary)
+                } header: {
+                    Text("Device access")
                 }
             }
-            .navigationTitle("Scratchpad & layout")
+            .scrollContentBackground(.hidden)
+            .background(CompanionStyle.background)
+            .navigationTitle("Scratchpad options")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Close") { dismiss() }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Done") { dismiss() }
                 }
             }
         }
-        .tint(accent)
-        .sheet(isPresented: $showSymbolPicker) {
-            FavoriteSymbolPicker(favorites: $draft.favoriteSymbols)
-        }
-    }
-
-    private var terminalInk: Color {
-        switch draft.scratchpadVisualStyle {
-        case .standard: .primary
-        case .phosphorGreen: Color(red: 0.47, green: 0.94, blue: 0.44)
-        case .amber: Color(red: 1, green: 0.73, blue: 0.22)
-        case .composite: Color(white: 0.95)
-        }
-    }
-
-    private var terminalGlass: Color {
-        switch draft.scratchpadVisualStyle {
-        case .standard: .clear
-        case .phosphorGreen: Color(red: 0.004, green: 0.016, blue: 0.004)
-        case .amber: Color(red: 0.016, green: 0.008, blue: 0)
-        case .composite: Color(red: 0.008, green: 0.008, blue: 0.016)
-        }
-    }
-
-    private func adjustment(_ title: String, value: Binding<Double>,
-                            bounds: ClosedRange<Double>) -> some View {
-        VStack(alignment: .leading, spacing: 4) {
-            HStack {
-                Text(title)
-                Spacer()
-                Text("\(Int(value.wrappedValue)) pt")
-                    .monospacedDigit().foregroundStyle(.secondary)
-            }
-            Slider(value: value, in: bounds, step: 1)
-                .accessibilityLabel(title)
-        }
+        .tint(CompanionStyle.accent)
     }
 }
-
 
 /// Full-size companion editor of the *same pages* as the keyboard extension.
 /// App Group storage is the source of truth. Text changes save only the
 /// selected page, preserving any edits to the other pages.
 private struct KeyScratchFullNotes: View {
+    var embedded = false
     @Environment(\.dismiss) private var dismiss
     @State private var notebook = ScratchpadNotebook.initial(legacy: "")
     @State private var note = ""
@@ -1044,15 +922,16 @@ private struct KeyScratchFullNotes: View {
             VStack(alignment: .leading, spacing: 12) {
                 HStack(alignment: .firstTextBaseline) {
                     VStack(alignment: .leading, spacing: 4) {
-                        Text("YOUR SCRATCHPAD")
-                            .font(.system(size: 10, weight: .semibold, design: .monospaced))
-                            .tracking(1.2).foregroundStyle(CompanionStyle.accent)
-                        Text("Pages")
-                            .font(.system(size: 27, weight: .semibold, design: .serif))
+                        Text("KEY SCRATCH / NOTES")
+                            .font(.system(size: 10, weight: .bold, design: .monospaced))
+                            .tracking(1.6).foregroundStyle(CompanionStyle.accent)
+                        Text("Scratchpad")
+                            .font(.system(size: 27, weight: .semibold, design: .rounded))
                     }
                     Spacer()
-                    Label("Saved locally", systemImage: "checkmark.circle")
-                        .font(.system(size: 11, weight: .medium))
+                    Label(loaded ? "Stored on this iPhone" : "Waiting for first use",
+                          systemImage: loaded ? "checkmark.circle" : "clock")
+                        .font(.system(size: 10, weight: .medium))
                         .foregroundStyle(.secondary)
                 }
 
@@ -1205,10 +1084,12 @@ private struct KeyScratchFullNotes: View {
             }
             .padding(16)
             .background(CompanionStyle.background)
-            .navigationTitle("Scratchpad")
+            .navigationTitle("Notes")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() } }
+                if !embedded {
+                    ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() } }
+                }
             }
         }
         .onChange(of: pickedPhotos) { _, selection in
@@ -1429,6 +1310,7 @@ private struct KeyScratchFullNotes: View {
 
 private struct FavoriteSymbolPicker: View {
     @Environment(\.dismiss) private var dismiss
+    var embedded = false
     @Binding var favorites: [String]
     @State private var group = "All"
     @State private var query = ""
@@ -1454,11 +1336,11 @@ private struct FavoriteSymbolPicker: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 17) {
                     VStack(alignment: .leading, spacing: 4) {
-                        Text("YOUR CHARACTER SHELF")
-                            .font(.system(size: 10, weight: .semibold, design: .monospaced))
-                            .tracking(1.2).foregroundStyle(CompanionStyle.accent)
-                        Text("A place for useful characters.")
-                            .font(.system(size: 25, weight: .semibold, design: .serif))
+                        Text("KEY SCRATCH / CHARACTERS")
+                            .font(.system(size: 10, weight: .bold, design: .monospaced))
+                            .tracking(1.6).foregroundStyle(CompanionStyle.accent)
+                        Text("Pin what you actually use.")
+                            .font(.system(size: 23, weight: .semibold, design: .rounded))
                     }
                     HStack {
                         Text("Pinned to ★")
@@ -1589,8 +1471,10 @@ private struct FavoriteSymbolPicker: View {
             .navigationTitle("Characters")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("Done") { dismiss() }
+                if !embedded {
+                    ToolbarItem(placement: .confirmationAction) {
+                        Button("Done") { dismiss() }
+                    }
                 }
             }
             .confirmationDialog("Clear all favorite symbols?", isPresented: $confirmClear) {
