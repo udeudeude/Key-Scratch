@@ -2,6 +2,13 @@
 
 A custom iPhone keyboard with an always-visible, editable scratchpad. Built from the open-source **Ortholinear** keyboard, retaining its swipe recognition, optional languages, and local-first design.
 
+The companion app opens directly to **Notes**, with two additional permanent
+workspaces: **Characters** for the ★ shelf and **Keyboard** for the live
+test drive, setup, and configuration. Scratchpad preferences now control only
+the note pane, appearance and personal Surround pairs. Detailed letter
+geometry remains in Keyboard settings; the old landing-page marketing and
+duplicate experimental controls have been removed.
+
 ## Features
 
 - A compact iOS-style typing area beside **persistent, independent scratchpad pages** (three to start, up to eight). The keyboard shows three compact permanent tabs and no + button. Existing optional extra pages remain accessible through an overflow menu; the companion app offers full-size page editing and page management. Original single-page notes migrate intact to Page 1.

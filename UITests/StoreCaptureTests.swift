@@ -19,7 +19,7 @@ final class StoreCaptureTests: XCTestCase {
     @MainActor
     private func launch() -> XCUIApplication {
         let app = XCUIApplication()
-        app.launchArguments = ["-no-keyboard-tips"]
+        app.launchArguments = ["-no-keyboard-tips", "-keyboard-workspace-ui-test"]
         app.launch()
         XCUIDevice.shared.orientation = .portrait
         XCTAssertTrue(app.buttons["clear-preview"].waitForExistence(timeout: 10))
@@ -95,7 +95,7 @@ final class StoreCaptureTests: XCTestCase {
                 .press(forDuration: 0.05, thenDragTo: app.coordinate(withNormalizedOffset: CGVector(dx: 0.975, dy: 0.75)))
         }
         button.tap()
-        XCTAssertTrue(app.navigationBars["Meet your new keyboard"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.navigationBars["Set up Key Scratch"].waitForExistence(timeout: 5))
         try save("private")
     }
 

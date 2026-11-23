@@ -1,10 +1,42 @@
 import XCTest
 
 final class KeyboardUITests: XCTestCase {
+    /// The companion now starts in Notes. The test driver explicitly chooses
+    /// Keyboard, instead of relying on a preview-centered marketing home.
+    @MainActor
+    func testCompanionWorkspacesLeadWithNotes() throws {
+        let app = XCUIApplication()
+        app.launchArguments = ["-no-keyboard-tips"]
+        app.launch()
+        XCUIDevice.shared.orientation = .portrait
+        let tabs = app.tabBars.firstMatch
+        XCTAssertTrue(tabs.buttons["Notes"].waitForExistence(timeout: 8))
+        XCTAssertTrue(tabs.buttons["Characters"].exists)
+        XCTAssertTrue(tabs.buttons["Keyboard"].exists)
+        XCTAssertTrue(app.staticTexts["Scratchpad"].waitForExistence(timeout: 5))
+        XCTAssertFalse(app.buttons["clear-preview"].isHittable)
+
+        tabs.buttons["Characters"].tap()
+        XCTAssertTrue(app.textFields["search-unicode-catalog"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["Favorites on ★"].exists)
+
+        tabs.buttons["Keyboard"].tap()
+        XCTAssertTrue(app.buttons["clear-preview"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons["customize-keyboard"].exists)
+        XCTAssertTrue(app.buttons["key-scratch-layout-settings"].exists)
+        app.buttons["key-scratch-layout-settings"].tap()
+        XCTAssertTrue(app.navigationBars["Scratchpad options"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons["add-surround-pair"].exists)
+        app.buttons["Done"].tap()
+        tabs.buttons["Notes"].tap()
+        XCTAssertTrue(app.staticTexts["Scratchpad"].waitForExistence(timeout: 5))
+    }
+
     @MainActor
     func testSuggestionOnlyTypingTeachingAndSettings() throws {
         let app = XCUIApplication()
-        app.launchArguments = ["-suggestion-ui-tests", "-no-auto-capitals", "-no-keyboard-tips"]
+        app.launchArguments = ["-suggestion-ui-tests", "-no-auto-capitals", "-no-keyboard-tips",
+                               "-keyboard-workspace-ui-test"]
         app.launch()
         XCUIDevice.shared.orientation = .portrait
         app.buttons["clear-preview"].tap()
@@ -93,7 +125,7 @@ final class KeyboardUITests: XCTestCase {
         let form = app.collectionViews["appearance-controls"]
         func reveal(_ element: XCUIElement, down fallback: Bool = true) {
             for _ in 0..<18 {
-                let top = app.navigationBars["Theme and colors"].frame.maxY + 10
+                let top = app.navigationBars["Appearance"].frame.maxY + 10
                 if element.exists && element.frame.minY > top && element.frame.maxY < form.frame.maxY - 10 { return }
                 let down = element.exists ? element.frame.midY > (top + form.frame.maxY) / 2 : fallback
                 form.coordinate(withNormalizedOffset: CGVector(dx: 0.97, dy: down ? 0.8 : 0.5))
@@ -358,7 +390,8 @@ final class KeyboardUITests: XCTestCase {
     private func launchApp(landscape: Bool = false, arguments: [String] = ["-no-auto-capitals", "-no-keyboard-tips"]) -> XCUIApplication {
         let app = XCUIApplication()
         // Custom layouts and extras from other test runs would change the keys these tests expect.
-        app.launchArguments = arguments + ["-reset-custom-layouts", "-reset-extras"]
+        app.launchArguments = arguments + ["-reset-custom-layouts", "-reset-extras",
+                                           "-keyboard-workspace-ui-test"]
         app.launch()
         XCUIDevice.shared.orientation = landscape ? .landscapeLeft : .portrait
         let orientation = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
@@ -582,7 +615,7 @@ final class KeyboardUITests: XCTestCase {
         XCTAssertEqual(app.switches["show-punctuation"].value as? String, "0")
         app.buttons["Done"].tap()
         tapMainButton("enable-keyboard", in: app)
-        XCTAssertTrue(app.navigationBars["Meet your new keyboard"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.navigationBars["Set up Key Scratch"].waitForExistence(timeout: 5))
         app.buttons["Done"].tap()
     }
 
@@ -601,7 +634,7 @@ final class KeyboardUITests: XCTestCase {
         app.buttons["key-Delete"].press(forDuration: 1.1)
         XCTAssertLessThan((editor.value as? String ?? "").count, 8)
         let attachment = XCTAttachment(screenshot: app.screenshot())
-        attachment.name = "Ortholinear preview"
+        attachment.name = "Key Scratch studio"
         attachment.lifetime = .keepAlways
         add(attachment)
     }

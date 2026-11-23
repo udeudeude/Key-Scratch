@@ -8,7 +8,8 @@ final class WorkshopUITests: XCTestCase {
     @MainActor
     func testSwapApplyTypeAndReturnToBuiltIn() throws {
         let app = XCUIApplication()
-        app.launchArguments = ["-no-auto-capitals", "-no-keyboard-tips", "-reset-custom-layouts"]
+        app.launchArguments = ["-no-auto-capitals", "-no-keyboard-tips", "-reset-custom-layouts",
+                               "-keyboard-workspace-ui-test"]
         app.launch()
         XCUIDevice.shared.orientation = .portrait
         let editor = app.textViews["preview-editor"]
