@@ -436,8 +436,14 @@ final class KeyboardCoreTests: XCTestCase {
     }
 
     func testSelectionWrappersPreserveTextAndMigrateExistingPreferences() throws {
-        XCTAssertEqual(SelectionWrapper.builtIn.first?.wrap("hi"), "“hi”")
-        XCTAssertEqual(SelectionWrapper.builtIn.first { $0.name == "Double asterisks" }?.wrap("hi"), "**hi**")
+        XCTAssertEqual(Array(SelectionWrapper.builtIn.prefix(7).map(\.name)), [
+            "Straight quotes", "Straight single quotes", "Asterisks",
+            "Double asterisks", "Parentheses", "Square brackets", "Braces"
+        ])
+        XCTAssertEqual(Array(SelectionWrapper.builtIn.prefix(7).map { $0.wrap("hi") }), [
+            "\"hi\"", "'hi'", "*hi*", "**hi**", "(hi)", "[hi]", "{hi}"
+        ])
+        XCTAssertEqual(SelectionWrapper.builtIn.first { $0.name == "Double quotes" }?.wrap("hi"), "“hi”")
         var prefs = KeyboardPreferences()
         prefs.customWrappers = [
             .init("Spoiler", "||", "||"),
