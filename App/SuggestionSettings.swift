@@ -28,8 +28,15 @@ struct SuggestionSettings: View {
             }
             Section("Teach it your words") {
                 Label("Type a word, then tap ⋯ in the suggestion row and choose Teach.", systemImage: "plus.circle")
-                Text("The same menu lets you forget a word or clear the list for the current language. Up to 200 words per language.")
+                Text("The same menu lets you forget a taught word or clear that list for the current language. Up to 200 taught words per language.")
                 Text("The system keyboard also offers your text replacements and contact names from iOS. Words taught in the system keyboard stay there. The app preview has its own word list. Neither list needs Full Access or leaves your device.")
+                    .foregroundStyle(.secondary)
+            }
+            Section("Hide dictionary words") {
+                Label("Tap ⋯, then Hide suggested word to remove a displayed suggestion, or Hide the word under your cursor.", systemImage: "eye.slash")
+                Text("Restore hidden word in the same menu undoes a personal removal. You can hide up to 200 words per language. Common vulgar words are already excluded from English and Ukrainian predictions.")
+                    .foregroundStyle(.secondary)
+                Text("This only changes Key Scratch suggestions, including swipe predictions. It never deletes typed text or changes Apple's keyboard dictionary. Explicitly teaching a word opts it back in.")
                     .foregroundStyle(.secondary)
             }
             Section {

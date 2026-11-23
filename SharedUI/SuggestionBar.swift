@@ -341,7 +341,7 @@ private actor SuggestionWorker {
                 words = [WordSuggestion(word: cased, kind: .correction, language: alternate)] + words.prefix(2)
             }
         }
-        words = supplementary.merged(into: words, target: target, language: snapshot.language)
+        words = supplementary.merged(into: words, target: target, language: snapshot.language, hidden: hidden)
         var response = SuggestionResponse(words: words)
         #if DEBUG
         timings.append((Date.timeIntervalSinceReferenceDate - began) * 1000)
@@ -582,7 +582,7 @@ final class SuggestionCoordinator {
                 let words = current.target.map {
                     supplementary.merged(into: SystemSuggestions.suggest(target: $0, language: current.language, learned: learned,
                                               geometry: geometry, hidden: Set(hidden)),
-                                         target: $0, language: current.language)
+                                         target: $0, language: current.language, hidden: Set(hidden))
                 } ?? []
                 self.offered = current
                 keyboard.suggestionBar.show(words, word: teachable, learned: learned, tip: tip, hidden: hidden)

@@ -43,6 +43,13 @@ final class SuggestionTests: XCTestCase {
         XCTAssertTrue(words.merged(into: [], target: french, language: .french)
             .contains(WordSuggestion(word: "Marie", kind: .completion)))
 
+        XCTAssertFalse(words.merged(into: [], target: french, language: .french,
+                                    hidden: ["marie"]).contains { $0.word == "Marie" },
+                       "A personally hidden contact suggestion must stay hidden")
+        XCTAssertEqual(words.merged(into: [], target: shortcut, language: .french,
+                                    hidden: ["marie"]).first?.kind, .replacement,
+                       "Explicit personal text replacements are never blocked")
+
         let ukrainian = try XCTUnwrap(snapshot("mar", language: .ukrainian).target)
         XCTAssertFalse(words.merged(into: [], target: ukrainian, language: .ukrainian)
             .contains { $0.word == "Marie" })
