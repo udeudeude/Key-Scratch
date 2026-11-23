@@ -436,14 +436,15 @@ final class KeyboardCoreTests: XCTestCase {
     }
 
     func testSelectionWrappersPreserveTextAndMigrateExistingPreferences() throws {
-        XCTAssertEqual(Array(SelectionWrapper.builtIn.prefix(7).map(\.name)), [
-            "Straight quotes", "Straight single quotes", "Asterisks",
-            "Double asterisks", "Parentheses", "Square brackets", "Braces"
+        XCTAssertEqual(Array(SelectionWrapper.builtIn.prefix(9).map(\.name)), [
+            "Double quotes", "Single quotes", "Asterisks",
+            "Double asterisks", "Parentheses", "Square brackets", "Braces",
+            "Straight quotes", "Straight single quotes"
         ])
-        XCTAssertEqual(Array(SelectionWrapper.builtIn.prefix(7).map { $0.wrap("hi") }), [
-            "\"hi\"", "'hi'", "*hi*", "**hi**", "(hi)", "[hi]", "{hi}"
+        XCTAssertEqual(Array(SelectionWrapper.builtIn.prefix(9).map { $0.wrap("hi") }), [
+            "“hi”", "‘hi’", "*hi*", "**hi**", "(hi)", "[hi]", "{hi}",
+            "\"hi\"", "'hi'"
         ])
-        XCTAssertEqual(SelectionWrapper.builtIn.first { $0.name == "Double quotes" }?.wrap("hi"), "“hi”")
         // UIKit positions count UTF-16 code units rather than grapheme clusters.
         // A multi-code-point custom delimiter must leave the caret inside the pair.
         let emojiPair = SelectionWrapper("Family", "🧪", "👨‍👩‍👧‍👦")

@@ -836,15 +836,15 @@ struct SelectionWrapper: Codable, Equatable, Hashable, Sendable {
     static let builtIn: [Self] = [
         // Keep the most frequently used text/Markdown pairs at the top
         // of the suggestion-row ⋯ → Surround selection submenu.
-        .init("Straight quotes", "\"", "\""),
-        .init("Straight single quotes", "'", "'"),
+        .init("Double quotes", "“", "”"),
+        .init("Single quotes", "‘", "’"),
         .init("Asterisks", "*", "*"),
         .init("Double asterisks", "**", "**"),
         .init("Parentheses", "(", ")"),
         .init("Square brackets", "[", "]"),
         .init("Braces", "{", "}"),
-        .init("Double quotes", "“", "”"),
-        .init("Single quotes", "‘", "’"),
+        .init("Straight quotes", "\"", "\""),
+        .init("Straight single quotes", "'", "'"),
         .init("Angle brackets", "<", ">"),
         .init("Backticks", "`", "`"),
         .init("Tildes", "~", "~"),
