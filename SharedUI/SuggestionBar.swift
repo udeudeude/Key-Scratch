@@ -26,6 +26,8 @@ final class SuggestionBar: UIView {
         didSet { if oldValue != wrappers { rebuildWrapMenu() } }
     }
     private var cachedWrapMenu: UIMenu?
+    private var cachedHiddenWords: [String] = []
+    private var cachedRestoreMenu: UIMenu?
     /// Shown between words, in stable positions, so a period is one tap away.
     var punctuation: [String] = [] {
         didSet { if oldValue != punctuation { rebuildPunctuation() } }
@@ -120,6 +122,23 @@ final class SuggestionBar: UIView {
                 [weak self] _ in self?.onWrap?(pair)
             }
         })
+    }
+
+    /// The menu can hold 200 words. Rebuild it only when the list changes,
+    /// rather than allocating hundreds of actions on every keystroke.
+    private func restoreMenu(for hidden: [String]) -> UIMenu? {
+        let sorted = hidden.sorted()
+        if sorted != cachedHiddenWords {
+            cachedHiddenWords = sorted
+            cachedRestoreMenu = sorted.isEmpty ? nil : UIMenu(
+                title: "Restore hidden word",
+                image: UIImage(systemName: "arrow.uturn.backward"),
+                children: sorted.map { word in
+                    UIAction(title: word) { [weak self] _ in self?.onRestore?(word) }
+                }
+            )
+        }
+        return cachedRestoreMenu
     }
 
     private func rebuildPunctuation() {
@@ -224,12 +243,8 @@ final class SuggestionBar: UIView {
                 }
             }))
         }
-        if !hidden.isEmpty {
-            actions.append(UIMenu(title: "Restore hidden word",
-                                  image: UIImage(systemName: "arrow.uturn.backward"),
-                                  children: hidden.sorted().map { word in
-                UIAction(title: word) { [weak self] _ in self?.onRestore?(word) }
-            }))
+        if let restoreMenu = restoreMenu(for: hidden) {
+            actions.append(restoreMenu)
             actions.append(UIMenu(title: "Clear hidden words…", children: [
                 UIAction(title: "Restore all personally hidden words", attributes: .destructive) {
                     [weak self] _ in self?.onClearHidden?()
@@ -316,7 +331,7 @@ private actor SuggestionWorker {
 
     func suggest(snapshot: SuggestionSnapshot, learned: [String], supplementary: SupplementaryWords, preferences: KeyboardPreferences, width: Double,
                  alternate: KeyboardLanguage?, hidden: Set<String>,
-                 alternateHidden: Set<String>) throws -> SuggestionResponse {
+                 alternateHidden: Set<String>, alternateLearned: [String]) throws -> SuggestionResponse {
         try Task.checkCancellation()
         let engine = try engine(snapshot.language)
         try Task.checkCancellation()
@@ -336,7 +351,8 @@ private actor SuggestionWorker {
             let other = try self.engine(alternate)
             let otherGeometry = SuggestionGeometry(language: alternate, preferences: preferences, width: width)
             if let word = LayoutRecovery.recover(target.word, from: geometry, to: otherGeometry, lexicon: other.lexicon),
-               !SuggestionExclusions.excluded(language: alternate, learned: [], hidden: alternateHidden).contains(word) {
+               !SuggestionExclusions.excluded(language: alternate, learned: alternateLearned,
+                                              hidden: alternateHidden).contains(word) {
                 let cased = SuggestionText.cased(word, like: target.word, language: alternate)
                 words = [WordSuggestion(word: cased, kind: .correction, language: alternate)] + words.prefix(2)
             }
@@ -591,12 +607,14 @@ final class SuggestionCoordinator {
         }
         let alternate = alternate(to: current.language, preferences: preferences)
         let alternateHidden = alternate.map { Set(HiddenWordStore.words($0)) } ?? []
+        let alternateLearned = alternate.map { TaughtWordStore.words($0) } ?? []
         task = Task { [weak self, worker] in
             do {
                 try await Task.sleep(for: .milliseconds(30))
                 let result = try await worker.suggest(snapshot: current, learned: learned, supplementary: supplementary,
                                                       preferences: preferences, width: width, alternate: alternate,
-                                                      hidden: Set(hidden), alternateHidden: alternateHidden)
+                                                      hidden: Set(hidden), alternateHidden: alternateHidden,
+                                                      alternateLearned: alternateLearned)
                 try Task.checkCancellation()
                 guard let self, token == self.generation, self.snapshot?() == current else { return }
                 self.offered = current
