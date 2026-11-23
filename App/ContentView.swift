@@ -890,6 +890,7 @@ private struct ScratchpadPreferences: View {
 /// selected page, preserving any edits to the other pages.
 private struct KeyScratchFullNotes: View {
     var embedded = false
+    init(embedded: Bool = false) { self.embedded = embedded }
     @Environment(\.dismiss) private var dismiss
     @State private var notebook = ScratchpadNotebook.initial(legacy: "")
     @State private var note = ""
@@ -903,6 +904,7 @@ private struct KeyScratchFullNotes: View {
     @State private var showImageRemovalConfirmation = false
     @State private var importingPhotos = false
     @State private var notice: String?
+    @State private var showNotesSetup = false
     @FocusState private var focused: Bool
 
     private var editableNote: Binding<String> {
@@ -1031,22 +1033,34 @@ private struct KeyScratchFullNotes: View {
                         .foregroundStyle(.secondary)
                 }
 
-                if !notebook.selectedPage.images.isEmpty {
-                    Text("Images are attached to this page, separately from its text.")
-                        .font(.caption).foregroundStyle(.secondary)
-                }
-
-                TextEditor(text: editableNote)
-                    .focused($focused)
-                    .font(.system(size: 17))
-                    .scrollContentBackground(.hidden)
-                    .padding(12)
+                if loaded {
+                    TextEditor(text: editableNote)
+                        .focused($focused)
+                        .font(.system(size: 17))
+                        .scrollContentBackground(.hidden)
+                        .padding(12)
+                        .background(CompanionStyle.card,
+                                    in: RoundedRectangle(cornerRadius: CompanionStyle.radius))
+                        .overlay(RoundedRectangle(cornerRadius: CompanionStyle.radius)
+                            .strokeBorder(CompanionStyle.line, lineWidth: 1))
+                        .accessibilityIdentifier("full-scratchpad-editor")
+                } else {
+                    VStack(alignment: .leading, spacing: 14) {
+                        Image(systemName: "note.text")
+                            .font(.system(size: 28, weight: .light))
+                            .foregroundStyle(CompanionStyle.accent)
+                        Text("Your notes will appear here")
+                            .font(.system(size: 21, weight: .semibold, design: .rounded))
+                        Text("Enable Key Scratch and open its keyboard once to finish bringing existing notes into the shared notebook.")
+                            .font(.subheadline).foregroundStyle(.secondary)
+                        Button("Set up the keyboard") { showNotesSetup = true }
+                            .buttonStyle(.borderedProminent)
+                    }
+                    .padding(24)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
                     .background(CompanionStyle.card,
                                 in: RoundedRectangle(cornerRadius: CompanionStyle.radius))
-                    .overlay(RoundedRectangle(cornerRadius: CompanionStyle.radius)
-                        .strokeBorder(CompanionStyle.line, lineWidth: 1))
-                    .accessibilityIdentifier("full-scratchpad-editor")
-                    .disabled(!loaded)
+                }
 
                 if let notice {
                     Text(notice).font(.caption).foregroundStyle(.secondary)
@@ -1079,8 +1093,10 @@ private struct KeyScratchFullNotes: View {
                 }
                 .buttonStyle(.bordered)
 
-                Text("Edits save to the selected local page. Use the standard text selection menu for Cut, Copy and Paste.")
-                    .font(.system(size: 11)).foregroundStyle(.secondary)
+                if loaded {
+                    Text("Each page stays on this device. Text and attached images are saved separately.")
+                        .font(.system(size: 11)).foregroundStyle(.secondary)
+                }
             }
             .padding(16)
             .background(CompanionStyle.background)
@@ -1092,6 +1108,7 @@ private struct KeyScratchFullNotes: View {
                 }
             }
         }
+        .sheet(isPresented: $showNotesSetup) { SetupView() }
         .onChange(of: pickedPhotos) { _, selection in
             guard !selection.isEmpty else { return }
             Task { @MainActor in await importPhotos(selection) }
@@ -1312,6 +1329,10 @@ private struct FavoriteSymbolPicker: View {
     @Environment(\.dismiss) private var dismiss
     var embedded = false
     @Binding var favorites: [String]
+    init(favorites: Binding<[String]>, embedded: Bool = false) {
+        _favorites = favorites
+        self.embedded = embedded
+    }
     @State private var group = "All"
     @State private var query = ""
     @State private var manual = ""
@@ -1343,7 +1364,7 @@ private struct FavoriteSymbolPicker: View {
                             .font(.system(size: 23, weight: .semibold, design: .rounded))
                     }
                     HStack {
-                        Text("Pinned to ★")
+                        Text("Favorites on ★")
                             .font(.system(size: 15, weight: .semibold))
                         Spacer()
                         Text("\(favorites.count)/48")
