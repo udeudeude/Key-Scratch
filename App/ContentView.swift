@@ -943,6 +943,7 @@ private struct KeyScratchFullNotes: View {
     @State private var importingPhotos = false
     @State private var notice: String?
     @State private var showNotesSetup = false
+    @State private var showCreateNotebook = false
     @FocusState private var focused: Bool
 
     private var editableNote: Binding<String> {
@@ -1091,8 +1092,10 @@ private struct KeyScratchFullNotes: View {
                             .font(.system(size: 21, weight: .semibold, design: .rounded))
                         Text("Enable Key Scratch and open its keyboard once to finish bringing existing notes into the shared notebook.")
                             .font(.subheadline).foregroundStyle(.secondary)
-                        Button("Set up the keyboard") { showNotesSetup = true }
+                        Button("Start a blank notebook") { showCreateNotebook = true }
                             .buttonStyle(.borderedProminent)
+                        Button("Set up the keyboard") { showNotesSetup = true }
+                            .buttonStyle(.bordered)
                     }
                     .padding(24)
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
@@ -1181,21 +1184,21 @@ private struct KeyScratchFullNotes: View {
                 }
             }
         }
-        .onAppear {
-            // Preserve any extension-only legacy note until the keyboard has
-            // migrated it. An empty editor must never overwrite old content.
-            if let shared = ScratchpadStore.loadNotebook() {
-                notebook = shared
-                note = shared.selectedPage.text
-                loaded = true
-            } else if let legacy = ScratchpadStore.load() {
-                notebook = ScratchpadStore.migrateNotebook(legacy: legacy)
-                note = notebook.selectedPage.text
-                loaded = true
-            } else {
-                loaded = false
-                notice = "Open the updated Key Scratch keyboard once to import your existing note, then reopen this editor."
-            }
+        .onAppear { reloadNotebook() }
+        .onReceive(NotificationCenter.default.publisher(
+            for: UIApplication.didBecomeActiveNotification
+        )) { _ in
+            // A return from another app may bring changes made in the keyboard.
+            // Never discard a draft that is being edited in this companion.
+            if !focused && !importingPhotos { reloadNotebook() }
+        }
+        .confirmationDialog("Start a blank notebook?",
+                            isPresented: $showCreateNotebook,
+                            titleVisibility: .visible) {
+            Button("Create blank notebook") { createNotebook() }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("If you have notes from an older Key Scratch keyboard, open that keyboard once to migrate them before creating a blank notebook.")
         }
         .confirmationDialog("Remove this image from the page?",
                             isPresented: $showImageRemovalConfirmation,
@@ -1235,6 +1238,45 @@ private struct KeyScratchFullNotes: View {
         } message: {
             Text("The entire current page will be deleted. Other pages remain.")
         }
+    }
+
+    private func reloadNotebook() {
+        // Avoid creating a notebook over an older extension-only local note.
+        // The keyboard can migrate that source the first time it is opened.
+        if let shared = ScratchpadStore.loadNotebook() {
+            notebook = shared
+            note = shared.selectedPage.text
+            loaded = true
+            notice = nil
+        } else if let legacy = ScratchpadStore.load() {
+            let migrated = ScratchpadStore.migrateNotebook(legacy: legacy)
+            notebook = migrated
+            note = migrated.selectedPage.text
+            loaded = true
+            notice = nil
+        } else {
+            loaded = false
+            notice = nil
+        }
+    }
+
+    private func createNotebook() {
+        if let existing = ScratchpadStore.loadNotebook() {
+            notebook = existing
+            note = existing.selectedPage.text
+            loaded = true
+            notice = nil
+            return
+        }
+        let initial = ScratchpadStore.migrateNotebook(legacy: ScratchpadStore.load())
+        guard ScratchpadStore.loadNotebook() != nil else {
+            notice = "Could not create the notebook. Check App Group signing."
+            return
+        }
+        notebook = initial
+        note = initial.selectedPage.text
+        loaded = true
+        notice = nil
     }
 
     /// Resize through ImageIO without ever decoding the original full-sized
