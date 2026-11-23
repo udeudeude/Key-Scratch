@@ -303,6 +303,9 @@ struct GeometrySettings: View {
 
     @State private var previewLanguage: KeyboardLanguage
     @State private var showAppearance = false
+    @State private var showResetConfirmation = false
+    @State private var showAdvanced =
+        ProcessInfo.processInfo.arguments.contains("-keyboard-workspace-ui-test")
     private enum SettingsPage: Hashable { case suggestions, languages, workshop }
     @State private var navigationPath: [SettingsPage] = []
 
@@ -346,6 +349,15 @@ struct GeometrySettings: View {
         .alert("Settings weren’t saved", isPresented: $saveError) {
             Button("OK", role: .cancel) { }
         } message: { Text("Please reopen settings and try again.") }
+        .confirmationDialog("Restore keyboard defaults?", isPresented: $showResetConfirmation,
+                            titleVisibility: .visible) {
+            Button("Restore keyboard settings", role: .destructive) {
+                restoreKeyboardDefaults()
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("Keyboard layout and typing options return to defaults. Your notes, favorite characters, custom Surround pairs and text expansions are preserved.")
+        }
     }
 
     private func livePreview(maxHeight: CGFloat) -> some View {
@@ -393,18 +405,6 @@ struct GeometrySettings: View {
 
     private var controls: some View {
         Form {
-            Section {
-                VStack(alignment: .leading, spacing: 5) {
-                    Text("MAKE IT YOURS")
-                        .font(.system(size: 10, weight: .semibold, design: .monospaced))
-                        .tracking(1.1).foregroundStyle(CompanionStyle.accent)
-                    Text("Arrange. Refine. Type.")
-                        .font(.system(size: 24, weight: .semibold, design: .serif))
-                    Text("Every change appears in the live preview. Your installed keyboard uses these same settings.")
-                        .font(.system(size: 12)).foregroundStyle(.secondary)
-                }
-                .padding(.vertical, 8)
-            }
             Section("Languages & layouts") {
                 NavigationLink(value: SettingsPage.languages) {
                     Label {
@@ -451,6 +451,27 @@ struct GeometrySettings: View {
                     } icon: { Image(systemName: "text.bubble") }
                 }.accessibilityIdentifier("suggestion-settings")
             }
+            Section {
+                Button {
+                    withAnimation(.easeInOut(duration: 0.18)) { showAdvanced.toggle() }
+                } label: {
+                    HStack(spacing: 12) {
+                        Image(systemName: "square.grid.3x3.topleft.filled")
+                            .font(.system(size: 18)).foregroundStyle(CompanionStyle.accent)
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text("Advanced key controls")
+                                .foregroundStyle(.primary).font(.body.weight(.semibold))
+                            Text("Presets, spacing, key placement and number access")
+                                .font(.caption).foregroundStyle(.secondary)
+                        }
+                        Spacer()
+                        Image(systemName: showAdvanced ? "chevron.up" : "chevron.down")
+                            .font(.caption.weight(.semibold)).foregroundStyle(.secondary)
+                    }
+                }
+                .accessibilityIdentifier("advanced-key-controls")
+            }
+            if showAdvanced {
             Section {
                 HStack(spacing: 6) {
                     ForEach(KeyboardPreset.allCases) { preset in
@@ -531,6 +552,7 @@ struct GeometrySettings: View {
             } header: { Label("Number access", systemImage: "number") } footer: {
                 Text(digitFooter)
             }
+            }
             Section {
                 Toggle("Capitalize sentences", isOn: $preferences.autoCapitalize)
                     .accessibilityIdentifier("auto-capitalize")
@@ -544,14 +566,30 @@ struct GeometrySettings: View {
                 Text("Capitals follow each text field, so email and web addresses stay lowercase. Automatic spacing adds a space after punctuation; apostrophes and numbers such as 3.14 stay together. For swipe typing, slide across a word and lift; suggestions appear above the keys. Hold Delete to gradually delete faster.")
             }
             Section {
-                Button("Reset to defaults") { preferences = KeyboardPreferences() }
+                Button("Restore keyboard defaults…", role: .destructive) {
+                    showResetConfirmation = true
+                }
+                .accessibilityIdentifier("restore-keyboard-defaults")
             } footer: {
-                Text("Settings save on this device. Dismiss and reopen the system keyboard to apply changes. Hold the ★ key to switch between enabled languages.")
+                Text("Changes save automatically. Switch to another keyboard and back to apply them in other apps.")
             }
         }
         .scrollContentBackground(.hidden)
         .background(CompanionStyle.background)
         .accessibilityIdentifier("geometry-controls")
+    }
+
+    private func restoreKeyboardDefaults() {
+        var restored = KeyboardPreferences()
+        restored.favoriteSymbols = preferences.favoriteSymbols
+        restored.customWrappers = preferences.customWrappers
+        restored.expansions = preferences.expansions
+        restored.keyScratchNoteWidth = preferences.keyScratchNoteWidth
+        restored.keyScratchNoteFontSize = preferences.keyScratchNoteFontSize
+        restored.keyScratchNoteFont = preferences.keyScratchNoteFont
+        restored.scratchpadVisualStyle = preferences.scratchpadVisualStyle
+        restored.leftHandedLayout = preferences.leftHandedLayout
+        preferences = restored.validated
     }
 
     private var digitFooter: String {
